@@ -118,6 +118,18 @@ namespace AdjustNamespace
                     return;
                 }
 
+                var componentModel = (IComponentModel)await ServiceProvider.GetServiceAsync(typeof(SComponentModel));
+                if (componentModel == null)
+                {
+                    return;
+                }
+
+                var workspace = componentModel.GetService<VisualStudioWorkspace>();
+                if (workspace == null)
+                {
+                    return;
+                }
+
                 if (dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
                 {
                     //var ad = dte.ActiveDocument;
@@ -130,25 +142,30 @@ namespace AdjustNamespace
                     {
                         foreach (UIHierarchyItem selItem in selectedItems)
                         {
-                            if (selItem.Object is SolutionClass solution)
+                            if ((selItem.Object as dynamic).ExtenderCATID == "{52AEFF70-BBD8-11d2-8598-006097C68E81}")
                             {
-                                //message += Environment.NewLine;
-                                //message += "solution " + solution.FullName;
+                                foreach (EnvDTE.Project prj in dte.Solution.Projects)
+                                {
+                                    foreach (ProjectItem prjItem in prj.ProjectItems)
+                                    {
+                                        filePaths.AddRange(ProcessProjectItem(workspace, prjItem));
+                                    }
+                                }
                             }
 
                             if (selItem.Object is EnvDTE.Project project)
                             {
-                                //message += Environment.NewLine;
-                                //message += "project " + project.Name;
+                                foreach (ProjectItem prjItem in project.ProjectItems)
+                                {
+                                    filePaths.AddRange(ProcessProjectItem(workspace, prjItem));
+                                }
                             }
 
-                            if (selItem.Object is ProjectItem prjItem)
+                            if (selItem.Object is ProjectItem projectItem)
                             {
-                                var filePath = prjItem.Properties.Item("FullPath").Value.ToString();
-                                filePaths.Add(filePath);
-
-                                //message += Environment.NewLine;
-                                //message += filePath;
+                                filePaths.AddRange(ProcessProjectItem(workspace, projectItem));
+                                //var filePath =  prjItem.Properties.Item("FullPath").Value.ToString();
+                                //filePaths.Add(filePath);
                             }
                         }
                     }
@@ -157,17 +174,6 @@ namespace AdjustNamespace
 
                 var filteredFilePaths = new List<string>();
 
-                var componentModel = (IComponentModel)await ServiceProvider.GetServiceAsync(typeof(SComponentModel));
-                if (componentModel == null)
-                {
-                    return;
-                }
-
-                var workspace = componentModel.GetService<VisualStudioWorkspace>();
-                if (workspace == null)
-                {
-                    return;
-                }
 
                 foreach (var filePath in filePaths)
                 {
@@ -232,6 +238,54 @@ namespace AdjustNamespace
             {
                 Logging.LogVS(excp);
             }
+        }
+
+        private static List<string> ProcessProjectItem(
+            VisualStudioWorkspace workspace,
+            ProjectItem projectItem
+            )
+        {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
+
+            if (projectItem is null)
+            {
+                throw new ArgumentNullException(nameof(projectItem));
+            }
+
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            var result = new List<string>();
+
+            for (var i = 0; i < projectItem.FileCount; i++)
+            {
+                var itemPath = projectItem.FileNames[(short)i];
+
+                if (Directory.Exists(itemPath))
+                {
+                    var filePaths = Directory.GetFiles(itemPath, "*.*", SearchOption.AllDirectories);
+
+                    foreach (var filePath in filePaths)
+                    {
+                        //if (workspace.GetDocument(filePath) != null)
+                        {
+                            result.Add(filePath);
+                        }
+                    }
+
+                }
+                else if (File.Exists(itemPath))
+                {
+                    //if (workspace.GetDocument(itemPath) != null)
+                    {
+                        result.Add(itemPath);
+                    }
+                }
+            }
+
+            return result;
         }
 
         //private void ShowError(string errorMessage)
