@@ -31,6 +31,11 @@ namespace AdjustNamespace
     /// </summary>
     internal sealed class AdjustNamespaceCommand
     {
+        public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
+        public static string ProjectItemKindFolder = "{6BB5F8EF-4483-11D3-8BCF-00C04F8EC28C}";
+        public static string ProjectItemKindFile =       "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
+
+
         /// <summary>
         /// Command ID.
         /// </summary>
@@ -142,7 +147,7 @@ namespace AdjustNamespace
                     {
                         foreach (UIHierarchyItem selItem in selectedItems)
                         {
-                            if ((selItem.Object as dynamic).ExtenderCATID == "{52AEFF70-BBD8-11d2-8598-006097C68E81}")
+                            if ((selItem.Object as dynamic).ExtenderCATID == ProjectKind)
                             {
                                 foreach (EnvDTE.Project prj in dte.Solution.Projects)
                                 {
@@ -263,24 +268,19 @@ namespace AdjustNamespace
             {
                 var itemPath = projectItem.FileNames[(short)i];
 
-                if (Directory.Exists(itemPath))
+                if (projectItem.Kind == ProjectItemKindFolder)
                 {
-                    var filePaths = Directory.GetFiles(itemPath, "*.*", SearchOption.AllDirectories);
-
-                    foreach (var filePath in filePaths)
-                    {
-                        //if (workspace.GetDocument(filePath) != null)
-                        {
-                            result.Add(filePath);
-                        }
-                    }
-
                 }
-                else if (File.Exists(itemPath))
+                else if (projectItem.Kind == ProjectItemKindFile)
                 {
-                    //if (workspace.GetDocument(itemPath) != null)
+                    result.Add(itemPath);
+                }
+
+                if (projectItem.ProjectItems != null && projectItem.ProjectItems.Count > 0)
+                {
+                    foreach (ProjectItem spi in projectItem.ProjectItems)
                     {
-                        result.Add(itemPath);
+                        result.AddRange(ProcessProjectItem(workspace, spi));
                     }
                 }
             }
