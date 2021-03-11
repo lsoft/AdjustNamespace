@@ -39,14 +39,14 @@ namespace AdjustNamespace
             {
                 return false;
             }
-            if (document.FilePath.EndsWith(".xaml.cs"))
-            {
-                return false;
-            }
-            if (document.FilePath.EndsWith(".Designer.cs"))
-            {
-                return false;
-            }
+            //if (document.FilePath.EndsWith(".xaml.cs"))
+            //{
+            //    return false;
+            //}
+            //if (document.FilePath.EndsWith(".Designer.cs"))
+            //{
+            //    return false;
+            //}
 
             return true;
         }

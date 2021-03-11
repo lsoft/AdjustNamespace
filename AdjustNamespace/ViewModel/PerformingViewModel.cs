@@ -1,5 +1,6 @@
 ﻿using AdjustNamespace.Helper;
 using AdjustNamespace.Mover;
+using EnvDTE80;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -7,13 +8,18 @@ using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Threading;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
+using System.Xml;
+using System.Xml.Linq;
 
 namespace AdjustNamespace.ViewModel
 {
@@ -58,6 +64,12 @@ namespace AdjustNamespace.ViewModel
 
         public override async System.Threading.Tasks.Task StartAsync()
         {
+            var dte = await _moverState.ServiceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
+            if (dte == null)
+            {
+                return;
+            }
+
             var componentModel = (IComponentModel)await _moverState.ServiceProvider.GetServiceAsync(typeof(SComponentModel));
             if (componentModel == null)
             {
@@ -70,22 +82,15 @@ namespace AdjustNamespace.ViewModel
                 return;
             }
 
-            for(var i = 0; i < _filePaths.Count; i++)
+            for (var i = 0; i < _filePaths.Count; i++)
             {
-                ProgressMessage = $"{i} out of {_filePaths.Count}";
+                ProgressMessage = $"Project #{i + 1} out of #{_filePaths.Count}";
 
                 var filePath = _filePaths[i];
 
                 var subjectDocument = workspace.GetDocument(filePath);
                 var subjectProject = subjectDocument!.Project;
-
-                var projectFolderPath = new FileInfo(subjectProject.FilePath).Directory.FullName;
-                var suffix = new FileInfo(filePath).Directory.FullName.Substring(projectFolderPath.Length);
-                var targetNamespace = subjectProject.DefaultNamespace +
-                    suffix
-                        .Replace(Path.DirectorySeparatorChar, '.')
-                        .Replace(Path.AltDirectorySeparatorChar, '.')
-                        ;
+                var targetNamespace = subjectProject.GetTargetNamespace(filePath);
 
                 var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
                 if (subjectSemanticModel == null)
@@ -99,129 +104,101 @@ namespace AdjustNamespace.ViewModel
                     continue;
                 }
 
-                var subjectNamespaces = subjectSyntaxRoot
-                    .DescendantNodesAndSelf()
-                    .OfType<NamespaceDeclarationSyntax>()
-                    .ToList()
-                    ;
-                if (subjectNamespaces.Count == 0)
+                var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(targetNamespace);
+                if (namespaceInfos.Count == 0)
                 {
                     continue;
                 }
 
-                var minimalDepth = subjectNamespaces.Min(n => n.GetDepth());
+                var namespaceRenameDict = namespaceInfos.BuildRenameDict();
 
-                var processedNamespaces = new List<NamespaceDeclarationSyntax>();
-                foreach (var subjectNamespace in subjectNamespaces)
-                {
-                    if (minimalDepth == subjectNamespace.GetDepth())
-                    {
-                        processedNamespaces.Add(subjectNamespace);
-                    }
-                }
-
-
-                var toDeleteNamespaces = new HashSet<string>();
                 var editorProvider = new EditorProvider(workspace);
 
                 #region fix refs (adding a new using namespace clauses)
 
-                var toProcess = new Dictionary<string, HashSet<string>>();
+                var toProcess = new Dictionary<string, HashSet<IFixer>>();
                 var processedTypes = new HashSet<string>();
-                foreach (var processedNamespace in processedNamespaces)
+
+                foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
                 {
-                    foreach (var foundType in processedNamespace.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                    var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
+                    if (symbolInfo == null)
                     {
-                        var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
-                        if (symbolInfo == null)
+                        continue;
+                    }
+
+                    if (processedTypes.Contains(symbolInfo.ToDisplayString()))
+                    {
+                        //already processed
+                        continue;
+                    }
+
+                    var targetNamespaceInfo = namespaceRenameDict[symbolInfo.ContainingNamespace.ToDisplayString()];
+
+                    var foundReferences = await SymbolFinder.FindReferencesAsync(symbolInfo, workspace.CurrentSolution);
+                    foreach (var foundReference in foundReferences)
+                    {
+                        foreach (var location in foundReference.Locations)
                         {
-                            continue;
-                        }
-
-                        if (processedTypes.Contains(symbolInfo.ToDisplayString()))
-                        {
-                            //already processed
-                            continue;
-                        }
-
-                        toDeleteNamespaces.Add(symbolInfo.ContainingNamespace.ToDisplayString());
-
-                        var symbolTargetNamespace = symbolInfo.GetTargetNamespace(
-                            processedNamespace.Name.ToString(),
-                            targetNamespace
-                            );
-
-                        var foundReferences = await SymbolFinder.FindReferencesAsync(symbolInfo, workspace.CurrentSolution);
-                        foreach (var foundReference in foundReferences)
-                        {
-                            foreach (var location in foundReference.Locations)
+                            if (location.Document.FilePath == null)
                             {
-                                if (location.Document.FilePath == null)
-                                {
-                                    continue;
-                                }
+                                continue;
+                            }
+                            if (location.Location.Kind != LocationKind.SourceFile)
+                            {
+                                continue;
+                            }
 
-                                if (!toProcess.ContainsKey(location.Document.FilePath))
-                                {
-                                    toProcess[location.Document.FilePath] = new HashSet<string>();
-                                }
+                            var refSyntax = location.Location.SourceTree?.GetRoot().FindNode(location.Location.SourceSpan);
+                            if (refSyntax == null)
+                            {
+                                continue;
+                            }
 
-                                toProcess[location.Document.FilePath].Add(symbolTargetNamespace);
+                            if (!toProcess.ContainsKey(location.Document.FilePath))
+                            {
+                                toProcess[location.Document.FilePath] = new HashSet<IFixer>(FixerEqualityComparer.Entity);
+                            }
+
+                            if (refSyntax.Parent is QualifiedNameSyntax qns)
+                            {
+                                //replace QualifiedNameSyntax
+                                toProcess[location.Document.FilePath].Add(
+                                    new QualifiedNameFixer(
+                                        qns,
+                                        targetNamespaceInfo.ModifiedName
+                                        )
+                                    );
+                            }
+                            else
+                            {
+                                //add a new using clause
+                                toProcess[location.Document.FilePath].Add(
+                                    new NamespaceFixer(
+                                        targetNamespaceInfo.ModifiedName
+                                        )
+                                    );
                             }
                         }
-
-                        processedTypes.Add(symbolInfo.ToDisplayString());
                     }
+
+                    processedTypes.Add(symbolInfo.ToDisplayString());
                 }
 
                 foreach (var group in toProcess)
                 {
                     var targetFilePath = group.Key;
 
-                    foreach (var symbolTargetNamespace in group.Value.OrderByDescending(a => a))
+                    var documentEditor = await editorProvider.GetDocumentEditorAsync(targetFilePath);
+                    if (documentEditor == null)
                     {
-                        var documentEditor = await editorProvider.GetDocumentEditorAsync(targetFilePath);
-                        if (documentEditor == null)
-                        {
-                            //skip this document
-                            break;
-                        }
+                        //skip this document
+                        continue;
+                    }
 
-                        var syntaxRoot = await documentEditor.OriginalDocument.GetSyntaxRootAsync();
-                        if (syntaxRoot == null)
-                        {
-                            //skip this document
-                            break;
-                        }
-
-                        var usingSyntaxes = syntaxRoot
-                            .DescendantNodes()
-                            .OfType<UsingDirectiveSyntax>()
-                            .ToList();
-
-
-                        if (usingSyntaxes.Count == 0)
-                        {
-                            //no namespaces exists
-                            //no need to insert new in this file
-                            break;
-                        }
-                        else
-                        {
-                            if (usingSyntaxes.Any(s => s.Name.ToString() == symbolTargetNamespace))
-                            {
-                                continue;
-                            }
-
-                            documentEditor.InsertAfter(
-                                usingSyntaxes.Last(),
-                                SyntaxFactory.UsingDirective(
-                                    SyntaxFactory.ParseName(
-                                        " " + symbolTargetNamespace
-                                        )
-                                    ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                                );
-                        }
+                    foreach (var fixer in group.Value.OrderByDescending(a => a.OrderingKey))
+                    {
+                        await fixer.FixAsync(documentEditor);
                     }
                 }
 
@@ -234,7 +211,7 @@ namespace AdjustNamespace.ViewModel
 
                     if (subjectDocumentEditor != null)
                     {
-                        foreach (var processedNamespace in processedNamespaces)
+                        foreach (var namespaceInfo in namespaceInfos.Where(ni => ni.IsRoot))
                         {
                             var syntaxRoot = await subjectDocumentEditor.OriginalDocument
                                 .GetSyntaxRootAsync()
@@ -244,11 +221,15 @@ namespace AdjustNamespace.ViewModel
                                 continue;
                             }
 
-                            var fNamespace = syntaxRoot.DescendantNodes().OfType<NamespaceDeclarationSyntax>().FirstOrDefault(mn => mn.Name == processedNamespace.Name);
+                            var fNamespace = syntaxRoot
+                                .DescendantNodes()
+                                .OfType<NamespaceDeclarationSyntax>()
+                                .FirstOrDefault(mn => mn.Name.ToString() == namespaceInfo.OriginalName)
+                                ;
 
                             var fixedNamespace = fNamespace.WithName(
                                 SyntaxFactory.ParseName(
-                                    targetNamespace
+                                    namespaceInfo.ModifiedName
                                     ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
                                 )
                                 .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
@@ -266,6 +247,8 @@ namespace AdjustNamespace.ViewModel
                     //remove `using oldnamespace` if oldnamespace does not exists anymore
                     foreach (var document in workspace.EnumerateAllDocuments(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
                     {
+                        Debug.WriteLine(document.FilePath);
+
                         var syntaxRoot = await document.GetSyntaxRootAsync();
                         if (syntaxRoot == null)
                         {
@@ -279,7 +262,7 @@ namespace AdjustNamespace.ViewModel
 
                         foreach (var usingSyntax in usingSyntaxes)
                         {
-                            if (toDeleteNamespaces.Contains(usingSyntax.Name.ToString()))
+                            if (namespaceRenameDict.Keys.Contains(usingSyntax.Name.ToString()))
                             {
                                 var documentEditor = await editorProvider.GetDocumentEditorAsync(document.FilePath!);
                                 if (documentEditor == null)
@@ -296,9 +279,85 @@ namespace AdjustNamespace.ViewModel
                 editorProvider.SaveAndClear();
 
                 #endregion
+
+                #region fix xaml
+
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                var xamlsToProcess = new List<string>();
+                foreach (EnvDTE.Project project in dte.Solution.Projects)
+                {
+                    foreach (EnvDTE.ProjectItem projectItem in project.ProjectItems)
+                    {
+                        if (projectItem == null)
+                        {
+                            continue;
+                        }
+
+                        for (var fi = 0; fi < projectItem.FileCount; fi++)
+                        {
+                            var projectItemFilePath = projectItem.FileNames[(short)fi];
+
+                            if (projectItemFilePath.EndsWith(".xaml"))
+                            {
+                                xamlsToProcess.Add(projectItemFilePath);
+                            }
+                        }
+                    }
+                }
+
+                await TaskScheduler.Default;
+
+                foreach (var xamlToProcess in xamlsToProcess)
+                {
+                    var plainBody = File.ReadAllText(xamlToProcess);
+                    var xmlDocument = XDocument.Load(xamlToProcess, LoadOptions.PreserveWhitespace);
+
+                    var changedExists = false;
+
+                    var element = xmlDocument.Elements().FirstOrDefault();
+                    if (element == null)
+                    {
+                        continue;
+                    }
+
+                    var attributes = new List<XAttribute>(element.Attributes());
+                    foreach (var attribute in attributes)
+                    {
+                        if (attribute.Name.Namespace == "http://www.w3.org/2000/xmlns/")
+                        {
+                            const string ClrNamespace = "clr-namespace:";
+
+                            if (attribute.Value.Length <= ClrNamespace.Length)
+                            {
+                                continue;
+                            }
+
+                            var modifiedValue = attribute.Value.Substring(ClrNamespace.Length);
+                            if (namespaceRenameDict.TryGetValue(modifiedValue, out var namespaceInfo))
+                            {
+                                plainBody = plainBody.Replace(
+                                    attribute.Value,
+                                    $"{ClrNamespace}{namespaceInfo.ModifiedName}"
+                                    );
+
+                                changedExists = true;
+                            }
+                        }
+                    }
+
+                    if (changedExists)
+                    {
+                        File.WriteAllText(xamlToProcess, plainBody);
+                    }
+                }
+
             }
+
+            #endregion
 
             ProgressMessage = $"Completed";
         }
     }
 }
+

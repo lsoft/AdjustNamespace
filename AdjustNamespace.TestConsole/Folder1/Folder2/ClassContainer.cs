@@ -7,6 +7,10 @@ using System.Threading.Tasks;
 //namespace UnrelaredNamespace
 namespace UnrelaredNamespace
 {
+    public interface IUserControl
+    {
+    }
+
     public class Class1
     {
 

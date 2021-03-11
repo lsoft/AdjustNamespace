@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,21 +10,40 @@ namespace AdjustNamespace.Helper
 {
     public static class RoslynHelper
     {
-        public static string GetTargetNamespace(
-            this INamedTypeSymbol symbol,
-            string sourceNamespace,
-            string targetNamespace
-            )
-        {
-            if (sourceNamespace == targetNamespace)
-            {
-                return targetNamespace;
-            }
 
-            var suffix = symbol.ContainingNamespace.ToDisplayString().Substring(sourceNamespace.Length);
+        //public static string GetTargetNamespaceName(
+        //    this NamespaceDeclarationSyntax n,
+        //    string root
+        //    )
+        //{
+        //    var nn = n.GetFullNamespaceName(root);
 
-            return targetNamespace + suffix;
-        }
+        //    if (nn == root)
+        //    {
+        //        return root;
+        //    }
+
+        //    var suffix = nn.Substring(root.Length);
+
+        //    return targetNamespace + suffix;
+        //}
+
+
+        //public static string GetTargetNamespace(
+        //    this INamedTypeSymbol symbol,
+        //    string sourceNamespace,
+        //    string targetNamespace
+        //    )
+        //{
+        //    if (sourceNamespace == targetNamespace)
+        //    {
+        //        return targetNamespace;
+        //    }
+
+        //    var suffix = symbol.ContainingNamespace.ToDisplayString().Substring(sourceNamespace.Length);
+
+        //    return targetNamespace + suffix;
+        //}
 
         public static int GetDepth(
             this SyntaxNode? node

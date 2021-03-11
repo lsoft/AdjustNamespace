@@ -126,15 +126,7 @@ namespace AdjustNamespace.ViewModel
 
                 var subjectDocument = workspace.GetDocument(filePath);
                 var subjectProject = subjectDocument!.Project;
-
-                var projectFolderPath = new FileInfo(subjectProject.FilePath).Directory.FullName;
-                var suffix = new FileInfo(filePath).Directory.FullName.Substring(projectFolderPath.Length);
-                var targetNamespace = subjectProject.DefaultNamespace +
-                    suffix
-                        .Replace(Path.DirectorySeparatorChar, '.')
-                        .Replace(Path.AltDirectorySeparatorChar, '.')
-                        ;
-
+                var targetNamespace = subjectProject.GetTargetNamespace(filePath);
 
                 var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
                 if (subjectSemanticModel == null)
@@ -148,58 +140,37 @@ namespace AdjustNamespace.ViewModel
                     continue;
                 }
 
-                #region determine root namespace in the file
-
-                var processedNamespaces = new List<NamespaceDeclarationSyntax>();
-
-                var subjectNamespaces = subjectSyntaxRoot
-                    .DescendantNodesAndSelf()
-                    .OfType<NamespaceDeclarationSyntax>()
-                    .ToList()
-                    ;
-                if (subjectNamespaces.Count == 0)
+                var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(targetNamespace);
+                if (namespaceInfos.Count == 0)
                 {
                     continue;
                 }
 
-                var minimalDepth = subjectNamespaces.Min(n => n.GetDepth());
 
-                foreach (var subjectNamespace in subjectNamespaces)
-                {
-                    if (minimalDepth == subjectNamespace.GetDepth())
-                    {
-                        processedNamespaces.Add(subjectNamespace);
-                    }
-                }
+                var namespaceRenameDict = namespaceInfos.BuildRenameDict();
 
-                #endregion
+
 
                 // get all types in the target namespace
                 var foundTypesInTargetNamespace = await workspace.GetAllTypesInNamespaceAsync(targetNamespace);
 
                 //check for same types already exists in the destination namespace
-                foreach (var processedNamespace in processedNamespaces)
+                foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
                 {
-                    foreach (var foundType in processedNamespace.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                    var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
+                    if (symbolInfo == null)
                     {
-                        var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
-                        if (symbolInfo == null)
-                        {
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        var symbolTargetNamespace = symbolInfo.GetTargetNamespace(
-                            processedNamespace.Name.ToString(),
-                            targetNamespace
-                            );
+                    var targetNamespaceInfo = namespaceRenameDict[symbolInfo.ContainingNamespace.ToDisplayString()];
 
-                        if (foundTypesInTargetNamespace.ContainsKey($"{symbolTargetNamespace}.{symbolInfo.Name}"))
-                        {
-                            Foreground = Brushes.Red;
-                            DetectedMessages += Environment.NewLine + $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'";
-                            _moverState.BlockMovingForward = true;
-                            return;
-                        }
+                    if (foundTypesInTargetNamespace.ContainsKey($"{targetNamespaceInfo}.{symbolInfo.Name}"))
+                    {
+                        Foreground = Brushes.Red;
+                        DetectedMessages += Environment.NewLine + $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'";
+                        _moverState.BlockMovingForward = true;
+                        return;
                     }
                 }
             }

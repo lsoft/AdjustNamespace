@@ -79,7 +79,7 @@ namespace AdjustNamespace.Window
                         CriticalErrorTextBlock.Text = excp.Message;
                         Logging.LogVS(excp);
                     }
-                });
+                }).FileAndForget(nameof(SetNextPage));
 
     }
 

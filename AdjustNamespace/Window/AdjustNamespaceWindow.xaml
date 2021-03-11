@@ -51,6 +51,7 @@
                 />
 
             <TextBlock
+                Grid.Column="1"
                 Name="CriticalErrorTextBlock"
                 Foreground="Red"
                 HorizontalAlignment="Stretch"
