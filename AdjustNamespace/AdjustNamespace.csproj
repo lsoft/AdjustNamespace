@@ -54,7 +54,10 @@
       <DependentUpon>PerformingUserControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="EditorProvider.cs" />
-    <Compile Include="Fixer.cs" />
+    <Compile Include="Fixer\Fixer.cs" />
+    <Compile Include="Fixer\FixerEqualityComparer.cs" />
+    <Compile Include="Fixer\NamespaceFixer.cs" />
+    <Compile Include="Fixer\QualifiedNameFixer.cs" />
     <Compile Include="Helper\BaseViewModel.cs" />
     <Compile Include="Helper\ChainViewModel.cs" />
     <Compile Include="Helper\ListHelper.cs" />

@@ -58,6 +58,28 @@ namespace AdjustNamespace
         }
 
 
+        public async Task<DocumentEditor?> GetDocumentEditorAsync(Document document)
+        {
+            if (document is null)
+            {
+                throw new ArgumentNullException(nameof(document));
+            }
+
+            if (_editor != null)
+            {
+                if (_editor.OriginalDocument.FilePath == document.FilePath)
+                {
+                    return _editor;
+                }
+
+                await SaveAndClearAsync();
+            }
+
+            _editor = await DocumentEditor.CreateAsync(document);
+            return _editor;
+        }
+
+
         public async Task SaveAndClearAsync()
         {
             if (_editor != null)

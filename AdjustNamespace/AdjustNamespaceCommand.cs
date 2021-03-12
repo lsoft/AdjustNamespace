@@ -144,17 +144,17 @@ namespace AdjustNamespace
                         {
                             if ((selItem.Object as dynamic).ExtenderCATID == ProjectKind)
                             {
-                                filePaths.AddRange(dte.Solution.ProcessSolution(workspace));
+                                filePaths.AddRange(dte.Solution.ProcessSolution());
                             }
 
                             if (selItem.Object is EnvDTE.Project project)
                             {
-                                filePaths.AddRange(project.ProcessProject(workspace));
+                                filePaths.AddRange(project.ProcessProject());
                             }
 
                             if (selItem.Object is ProjectItem projectItem)
                             {
-                                filePaths.AddRange(projectItem.ProcessProjectItem(workspace));
+                                filePaths.AddRange(projectItem.ProcessProjectItem());
                             }
                         }
                     }

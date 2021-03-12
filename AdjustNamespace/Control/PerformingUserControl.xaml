@@ -23,6 +23,7 @@
             Grid.Row="1"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
+            TextWrapping="Wrap"
             Text="{Binding ProgressMessage}"
             />
     </Grid>

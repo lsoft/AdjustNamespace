@@ -29,9 +29,48 @@ namespace AdjustNamespace.Helper
             modifiers: null);
 
 
-        public static async Task<Dictionary<string, INamedTypeSymbol>> GetAllTypesInNamespaceAsync(
+        //public static async Task<Dictionary<string, bool>> IsNamespacesEmptyAsync(
+        //    this Workspace workspace,
+        //    params string[] sourceNamespaces
+        //    )
+        //{
+        //    if (workspace is null)
+        //    {
+        //        throw new ArgumentNullException(nameof(workspace));
+        //    }
+
+        //    if (sourceNamespaces is null)
+        //    {
+        //        throw new ArgumentNullException(nameof(sourceNamespaces));
+        //    }
+
+        //    var result = new Dictionary<string, bool>();
+        //    sourceNamespaces.ForEach(sn => result[sn] = true);
+
+        //    foreach (var cproject in workspace.CurrentSolution.Projects)
+        //    {
+        //        var ccompilation = await cproject.GetCompilationAsync();
+        //        if (ccompilation == null)
+        //        {
+        //            continue;
+        //        }
+
+        //        foreach (var ctype in ccompilation.GlobalNamespace.GetAllTypes())
+        //        {
+        //            var ctnds = ctype.ContainingNamespace.ToDisplayString();
+        //            if (sourceNamespaces.Any(sn => ctnds == sn))
+        //            {
+        //                result[ctnds] = false;
+        //            }
+        //        }
+        //    }
+
+        //    return result;
+        //}
+
+        public static async Task<Dictionary<string, INamedTypeSymbol>> GetAllTypesInNamespaceRecursivelyAsync(
             this Workspace workspace,
-            params string[] sourceNamespaces
+            string[]? sourceNamespaces = null
             )
         {
             if (workspace is null)
@@ -39,10 +78,6 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(workspace));
             }
 
-            if (sourceNamespaces is null)
-            {
-                throw new ArgumentNullException(nameof(sourceNamespaces));
-            }
 
             var result = new Dictionary<string, INamedTypeSymbol>();
             foreach (var cproject in workspace.CurrentSolution.Projects)
@@ -56,7 +91,7 @@ namespace AdjustNamespace.Helper
                 foreach (var ctype in ccompilation.GlobalNamespace.GetAllTypes())
                 {
                     var ctnds = ctype.ContainingNamespace.ToDisplayString();
-                    if(sourceNamespaces.Any(sn => ctnds.StartsWith(sn)))
+                    if(sourceNamespaces == null || sourceNamespaces.Length == 0 || sourceNamespaces.Any(sn => ctnds.StartsWith(sn)))
                     {
                         result[ctype.ToDisplayString()] = ctype;
                     }

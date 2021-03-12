@@ -82,6 +82,16 @@ namespace AdjustNamespace.ViewModel
                 return;
             }
 
+            #region get all interestring files in current solution
+
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            var filePaths = dte.Solution.ProcessSolution();
+
+            await TaskScheduler.Default;
+
+            #endregion
+
             for (var i = 0; i < _subjectFilePaths.Count; i++)
             {
                 var subjectFilePath = _subjectFilePaths[i];
@@ -149,7 +159,18 @@ namespace AdjustNamespace.ViewModel
                                 continue;
                             }
 
-                            var refSyntax = location.Location.SourceTree?.GetRoot().FindNode(location.Location.SourceSpan);
+                            if (location.Location.SourceTree == null)
+                            {
+                                continue;
+                            }
+
+                            var refRoot = await location.Location.SourceTree.GetRootAsync();
+                            if (refRoot == null)
+                            {
+                                continue;
+                            }
+
+                            var refSyntax = refRoot.FindNode(location.Location.SourceSpan);
                             if (refSyntax == null)
                             {
                                 continue;
@@ -244,36 +265,36 @@ namespace AdjustNamespace.ViewModel
 
                     await editorProvider.SaveAndClearAsync();
 
-                    //remove `using oldnamespace` if oldnamespace does not exists anymore
-                    foreach (var document in workspace.EnumerateAllDocuments(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
-                    {
-                        Debug.WriteLine(document.FilePath);
+                    ////remove `using oldnamespace` if oldnamespace does not exists anymore
+                    //foreach (var document in workspace.EnumerateAllDocuments(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
+                    //{
+                    //    Debug.WriteLine(document.FilePath);
 
-                        var syntaxRoot = await document.GetSyntaxRootAsync();
-                        if (syntaxRoot == null)
-                        {
-                            continue;
-                        }
+                    //    var syntaxRoot = await document.GetSyntaxRootAsync();
+                    //    if (syntaxRoot == null)
+                    //    {
+                    //        continue;
+                    //    }
 
-                        var usingSyntaxes = syntaxRoot
-                            .DescendantNodes()
-                            .OfType<UsingDirectiveSyntax>()
-                            .ToList();
+                    //    var usingSyntaxes = syntaxRoot
+                    //        .DescendantNodes()
+                    //        .OfType<UsingDirectiveSyntax>()
+                    //        .ToList();
 
-                        foreach (var usingSyntax in usingSyntaxes)
-                        {
-                            if (namespaceRenameDict.Keys.Contains(usingSyntax.Name.ToString()))
-                            {
-                                var documentEditor = await editorProvider.GetDocumentEditorAsync(document.FilePath!);
-                                if (documentEditor == null)
-                                {
-                                    continue;
-                                }
+                    //    foreach (var usingSyntax in usingSyntaxes)
+                    //    {
+                    //        if (namespaceRenameDict.Keys.Contains(usingSyntax.Name.ToString()))
+                    //        {
+                    //            var documentEditor = await editorProvider.GetDocumentEditorAsync(document.FilePath!);
+                    //            if (documentEditor == null)
+                    //            {
+                    //                continue;
+                    //            }
 
-                                documentEditor.RemoveNode(usingSyntax);
-                            }
-                        }
-                    }
+                    //            documentEditor.RemoveNode(usingSyntax);
+                    //        }
+                    //    }
+                    //}
                 }
 
                 await editorProvider.SaveAndClearAsync();
@@ -281,35 +302,6 @@ namespace AdjustNamespace.ViewModel
                 #endregion
 
                 #region fix xaml
-
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-                var xamlsToProcess = new List<string>();
-
-                var filePaths = dte.Solution.ProcessSolution(workspace);
-
-                //foreach (EnvDTE.Project project in dte.Solution.Projects)
-                //{
-                //    foreach (EnvDTE.ProjectItem projectItem in project.ProjectItems)
-                //    {
-                //        if (projectItem == null)
-                //        {
-                //            continue;
-                //        }
-
-                //        for (var fi = 0; fi < projectItem.FileCount; fi++)
-                //        {
-                //            var projectItemFilePath = projectItem.FileNames[(short)fi]; 123123
-
-                //            if (projectItemFilePath.EndsWith(".xaml"))
-                //            {
-                //                xamlsToProcess.Add(projectItemFilePath);
-                //            }
-                //        }
-                //    }
-                //}
-
-                await TaskScheduler.Default;
 
                 foreach (var filePath in filePaths)
                 {
@@ -361,12 +353,81 @@ namespace AdjustNamespace.ViewModel
                         File.WriteAllText(xamlToProcess, plainBody);
                     }
                 }
+                #endregion
 
+                #region remove empty 'using namespace'
+
+                var allSolutionNamespaces = await GetAllNamespacesAsync(workspace);
+
+                foreach (Document document in workspace.EnumerateAllDocuments(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
+                {
+                    var syntaxRoot = await document.GetSyntaxRootAsync();
+                    if (syntaxRoot == null)
+                    {
+                        continue;
+                    }
+
+                    var namespaces = syntaxRoot
+                        .DescendantNodes()
+                        .OfType<UsingDirectiveSyntax>()
+                        .ToList()
+                        ;
+
+                    if (namespaces.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var changed = false;
+                    foreach (var n in namespaces)
+                    {
+                        var nname = n.Name.ToString();
+
+                        if (!namespaceRenameDict.ContainsKey(nname))
+                        {
+                            //this namespace is not what we changed
+                            continue;
+                        }
+
+                        if (allSolutionNamespaces.Contains(nname))
+                        {
+                            //there is a types in this namespace
+                            continue;
+                        }
+
+                        var documentEditor = await editorProvider.GetDocumentEditorAsync(document);
+                        if (documentEditor == null)
+                        {
+                            continue;
+                        }
+
+                        documentEditor.RemoveNode(n, SyntaxRemoveOptions.KeepNoTrivia);
+
+                        changed = true;
+                    }
+
+                    if (changed)
+                    {
+                        await editorProvider.SaveAndClearAsync();
+                    }
+                }
+
+                #endregion
             }
 
-            #endregion
 
             ProgressMessage = $"Completed";
+        }
+
+        private static async Task<HashSet<string>> GetAllNamespacesAsync(VisualStudioWorkspace workspace)
+        {
+            var allSolutionNamespaces = 
+                (await workspace.GetAllTypesInNamespaceRecursivelyAsync(null))
+                    .Values
+                    .Select(t => t.ContainingNamespace.ToDisplayString())
+                    .ToHashSet();
+
+            return allSolutionNamespaces;
         }
     }
 }

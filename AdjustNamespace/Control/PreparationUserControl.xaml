@@ -15,6 +15,7 @@
             Grid.Row="0"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
+            TextWrapping="Wrap"
             Text="{Binding MainMessage}"
             />
 

@@ -14,19 +14,14 @@ namespace AdjustNamespace.Helper
         public static string ProjectItemKindFolder = "{6BB5F8EF-4483-11D3-8BCF-00C04F8EC28C}";
         public static string ProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 
+
         public static List<string> ProcessSolution(
-            this EnvDTE.Solution solution,
-            VisualStudioWorkspace workspace
+            this EnvDTE.Solution solution
             )
         {
             if (solution is null)
             {
                 throw new ArgumentNullException(nameof(solution));
-            }
-
-            if (workspace is null)
-            {
-                throw new ArgumentNullException(nameof(workspace));
             }
 
             ThreadHelper.ThrowIfNotOnUIThread();
@@ -35,15 +30,14 @@ namespace AdjustNamespace.Helper
 
             foreach (EnvDTE.Project prj in solution.Projects)
             {
-                filePaths.AddRange(prj.ProcessProject(workspace));
+                filePaths.AddRange(prj.ProcessProject());
             }
 
             return filePaths;
         }
 
         public static List<string> ProcessProject(
-            this EnvDTE.Project project,
-            VisualStudioWorkspace workspace
+            this EnvDTE.Project project
             )
         {
             if (project is null)
@@ -51,33 +45,25 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(project));
             }
 
-            if (workspace is null)
-            {
-                throw new ArgumentNullException(nameof(workspace));
-            }
-
             ThreadHelper.ThrowIfNotOnUIThread();
 
             var filePaths = new List<string>();
 
-            foreach (ProjectItem prjItem in project.ProjectItems)
+            if (project.ProjectItems != null && project.ProjectItems.Count > 0)
             {
-                filePaths.AddRange(prjItem.ProcessProjectItem(workspace));
+                foreach (ProjectItem prjItem in project.ProjectItems)
+                {
+                    filePaths.AddRange(prjItem.ProcessProjectItem());
+                }
             }
 
             return filePaths;
         }
 
         public static List<string> ProcessProjectItem(
-            this ProjectItem projectItem,
-            VisualStudioWorkspace workspace
+            this ProjectItem projectItem
             )
         {
-            if (workspace is null)
-            {
-                throw new ArgumentNullException(nameof(workspace));
-            }
-
             if (projectItem is null)
             {
                 throw new ArgumentNullException(nameof(projectItem));
@@ -105,7 +91,7 @@ namespace AdjustNamespace.Helper
                 {
                     foreach (ProjectItem spi in projectItem.ProjectItems)
                     {
-                        result.AddRange(ProcessProjectItem(spi, workspace));
+                        result.AddRange(ProcessProjectItem(spi));
                     }
                 }
             }

@@ -152,7 +152,7 @@ namespace AdjustNamespace.ViewModel
 
 
                 // get all types in the target namespace
-                var foundTypesInTargetNamespace = await workspace.GetAllTypesInNamespaceAsync(targetNamespace);
+                var foundTypesInTargetNamespace = await workspace.GetAllTypesInNamespaceRecursivelyAsync(new[] { targetNamespace });
 
                 //check for same types already exists in the destination namespace
                 foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
