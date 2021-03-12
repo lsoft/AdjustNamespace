@@ -1,8 +1,8 @@
 ﻿using System.Windows.Controls;
-using UnrelaredNamespace;
+using Experiment0.UnrelaredNamespace;
 
 
-namespace AdjustNamespace.TestConsole
+namespace AdjustNamespace.TestConsole.Experiment0
 {
     /// <summary>
     /// Interaction logic for UserControl1.xaml

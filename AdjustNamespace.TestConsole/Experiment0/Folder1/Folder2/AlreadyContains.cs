@@ -4,7 +4,7 @@
 //using System.Text;
 //using System.Threading.Tasks;
 
-//namespace AdjustNamespace.TestConsole.Folder1.Folder2.DerivedNamespace0.DerivedNamespace1
+//namespace AdjustNamespace.TestConsole.Experiment0.Folder1.Folder2
 //{
 //    public class Class4
 //    {

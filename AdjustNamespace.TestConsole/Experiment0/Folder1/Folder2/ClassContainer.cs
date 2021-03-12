@@ -4,8 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-//namespace UnrelaredNamespace
-namespace UnrelaredNamespace
+//namespace Experiment0.UnrelaredNamespace
+namespace Experiment0.UnrelaredNamespace
 {
     public interface IUserControl
     {

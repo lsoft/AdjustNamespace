@@ -33,7 +33,7 @@ namespace AdjustNamespace
     {
         public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
         public static string ProjectItemKindFolder = "{6BB5F8EF-4483-11D3-8BCF-00C04F8EC28C}";
-        public static string ProjectItemKindFile =       "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
+        public static string ProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 
 
         /// <summary>
@@ -169,8 +169,6 @@ namespace AdjustNamespace
                             if (selItem.Object is ProjectItem projectItem)
                             {
                                 filePaths.AddRange(ProcessProjectItem(workspace, projectItem));
-                                //var filePath =  prjItem.Properties.Item("FullPath").Value.ToString();
-                                //filePaths.Add(filePath);
                             }
                         }
                     }
@@ -270,6 +268,7 @@ namespace AdjustNamespace
 
                 if (projectItem.Kind == ProjectItemKindFolder)
                 {
+                    //nothing to do
                 }
                 else if (projectItem.Kind == ProjectItemKindFile)
                 {
