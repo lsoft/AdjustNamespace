@@ -3,7 +3,7 @@
     <Metadata>
         <Identity Id="AdjustNamespace.5744262e-0521-4f72-a2d6-aa7d60d8ea95" Version="0.1.0.0" Language="en-US" Publisher="lsoft" />
         <DisplayName>Adjust C# Namespaces</DisplayName>
-        <Description xml:space="preserve">Fix incorrect namespaces for a single file, folder, project or a whole solution. Early alpha.</Description>
+        <Description xml:space="preserve">Fix incorrect namespaces for a single file, folder, project or a whole solution and rules the resulting regressions in the code. Early alpha.</Description>
         <MoreInfo>https://github.com/lsoft/AdjustNamespace</MoreInfo>
         <License>LICENSE.txt</License>
         <Icon>Resources\order90.png</Icon>
