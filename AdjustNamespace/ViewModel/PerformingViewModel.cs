@@ -26,7 +26,7 @@ namespace AdjustNamespace.ViewModel
     public class PerformingViewModel : ChainViewModel
     {
         private readonly IChainMoverState _moverState;
-        private readonly List<string> _filePaths;
+        private readonly List<string> _subjectFilePaths;
 
         private string _progressMessage;
 
@@ -43,7 +43,7 @@ namespace AdjustNamespace.ViewModel
         public PerformingViewModel(
             IChainMoverState moverState,
             Dispatcher dispatcher,
-            List<string> filePaths
+            List<string> subjectFilePaths
             )
             : base(dispatcher)
         {
@@ -52,13 +52,13 @@ namespace AdjustNamespace.ViewModel
                 throw new ArgumentNullException(nameof(moverState));
             }
 
-            if (filePaths is null)
+            if (subjectFilePaths is null)
             {
-                throw new ArgumentNullException(nameof(filePaths));
+                throw new ArgumentNullException(nameof(subjectFilePaths));
             }
 
             _moverState = moverState;
-            _filePaths = filePaths;
+            _subjectFilePaths = subjectFilePaths;
             _progressMessage = string.Empty;
         }
 
@@ -82,15 +82,15 @@ namespace AdjustNamespace.ViewModel
                 return;
             }
 
-            for (var i = 0; i < _filePaths.Count; i++)
+            for (var i = 0; i < _subjectFilePaths.Count; i++)
             {
-                ProgressMessage = $"Project #{i + 1} out of #{_filePaths.Count}";
+                var subjectFilePath = _subjectFilePaths[i];
 
-                var filePath = _filePaths[i];
+                ProgressMessage = $"File #{i + 1} out of #{_subjectFilePaths.Count}";
 
-                var subjectDocument = workspace.GetDocument(filePath);
+                var subjectDocument = workspace.GetDocument(subjectFilePath);
                 var subjectProject = subjectDocument!.Project;
-                var targetNamespace = subjectProject.GetTargetNamespace(filePath);
+                var targetNamespace = subjectProject.GetTargetNamespace(subjectFilePath);
 
                 var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
                 if (subjectSemanticModel == null)
@@ -242,7 +242,7 @@ namespace AdjustNamespace.ViewModel
                         }
                     }
 
-                    editorProvider.SaveAndClear();
+                    await editorProvider.SaveAndClearAsync();
 
                     //remove `using oldnamespace` if oldnamespace does not exists anymore
                     foreach (var document in workspace.EnumerateAllDocuments(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
@@ -276,7 +276,7 @@ namespace AdjustNamespace.ViewModel
                     }
                 }
 
-                editorProvider.SaveAndClear();
+                await editorProvider.SaveAndClearAsync();
 
                 #endregion
 
@@ -285,31 +285,41 @@ namespace AdjustNamespace.ViewModel
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
                 var xamlsToProcess = new List<string>();
-                foreach (EnvDTE.Project project in dte.Solution.Projects)
-                {
-                    foreach (EnvDTE.ProjectItem projectItem in project.ProjectItems)
-                    {
-                        if (projectItem == null)
-                        {
-                            continue;
-                        }
 
-                        for (var fi = 0; fi < projectItem.FileCount; fi++)
-                        {
-                            var projectItemFilePath = projectItem.FileNames[(short)fi];
+                var filePaths = dte.Solution.ProcessSolution(workspace);
 
-                            if (projectItemFilePath.EndsWith(".xaml"))
-                            {
-                                xamlsToProcess.Add(projectItemFilePath);
-                            }
-                        }
-                    }
-                }
+                //foreach (EnvDTE.Project project in dte.Solution.Projects)
+                //{
+                //    foreach (EnvDTE.ProjectItem projectItem in project.ProjectItems)
+                //    {
+                //        if (projectItem == null)
+                //        {
+                //            continue;
+                //        }
+
+                //        for (var fi = 0; fi < projectItem.FileCount; fi++)
+                //        {
+                //            var projectItemFilePath = projectItem.FileNames[(short)fi]; 123123
+
+                //            if (projectItemFilePath.EndsWith(".xaml"))
+                //            {
+                //                xamlsToProcess.Add(projectItemFilePath);
+                //            }
+                //        }
+                //    }
+                //}
 
                 await TaskScheduler.Default;
 
-                foreach (var xamlToProcess in xamlsToProcess)
+                foreach (var filePath in filePaths)
                 {
+                    if (!filePath.EndsWith(".xaml"))
+                    {
+                        continue;
+                    }
+
+                    var xamlToProcess = filePath;
+
                     var plainBody = File.ReadAllText(xamlToProcess);
                     var xmlDocument = XDocument.Load(xamlToProcess, LoadOptions.PreserveWhitespace);
 

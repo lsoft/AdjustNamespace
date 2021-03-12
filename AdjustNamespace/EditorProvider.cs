@@ -1,11 +1,14 @@
 ﻿using AdjustNamespace.Helper;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Editing;
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Threading;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Task = System.Threading.Tasks.Task;
 
 namespace AdjustNamespace
 {
@@ -41,10 +44,7 @@ namespace AdjustNamespace
                     return _editor;
                 }
 
-                var changedDocument = _editor.GetChangedDocument();
-                _workspace.TryApplyChanges(changedDocument.Project.Solution);
-
-                _editor = null;
+                await SaveAndClearAsync();
             }
 
             var document = _workspace.GetDocument(filePath);
@@ -58,12 +58,16 @@ namespace AdjustNamespace
         }
 
 
-        public void SaveAndClear()
+        public async Task SaveAndClearAsync()
         {
             if (_editor != null)
             {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
                 var changedDocument = _editor.GetChangedDocument();
                 _workspace.TryApplyChanges(changedDocument.Project.Solution);
+
+                await TaskScheduler.Default;
             }
 
             _editor = null;

@@ -55,10 +55,11 @@
     </Compile>
     <Compile Include="EditorProvider.cs" />
     <Compile Include="Fixer.cs" />
-    <Compile Include="FunctionSet.cs" />
     <Compile Include="Helper\BaseViewModel.cs" />
     <Compile Include="Helper\ChainViewModel.cs" />
+    <Compile Include="Helper\ListHelper.cs" />
     <Compile Include="Helper\NamespaceHelper.cs" />
+    <Compile Include="Helper\SolutionHelper.cs" />
     <Compile Include="Helper\RoslynHelper.cs" />
     <Compile Include="Helper\WorkspaceHelper.cs" />
     <Compile Include="Helper\WpfHelper.cs" />

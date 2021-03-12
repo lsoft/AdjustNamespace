@@ -32,8 +32,6 @@ namespace AdjustNamespace
     internal sealed class AdjustNamespaceCommand
     {
         public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
-        public static string ProjectItemKindFolder = "{6BB5F8EF-4483-11D3-8BCF-00C04F8EC28C}";
-        public static string ProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 
 
         /// <summary>
@@ -137,9 +135,6 @@ namespace AdjustNamespace
 
                 if (dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
                 {
-                    //var ad = dte.ActiveDocument;
-                    //var ae = dte.ActiveSolutionProjects.GetValue(0);
-
                     var uih = dte.ToolWindows.SolutionExplorer;
                     var selectedItems = (Array)uih.SelectedItems;
 
@@ -149,26 +144,17 @@ namespace AdjustNamespace
                         {
                             if ((selItem.Object as dynamic).ExtenderCATID == ProjectKind)
                             {
-                                foreach (EnvDTE.Project prj in dte.Solution.Projects)
-                                {
-                                    foreach (ProjectItem prjItem in prj.ProjectItems)
-                                    {
-                                        filePaths.AddRange(ProcessProjectItem(workspace, prjItem));
-                                    }
-                                }
+                                filePaths.AddRange(dte.Solution.ProcessSolution(workspace));
                             }
 
                             if (selItem.Object is EnvDTE.Project project)
                             {
-                                foreach (ProjectItem prjItem in project.ProjectItems)
-                                {
-                                    filePaths.AddRange(ProcessProjectItem(workspace, prjItem));
-                                }
+                                filePaths.AddRange(project.ProcessProject(workspace));
                             }
 
                             if (selItem.Object is ProjectItem projectItem)
                             {
-                                filePaths.AddRange(ProcessProjectItem(workspace, projectItem));
+                                filePaths.AddRange(projectItem.ProcessProjectItem(workspace));
                             }
                         }
                     }
@@ -243,49 +229,6 @@ namespace AdjustNamespace
             }
         }
 
-        private static List<string> ProcessProjectItem(
-            VisualStudioWorkspace workspace,
-            ProjectItem projectItem
-            )
-        {
-            if (workspace is null)
-            {
-                throw new ArgumentNullException(nameof(workspace));
-            }
-
-            if (projectItem is null)
-            {
-                throw new ArgumentNullException(nameof(projectItem));
-            }
-
-            ThreadHelper.ThrowIfNotOnUIThread();
-
-            var result = new List<string>();
-
-            for (var i = 0; i < projectItem.FileCount; i++)
-            {
-                var itemPath = projectItem.FileNames[(short)i];
-
-                if (projectItem.Kind == ProjectItemKindFolder)
-                {
-                    //nothing to do
-                }
-                else if (projectItem.Kind == ProjectItemKindFile)
-                {
-                    result.Add(itemPath);
-                }
-
-                if (projectItem.ProjectItems != null && projectItem.ProjectItems.Count > 0)
-                {
-                    foreach (ProjectItem spi in projectItem.ProjectItems)
-                    {
-                        result.AddRange(ProcessProjectItem(workspace, spi));
-                    }
-                }
-            }
-
-            return result;
-        }
 
         //private void ShowError(string errorMessage)
         //{
