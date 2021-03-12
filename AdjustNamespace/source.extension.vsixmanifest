@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
-        <Identity Id="AdjustNamespaceVisualStudioExtension.5744262e-0521-4f72-a2d6-aa7d60d8ea95" Version="0.1" Language="en-US" Publisher="ls" />
-        <DisplayName>AdjustNamespaceVisualStudioExtension</DisplayName>
-        <Description xml:space="preserve">Empty VSIX Project.</Description>
+        <Identity Id="AdjustNamespace.5744262e-0521-4f72-a2d6-aa7d60d8ea95" Version="0.1.0.0" Language="en-US" Publisher="lsoft" />
+        <DisplayName>Adjust C# Namespaces</DisplayName>
+        <Description xml:space="preserve">Fix incorrect namespaces for a single file, folder, project or a whole solution. Early alpha.</Description>
+        <MoreInfo>https://github.com/lsoft/AdjustNamespace</MoreInfo>
+        <License>LICENSE.txt</License>
         <Icon>Resources\order90.png</Icon>
+        <PreviewImage>Resources\order90.png</PreviewImage>
+        <Tags>namespace</Tags>
+        <Preview>true</Preview>
     </Metadata>
     <Installation>
         <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[16.0, 17.0)" />
