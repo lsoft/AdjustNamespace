@@ -61,6 +61,26 @@ namespace AdjustNamespace.Helper
             return documentEditor;
         }
 
+
+        public static async Task<HashSet<string>> GetAllNamespacesAsync(
+            this VisualStudioWorkspace workspace
+            )
+        {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
+
+            var allSolutionNamespaces =
+                (await workspace.GetAllTypesInNamespaceRecursivelyAsync(null))
+                    .Values
+                    .Select(t => t.ContainingNamespace.ToDisplayString())
+                    .ToHashSet();
+
+            return allSolutionNamespaces;
+        }
+
+
         public static async Task<Dictionary<string, INamedTypeSymbol>> GetAllTypesInNamespaceRecursivelyAsync(
             this Workspace workspace,
             string[]? sourceNamespaces = null
