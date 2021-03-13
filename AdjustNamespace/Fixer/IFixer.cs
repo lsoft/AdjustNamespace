@@ -16,6 +16,6 @@ namespace AdjustNamespace
             get;
         }
 
-        Task FixAsync(DocumentEditor documentEditor);
+        Task FixAsync(string filePath);
     }
 }

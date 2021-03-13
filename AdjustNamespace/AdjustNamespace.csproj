@@ -53,8 +53,7 @@
     <Compile Include="Control\PerformingUserControl.xaml.cs">
       <DependentUpon>PerformingUserControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="EditorProvider.cs" />
-    <Compile Include="Fixer\Fixer.cs" />
+    <Compile Include="Fixer\IFixer.cs" />
     <Compile Include="Fixer\FixerEqualityComparer.cs" />
     <Compile Include="Fixer\NamespaceFixer.cs" />
     <Compile Include="Fixer\QualifiedNameFixer.cs" />
@@ -87,6 +86,12 @@
     <Compile Include="Window\AdjustNamespaceWindow.xaml.cs">
       <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Xaml\CustomXmlWriter.cs" />
+    <Compile Include="Xaml\XamlClrAttribute.cs" />
+    <Compile Include="Xaml\XamlClrObject.cs" />
+    <Compile Include="Xaml\XamlEngine.cs" />
+    <Compile Include="Xaml\XamlHelper.cs" />
+    <Compile Include="Xaml\XamlClrAttributeNamespaceComparer.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="LICENSE.txt">

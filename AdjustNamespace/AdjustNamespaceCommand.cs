@@ -161,62 +161,61 @@ namespace AdjustNamespace
                 }
 
 
-                var filteredFilePaths = new List<string>();
+                //var filteredFilePaths = new List<string>();
+
+                //foreach (var filePath in filePaths)
+                //{
+                //    var subjectDocument = workspace.GetDocument(filePath);
+                //    if (!subjectDocument.IsDocumentInScope())
+                //    {
+                //        continue;
+                //    }
+
+                //    var project = subjectDocument!.Project;
+                //    if (!project.IsProjectInScope())
+                //    {
+                //        continue;
+                //    }
+
+                //    var projectFolderPath = new FileInfo(project.FilePath).Directory.FullName;
+                //    var suffix = new FileInfo(filePath).Directory.FullName.Substring(projectFolderPath.Length);
+                //    var targetNamespace = project.DefaultNamespace +
+                //        suffix
+                //            .Replace(Path.DirectorySeparatorChar, '.')
+                //            .Replace(Path.AltDirectorySeparatorChar, '.')
+                //            ;
 
 
-                foreach (var filePath in filePaths)
-                {
-                    var subjectDocument = workspace.GetDocument(filePath);
-                    if (!subjectDocument.IsDocumentInScope())
-                    {
-                        continue;
-                    }
+                //    var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
+                //    if (subjectSemanticModel == null)
+                //    {
+                //        continue;
+                //    }
 
-                    var project = subjectDocument!.Project;
-                    if (!project.IsProjectInScope())
-                    {
-                        continue;
-                    }
+                //    var subjectSyntaxRoot = await subjectDocument.GetSyntaxRootAsync();
+                //    if (subjectSyntaxRoot == null)
+                //    {
+                //        continue;
+                //    }
 
-                    var projectFolderPath = new FileInfo(project.FilePath).Directory.FullName;
-                    var suffix = new FileInfo(filePath).Directory.FullName.Substring(projectFolderPath.Length);
-                    var targetNamespace = project.DefaultNamespace +
-                        suffix
-                            .Replace(Path.DirectorySeparatorChar, '.')
-                            .Replace(Path.AltDirectorySeparatorChar, '.')
-                            ;
+                //    var subjectNamespaces = subjectSyntaxRoot
+                //        .DescendantNodesAndSelf()
+                //        .OfType<NamespaceDeclarationSyntax>()
+                //        .ToList()
+                //        ;
+                //    if (subjectNamespaces.Count == 0)
+                //    {
+                //        continue;
+                //    }
 
+                //    filteredFilePaths.Add(filePath);
+                //}
 
-                    var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
-                    if (subjectSemanticModel == null)
-                    {
-                        continue;
-                    }
-
-                    var subjectSyntaxRoot = await subjectDocument.GetSyntaxRootAsync();
-                    if (subjectSyntaxRoot == null)
-                    {
-                        continue;
-                    }
-
-                    var subjectNamespaces = subjectSyntaxRoot
-                        .DescendantNodesAndSelf()
-                        .OfType<NamespaceDeclarationSyntax>()
-                        .ToList()
-                        ;
-                    if (subjectNamespaces.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    filteredFilePaths.Add(filePath);
-                }
-
-                if (filteredFilePaths.Count > 0)
+                if (filePaths.Count > 0)
                 {
                     var mover = new AdjustChainMover(
                         ServiceProvider,
-                        filteredFilePaths
+                        filePaths
                         );
 
                     var window = new AdjustNamespaceWindow(mover);

@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Editing;
 using Microsoft.VisualStudio.LanguageServices;
 using System;
 using System.Collections.Generic;
@@ -29,44 +30,36 @@ namespace AdjustNamespace.Helper
             modifiers: null);
 
 
-        //public static async Task<Dictionary<string, bool>> IsNamespacesEmptyAsync(
-        //    this Workspace workspace,
-        //    params string[] sourceNamespaces
-        //    )
-        //{
-        //    if (workspace is null)
-        //    {
-        //        throw new ArgumentNullException(nameof(workspace));
-        //    }
+        public static async Task<DocumentEditor?> CreateDocumentEditorAsync(
+            this Workspace workspace,
+            string filePath
+            )
+        {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
 
-        //    if (sourceNamespaces is null)
-        //    {
-        //        throw new ArgumentNullException(nameof(sourceNamespaces));
-        //    }
+            if (filePath is null)
+            {
+                throw new ArgumentNullException(nameof(filePath));
+            }
 
-        //    var result = new Dictionary<string, bool>();
-        //    sourceNamespaces.ForEach(sn => result[sn] = true);
+            var document = workspace.GetDocument(filePath);
+            if (document == null)
+            {
+                return null;
+            }
 
-        //    foreach (var cproject in workspace.CurrentSolution.Projects)
-        //    {
-        //        var ccompilation = await cproject.GetCompilationAsync();
-        //        if (ccompilation == null)
-        //        {
-        //            continue;
-        //        }
+            var documentEditor = await DocumentEditor.CreateAsync(document);
+            if (documentEditor == null)
+            {
+                //skip this document
+                return null;
+            }
 
-        //        foreach (var ctype in ccompilation.GlobalNamespace.GetAllTypes())
-        //        {
-        //            var ctnds = ctype.ContainingNamespace.ToDisplayString();
-        //            if (sourceNamespaces.Any(sn => ctnds == sn))
-        //            {
-        //                result[ctnds] = false;
-        //            }
-        //        }
-        //    }
-
-        //    return result;
-        //}
+            return documentEditor;
+        }
 
         public static async Task<Dictionary<string, INamedTypeSymbol>> GetAllTypesInNamespaceRecursivelyAsync(
             this Workspace workspace,

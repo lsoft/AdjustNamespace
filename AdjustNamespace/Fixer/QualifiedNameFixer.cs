@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using AdjustNamespace.Helper;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
@@ -9,6 +10,7 @@ namespace AdjustNamespace
 {
     public class QualifiedNameFixer : IFixer
     {
+        private readonly Workspace _workspace;
         private readonly QualifiedNameSyntax _qualifiedNameSyntax;
         private readonly string _symbolTargetNamespace;
 
@@ -17,10 +19,16 @@ namespace AdjustNamespace
         public string OrderingKey => _symbolTargetNamespace;
 
         public QualifiedNameFixer(
+            Workspace workspace,
             QualifiedNameSyntax qualifiedNameSyntax,
             string symbolTargetNamespace
             )
         {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
+
             if (qualifiedNameSyntax is null)
             {
                 throw new ArgumentNullException(nameof(qualifiedNameSyntax));
@@ -30,23 +38,40 @@ namespace AdjustNamespace
             {
                 throw new ArgumentNullException(nameof(symbolTargetNamespace));
             }
+            _workspace = workspace;
             _qualifiedNameSyntax = qualifiedNameSyntax;
             _symbolTargetNamespace = symbolTargetNamespace;
         }
 
-        public async Task FixAsync(DocumentEditor documentEditor)
+        public async Task FixAsync(string filePath)
         {
-            if (documentEditor is null)
+            if (filePath is null)
             {
-                throw new ArgumentNullException(nameof(documentEditor));
+                throw new ArgumentNullException(nameof(filePath));
             }
 
-            documentEditor.ReplaceNode(
-                _qualifiedNameSyntax,
-                _qualifiedNameSyntax.WithLeft(SyntaxFactory.ParseName(" " + _symbolTargetNamespace))
-                    .WithLeadingTrivia(_qualifiedNameSyntax.GetLeadingTrivia())
-                    .WithTrailingTrivia(_qualifiedNameSyntax.GetTrailingTrivia())
-                );
+            bool r;
+            do
+            {
+                var documentEditor = await _workspace.CreateDocumentEditorAsync(filePath);
+                if (documentEditor == null)
+                {
+                    //skip this document
+                    return;
+                }
+
+                documentEditor.ReplaceNode(
+                    _qualifiedNameSyntax,
+                    _qualifiedNameSyntax.WithLeft(SyntaxFactory.ParseName(" " + _symbolTargetNamespace))
+                        .WithLeadingTrivia(_qualifiedNameSyntax.GetLeadingTrivia())
+                        .WithTrailingTrivia(_qualifiedNameSyntax.GetTrailingTrivia())
+                    );
+
+                var changedDocument = documentEditor.GetChangedDocument();
+                r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
+            }
+            while (!r);
+
         }
     }
 }

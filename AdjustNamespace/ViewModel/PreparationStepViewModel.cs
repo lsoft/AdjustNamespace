@@ -120,13 +120,29 @@ namespace AdjustNamespace.ViewModel
 
             #region check for the target namespace already contains a type with same name
 
-            foreach (var filePath in _filePaths)
+            foreach (var subjectFilePath in _filePaths)
             {
-                MainMessage = $"Processing {filePath}";
+                MainMessage = $"Processing {subjectFilePath}";
 
-                var subjectDocument = workspace.GetDocument(filePath);
-                var subjectProject = subjectDocument!.Project;
-                var targetNamespace = subjectProject.GetTargetNamespace(filePath);
+                var subjectProjectItem = dte.Solution.GetProjectItem(subjectFilePath);
+                if (subjectProjectItem == null)
+                {
+                    continue;
+                }
+
+                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem.ContainingProject.FullName);
+                if (roslynProject == null)
+                {
+                    continue;
+                }
+
+                var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
+
+                var subjectDocument = workspace.GetDocument(subjectFilePath);
+                if (subjectDocument == null)
+                {
+                    continue;
+                }
 
                 var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
                 if (subjectSemanticModel == null)

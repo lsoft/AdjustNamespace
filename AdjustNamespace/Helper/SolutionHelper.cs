@@ -15,6 +15,77 @@ namespace AdjustNamespace.Helper
         public static string ProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 
 
+        public static ProjectItem? GetProjectItem(
+            this Solution solution,
+            string filePath
+            )
+        {
+            if (solution is null)
+            {
+                throw new ArgumentNullException(nameof(solution));
+            }
+
+            if (filePath is null)
+            {
+                throw new ArgumentNullException(nameof(filePath));
+            }
+
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            var prjItems = new List<ProjectItem>();
+            if (solution.Projects != null)
+            {
+                foreach (EnvDTE.Project project in solution.Projects)
+                {
+                    if (project.ProjectItems != null && project.ProjectItems.Count > 0)
+                    {
+                        foreach (ProjectItem projectItem in project.ProjectItems)
+                        {
+                            prjItems.Clear();
+                            ProcessProjectItem2(projectItem, ref prjItems);
+
+                            foreach (var prjItem in prjItems)
+                            {
+                                for (var i = 0; i < prjItem.FileCount; i++)
+                                {
+                                    var itemPath = prjItem.FileNames[(short)i];
+                                    if (itemPath == filePath)
+                                    {
+                                        return prjItem;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static void ProcessProjectItem2(
+            ProjectItem projectItem,
+            ref List<ProjectItem> result
+            )
+        {
+            if (projectItem is null)
+            {
+                throw new ArgumentNullException(nameof(projectItem));
+            }
+
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            result.Add(projectItem);
+
+            if (projectItem.ProjectItems != null && projectItem.ProjectItems.Count > 0)
+            {
+                foreach (ProjectItem spi in projectItem.ProjectItems)
+                {
+                    ProcessProjectItem2(spi, ref result);
+                }
+            }
+        }
+
         public static List<string> ProcessSolution(
             this EnvDTE.Solution solution
             )

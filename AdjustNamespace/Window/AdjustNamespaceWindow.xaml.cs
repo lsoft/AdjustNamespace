@@ -42,17 +42,17 @@ namespace AdjustNamespace.Window
             InitializeComponent();
         }
 
-        private void DialogWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void DialogWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            SetNextPage();
+            await SetNextPageAsync();
         }
 
-        private void NextButton_Click(object sender, RoutedEventArgs e)
+        private async void NextButton_Click(object sender, RoutedEventArgs e)
         {
-            SetNextPage();
+            await SetNextPageAsync();
         }
 
-        private void SetNextPage()
+        private async System.Threading.Tasks.Task SetNextPageAsync()
         {
             if (!_mover!.TryToMove(Dispatcher, out var vm, out var uc))
             {
@@ -65,23 +65,35 @@ namespace AdjustNamespace.Window
             uc!.DataContext = vm;
             CenterContentControl.Content = uc;
 
-            ThreadHelper.JoinableTaskFactory.RunAsync(
-                async () => 
-                {
-                    try
-                    {
-                        await vm!.StartAsync();
+            try
+            {
+                await vm!.StartAsync();
 
-                        ButtonGrid.IsEnabled = true;
-                    }
-                    catch (Exception excp)
-                    {
-                        CriticalErrorTextBlock.Text = excp.Message;
-                        Logging.LogVS(excp);
-                    }
-                }).FileAndForget(nameof(SetNextPage));
+                ButtonGrid.IsEnabled = true;
+            }
+            catch (Exception excp)
+            {
+                CriticalErrorTextBlock.Text = excp.Message;
+                Logging.LogVS(excp);
+            }
 
-    }
+            //ThreadHelper.JoinableTaskFactory.RunAsync(
+            //    async () => 
+            //    {
+            //        try
+            //        {
+            //            await vm!.StartAsync();
+
+            //            ButtonGrid.IsEnabled = true;
+            //        }
+            //        catch (Exception excp)
+            //        {
+            //            CriticalErrorTextBlock.Text = excp.Message;
+            //            Logging.LogVS(excp);
+            //        }
+            //    }).FileAndForget(nameof(SetNextPage));
+
+        }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {

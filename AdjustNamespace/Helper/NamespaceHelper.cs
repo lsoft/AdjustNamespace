@@ -12,7 +12,7 @@ namespace AdjustNamespace.Helper
     public static class NamespaceHelper
     {
         public static string GetTargetNamespace(
-            this Microsoft.CodeAnalysis.Project project,
+            this Project project,
             string documentFilePath
             )
         {

@@ -1,5 +1,6 @@
 ﻿using AdjustNamespace.Helper;
 using AdjustNamespace.Mover;
+using AdjustNamespace.Xaml;
 using EnvDTE80;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -64,6 +65,8 @@ namespace AdjustNamespace.ViewModel
 
         public override async System.Threading.Tasks.Task StartAsync()
         {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
             var dte = await _moverState.ServiceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
             if (dte == null)
             {
@@ -84,11 +87,11 @@ namespace AdjustNamespace.ViewModel
 
             #region get all interestring files in current solution
 
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            //await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             var filePaths = dte.Solution.ProcessSolution();
 
-            await TaskScheduler.Default;
+            //await TaskScheduler.Default;
 
             #endregion
 
@@ -98,9 +101,58 @@ namespace AdjustNamespace.ViewModel
 
                 ProgressMessage = $"File #{i + 1} out of #{_subjectFilePaths.Count}";
 
+                var subjectProjectItem = dte.Solution.GetProjectItem(subjectFilePath);
+                if (subjectProjectItem == null)
+                {
+                    continue;
+                }
+
+                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem.ContainingProject.FullName);
+                if (roslynProject == null)
+                {
+                    continue;
+                }
+
+                var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
+
+
+                if (subjectFilePath.EndsWith(".xaml"))
+                {
+                    //it's a xaml
+
+                    var xamlEngine = new XamlEngine(subjectFilePath);
+
+                    if (!xamlEngine.GetRootInfo(out var rootNamespace, out var rootName))
+                    {
+                        continue;
+                    }
+
+                    if (rootNamespace != targetNamespace)
+                    {
+                        continue;
+                    }
+
+                    xamlEngine.MoveObject(
+                        rootNamespace!,
+                        rootName!,
+                        targetNamespace
+                        );
+
+                    xamlEngine.SaveIfChangesExists();
+
+                    continue;
+                }
+
+
+
                 var subjectDocument = workspace.GetDocument(subjectFilePath);
-                var subjectProject = subjectDocument!.Project;
-                var targetNamespace = subjectProject.GetTargetNamespace(subjectFilePath);
+                if (subjectDocument == null)
+                {
+                    continue;
+                }
+                
+                //var subjectProject = subjectDocument!.Project;
+                //var targetNamespace = subjectProject.GetTargetNamespace(subjectFilePath);
 
                 var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
                 if (subjectSemanticModel == null)
@@ -122,13 +174,13 @@ namespace AdjustNamespace.ViewModel
 
                 var namespaceRenameDict = namespaceInfos.BuildRenameDict();
 
-                var editorProvider = new EditorProvider(workspace);
+                //var editorProvider = new EditorProvider(workspace);
 
                 #region fix refs (adding a new using namespace clauses)
 
                 var toProcess = new Dictionary<string, HashSet<IFixer>>();
-                var processedTypes = new HashSet<string>();
-
+                var processedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+                
                 foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
                 {
                     var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
@@ -137,7 +189,7 @@ namespace AdjustNamespace.ViewModel
                         continue;
                     }
 
-                    if (processedTypes.Contains(symbolInfo.ToDisplayString()))
+                    if (processedTypes.Contains(symbolInfo))
                     {
                         //already processed
                         continue;
@@ -148,6 +200,12 @@ namespace AdjustNamespace.ViewModel
                     var foundReferences = await SymbolFinder.FindReferencesAsync(symbolInfo, workspace.CurrentSolution);
                     foreach (var foundReference in foundReferences)
                     {
+                        if (foundReference.Definition.ContainingNamespace.ToDisplayString() == targetNamespaceInfo.ModifiedName)
+                        {
+                            //referenced symbols is in target namespace already
+                            continue;
+                        }
+
                         foreach (var location in foundReference.Locations)
                         {
                             if (location.Document.FilePath == null)
@@ -186,6 +244,7 @@ namespace AdjustNamespace.ViewModel
                                 //replace QualifiedNameSyntax
                                 toProcess[location.Document.FilePath].Add(
                                     new QualifiedNameFixer(
+                                        workspace,
                                         qns,
                                         targetNamespaceInfo.ModifiedName
                                         )
@@ -196,6 +255,7 @@ namespace AdjustNamespace.ViewModel
                                 //add a new using clause
                                 toProcess[location.Document.FilePath].Add(
                                     new NamespaceFixer(
+                                        workspace,
                                         targetNamespaceInfo.ModifiedName
                                         )
                                     );
@@ -203,23 +263,18 @@ namespace AdjustNamespace.ViewModel
                         }
                     }
 
-                    processedTypes.Add(symbolInfo.ToDisplayString());
+                    processedTypes.Add(symbolInfo);
                 }
 
                 foreach (var group in toProcess)
                 {
                     var targetFilePath = group.Key;
 
-                    var documentEditor = await editorProvider.GetDocumentEditorAsync(targetFilePath);
-                    if (documentEditor == null)
-                    {
-                        //skip this document
-                        continue;
-                    }
+                    Debug.WriteLine($"Fix references in {targetFilePath}");
 
-                    foreach (var fixer in group.Value.OrderByDescending(a => a.OrderingKey))
+                    foreach (var fixer in group.Value.OrderBy(a => a.OrderingKey))
                     {
-                        await fixer.FixAsync(documentEditor);
+                        await fixer.FixAsync(targetFilePath);
                     }
                 }
 
@@ -228,10 +283,16 @@ namespace AdjustNamespace.ViewModel
                 #region fixed subject namespaces
 
                 {
-                    var subjectDocumentEditor = await editorProvider.GetDocumentEditorAsync(subjectDocument.FilePath!);
-
-                    if (subjectDocumentEditor != null)
+                    bool r;
+                    do
                     {
+                        var subjectDocumentEditor = await workspace.CreateDocumentEditorAsync(subjectDocument.FilePath!);
+                        if (subjectDocumentEditor == null)
+                        {
+                            //skip this document
+                            return;
+                        }
+
                         foreach (var namespaceInfo in namespaceInfos.Where(ni => ni.IsRoot))
                         {
                             var syntaxRoot = await subjectDocumentEditor.OriginalDocument
@@ -261,47 +322,16 @@ namespace AdjustNamespace.ViewModel
                                 fixedNamespace
                                 );
                         }
+
+                        var changedDocument = subjectDocumentEditor.GetChangedDocument();
+                        r = workspace.TryApplyChanges(changedDocument.Project.Solution);
                     }
-
-                    await editorProvider.SaveAndClearAsync();
-
-                    ////remove `using oldnamespace` if oldnamespace does not exists anymore
-                    //foreach (var document in workspace.EnumerateAllDocuments(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
-                    //{
-                    //    Debug.WriteLine(document.FilePath);
-
-                    //    var syntaxRoot = await document.GetSyntaxRootAsync();
-                    //    if (syntaxRoot == null)
-                    //    {
-                    //        continue;
-                    //    }
-
-                    //    var usingSyntaxes = syntaxRoot
-                    //        .DescendantNodes()
-                    //        .OfType<UsingDirectiveSyntax>()
-                    //        .ToList();
-
-                    //    foreach (var usingSyntax in usingSyntaxes)
-                    //    {
-                    //        if (namespaceRenameDict.Keys.Contains(usingSyntax.Name.ToString()))
-                    //        {
-                    //            var documentEditor = await editorProvider.GetDocumentEditorAsync(document.FilePath!);
-                    //            if (documentEditor == null)
-                    //            {
-                    //                continue;
-                    //            }
-
-                    //            documentEditor.RemoveNode(usingSyntax);
-                    //        }
-                    //    }
-                    //}
+                    while (!r);
                 }
-
-                await editorProvider.SaveAndClearAsync();
 
                 #endregion
 
-                #region fix xaml
+                #region fix references in xaml files
 
                 foreach (var filePath in filePaths)
                 {
@@ -310,48 +340,20 @@ namespace AdjustNamespace.ViewModel
                         continue;
                     }
 
-                    var xamlToProcess = filePath;
+                    var xamlEngine = new XamlEngine(filePath);
 
-                    var plainBody = File.ReadAllText(xamlToProcess);
-                    var xmlDocument = XDocument.Load(xamlToProcess, LoadOptions.PreserveWhitespace);
-
-                    var changedExists = false;
-
-                    var element = xmlDocument.Elements().FirstOrDefault();
-                    if (element == null)
+                    foreach (var processedType in processedTypes)
                     {
-                        continue;
+                        var targetNamespaceInfo = namespaceRenameDict[processedType.ContainingNamespace.ToDisplayString()];
+
+                        xamlEngine.MoveObject(
+                            processedType.ContainingNamespace.ToDisplayString(),
+                            processedType.Name,
+                            targetNamespaceInfo.ModifiedName
+                            );
                     }
 
-                    var attributes = new List<XAttribute>(element.Attributes());
-                    foreach (var attribute in attributes)
-                    {
-                        if (attribute.Name.Namespace == "http://www.w3.org/2000/xmlns/")
-                        {
-                            const string ClrNamespace = "clr-namespace:";
-
-                            if (attribute.Value.Length <= ClrNamespace.Length)
-                            {
-                                continue;
-                            }
-
-                            var modifiedValue = attribute.Value.Substring(ClrNamespace.Length);
-                            if (namespaceRenameDict.TryGetValue(modifiedValue, out var namespaceInfo))
-                            {
-                                plainBody = plainBody.Replace(
-                                    attribute.Value,
-                                    $"{ClrNamespace}{namespaceInfo.ModifiedName}"
-                                    );
-
-                                changedExists = true;
-                            }
-                        }
-                    }
-
-                    if (changedExists)
-                    {
-                        File.WriteAllText(xamlToProcess, plainBody);
-                    }
+                    xamlEngine.SaveIfChangesExists();
                 }
                 #endregion
 
@@ -361,6 +363,11 @@ namespace AdjustNamespace.ViewModel
 
                 foreach (Document document in workspace.EnumerateAllDocuments(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
                 {
+                    if (document.FilePath == null)
+                    {
+                        continue;
+                    }
+
                     var syntaxRoot = await document.GetSyntaxRootAsync();
                     if (syntaxRoot == null)
                     {
@@ -378,38 +385,52 @@ namespace AdjustNamespace.ViewModel
                         continue;
                     }
 
-                    var changed = false;
-                    foreach (var n in namespaces)
+                    bool r;
+                    do
                     {
-                        var nname = n.Name.ToString();
-
-                        if (!namespaceRenameDict.ContainsKey(nname))
-                        {
-                            //this namespace is not what we changed
-                            continue;
-                        }
-
-                        if (allSolutionNamespaces.Contains(nname))
-                        {
-                            //there is a types in this namespace
-                            continue;
-                        }
-
-                        var documentEditor = await editorProvider.GetDocumentEditorAsync(document);
+                        var documentEditor = await workspace.CreateDocumentEditorAsync(document.FilePath);
                         if (documentEditor == null)
                         {
-                            continue;
+                            //skip this document
+                            return;
                         }
 
-                        documentEditor.RemoveNode(n, SyntaxRemoveOptions.KeepNoTrivia);
 
-                        changed = true;
-                    }
+                        var changed = false;
+                        foreach (var n in namespaces)
+                        {
+                            var nname = n.Name.ToString();
 
-                    if (changed)
-                    {
-                        await editorProvider.SaveAndClearAsync();
+                            if (!namespaceRenameDict.ContainsKey(nname))
+                            {
+                                //this namespace is not what we changed
+                                continue;
+                            }
+
+                            if (allSolutionNamespaces.Contains(nname))
+                            {
+                                //there is a types in this namespace
+                                continue;
+                            }
+
+                            documentEditor.RemoveNode(n, SyntaxRemoveOptions.KeepNoTrivia);
+
+                            changed = true;
+                        }
+
+                        if (changed)
+                        {
+                            var changedDocument = documentEditor.GetChangedDocument();
+                            r = workspace.TryApplyChanges(changedDocument.Project.Solution);
+                        }
+                        else
+                        {
+                            r = true;
+                        }
+
                     }
+                    while (!r);
+
                 }
 
                 #endregion
