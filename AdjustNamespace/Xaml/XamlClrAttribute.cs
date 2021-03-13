@@ -5,36 +5,43 @@ namespace AdjustNamespace.Xaml
 {
     public class XamlClrAttribute
     {
+        public string Alias
+        {
+            get;
+        }
+        public string ClassName
+        {
+            get;
+        }
         public XAttribute Attribute
-        {
-            get;
-        }
-        public string XamlKey
-        {
-            get;
-        }
-        public string ClrNamespace
         {
             get;
         }
 
         public XamlClrAttribute(
+            string alias,
+            string className,
             XAttribute attribute
             )
         {
-            if (attribute == null)
+            if (alias is null)
+            {
+                throw new ArgumentNullException(nameof(alias));
+            }
+
+            if (className is null)
+            {
+                throw new ArgumentNullException(nameof(className));
+            }
+
+            if (attribute is null)
             {
                 throw new ArgumentNullException(nameof(attribute));
             }
 
-            var clrAttributeNamespace = XamlHelper.GetNamespace(attribute.Value);
-
-            //Debug.WriteLine(clrAttribute.Name + "  -->  " + clrAttributeNamespace);
-
+            Alias = alias;
+            ClassName = className;
             Attribute = attribute;
-            XamlKey = attribute.Name.LocalName;
-            ClrNamespace = clrAttributeNamespace;
         }
-
     }
 }

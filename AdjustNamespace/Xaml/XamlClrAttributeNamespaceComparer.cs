@@ -3,11 +3,11 @@ using System.Threading.Tasks;
 
 namespace AdjustNamespace.Xaml
 {
-    public class XamlClrAttributeNamespaceComparer : IEqualityComparer<XamlClrAttribute>
+    public class XamlClrAttributeNamespaceComparer : IEqualityComparer<XamlClrNamespace>
     {
         public static readonly XamlClrAttributeNamespaceComparer Instance = new XamlClrAttributeNamespaceComparer();
 
-        public bool Equals(XamlClrAttribute x, XamlClrAttribute y)
+        public bool Equals(XamlClrNamespace x, XamlClrNamespace y)
         {
             if (x == null && y == null)
             {
@@ -25,7 +25,7 @@ namespace AdjustNamespace.Xaml
             return x!.ClrNamespace == y!.ClrNamespace;
         }
 
-        public int GetHashCode(XamlClrAttribute obj)
+        public int GetHashCode(XamlClrNamespace obj)
         {
             return obj?.ClrNamespace.GetHashCode() ?? 0;
         }

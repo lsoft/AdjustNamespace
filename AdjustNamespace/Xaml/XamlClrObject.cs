@@ -3,6 +3,8 @@ using System.Xml.Linq;
 
 namespace AdjustNamespace.Xaml
 {
+
+
     public class XamlClrObject
     {
         public XElement Element

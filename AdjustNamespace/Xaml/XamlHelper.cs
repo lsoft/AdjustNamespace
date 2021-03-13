@@ -2,6 +2,7 @@
 
 namespace AdjustNamespace.Xaml
 {
+
     public static class XamlHelper
     {
         public static string GetNamespace(string attributeValue)

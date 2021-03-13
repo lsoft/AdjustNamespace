@@ -89,11 +89,13 @@
       <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Xaml\CustomXmlWriter.cs" />
+    <Compile Include="Xaml\XamlClrNamespace.cs" />
     <Compile Include="Xaml\XamlClrAttribute.cs" />
     <Compile Include="Xaml\XamlClrObject.cs" />
     <Compile Include="Xaml\XamlEngine.cs" />
     <Compile Include="Xaml\XamlHelper.cs" />
     <Compile Include="Xaml\XamlClrAttributeNamespaceComparer.cs" />
+    <Compile Include="Xaml\XamlReference.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="LICENSE.txt">
