@@ -112,9 +112,6 @@ namespace AdjustNamespace
             {
                 var filePaths = new List<string>();
 
-                //var message = string.Format(CultureInfo.CurrentCulture, "Inside {0}.MenuItemCallback()", GetType().FullName) + Environment.NewLine;
-                //var title = "AdjustNamespace";
-
                 var dte = await ServiceProvider.GetServiceAsync(typeof(DTE)) as DTE2;
                 if (dte == null)
                 {
@@ -159,57 +156,6 @@ namespace AdjustNamespace
                         }
                     }
                 }
-
-
-                //var filteredFilePaths = new List<string>();
-
-                //foreach (var filePath in filePaths)
-                //{
-                //    var subjectDocument = workspace.GetDocument(filePath);
-                //    if (!subjectDocument.IsDocumentInScope())
-                //    {
-                //        continue;
-                //    }
-
-                //    var project = subjectDocument!.Project;
-                //    if (!project.IsProjectInScope())
-                //    {
-                //        continue;
-                //    }
-
-                //    var projectFolderPath = new FileInfo(project.FilePath).Directory.FullName;
-                //    var suffix = new FileInfo(filePath).Directory.FullName.Substring(projectFolderPath.Length);
-                //    var targetNamespace = project.DefaultNamespace +
-                //        suffix
-                //            .Replace(Path.DirectorySeparatorChar, '.')
-                //            .Replace(Path.AltDirectorySeparatorChar, '.')
-                //            ;
-
-
-                //    var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
-                //    if (subjectSemanticModel == null)
-                //    {
-                //        continue;
-                //    }
-
-                //    var subjectSyntaxRoot = await subjectDocument.GetSyntaxRootAsync();
-                //    if (subjectSyntaxRoot == null)
-                //    {
-                //        continue;
-                //    }
-
-                //    var subjectNamespaces = subjectSyntaxRoot
-                //        .DescendantNodesAndSelf()
-                //        .OfType<NamespaceDeclarationSyntax>()
-                //        .ToList()
-                //        ;
-                //    if (subjectNamespaces.Count == 0)
-                //    {
-                //        continue;
-                //    }
-
-                //    filteredFilePaths.Add(filePath);
-                //}
 
                 if (filePaths.Count > 0)
                 {
