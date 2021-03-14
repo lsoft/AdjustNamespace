@@ -53,6 +53,7 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(root));
             }
 
+
             var candidateNamespaces = (
                 from dnode in node.DescendantNodesAndSelf()
                 let tdnode = dnode as NamespaceDeclarationSyntax
