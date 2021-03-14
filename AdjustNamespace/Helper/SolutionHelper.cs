@@ -48,10 +48,12 @@ namespace AdjustNamespace.Helper
                             {
                                 for (var i = 0; i < prjItem.FileCount; i++)
                                 {
-                                    var itemPath = prjItem.FileNames[(short)i];
-                                    if (itemPath == filePath)
+                                    if (prjItem.TryGetFileName(i, out var itemPath))
                                     {
-                                        return prjItem;
+                                        if (itemPath == filePath)
+                                        {
+                                            return prjItem;
+                                        }
                                     }
                                 }
                             }
@@ -61,6 +63,24 @@ namespace AdjustNamespace.Helper
             }
 
             return null;
+        }
+
+        public static bool TryGetFileName(
+            this ProjectItem prjItem,
+            int index,
+            out string? fileName
+            )
+        {
+            try
+            {
+                fileName = prjItem.FileNames[(short)index];
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                fileName = null;
+                return false;
+            }
         }
 
         private static void ProcessProjectItem2(

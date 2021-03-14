@@ -53,17 +53,19 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(root));
             }
 
-            var candidateNamespaces = node
-                .DescendantNodesAndSelf()
-                .OfType<NamespaceDeclarationSyntax>()
-                .Select(nds => nds.GetNamespaceInfo(root))
-                .ToList()
-                ;
+            var candidateNamespaces = (
+                from dnode in node.DescendantNodesAndSelf()
+                let tdnode = dnode as NamespaceDeclarationSyntax
+                where tdnode != null
+                let ni = tdnode.TryGetNamespaceInfo(root)
+                where ni != null
+                select ni
+                ).ToList();
 
             return candidateNamespaces;
         }
 
-        public static NamespaceInfo GetNamespaceInfo(
+        public static NamespaceInfo? TryGetNamespaceInfo(
             this NamespaceDeclarationSyntax n,
             string root
             )
@@ -99,12 +101,19 @@ namespace AdjustNamespace.Helper
                 cloned[0] = root!;
             }
 
-            return
-                new NamespaceInfo(
-                    string.Join(".", res),
-                    string.Join(".", cloned),
-                    res.Count == 1
-                    );
+            var originalNamespace = string.Join(".", res);
+            var clonedNamespace = string.Join(".", cloned);
+
+            if (originalNamespace == clonedNamespace)
+            {
+                return null;
+            }
+
+            return new NamespaceInfo(
+                originalNamespace,
+                clonedNamespace,
+                res.Count == 1
+                );
         }
 
         public static Dictionary<string, NamespaceInfo> BuildRenameDict(
