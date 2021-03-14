@@ -15,7 +15,7 @@ namespace AdjustNamespace.Helper
         public static string ProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 
 
-        public static ProjectItem? GetProjectItem(
+        public static ProjectItem? TryGetProjectItem(
             this Solution solution,
             string filePath
             )

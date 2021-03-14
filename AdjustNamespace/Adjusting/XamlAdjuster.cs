@@ -50,7 +50,7 @@ namespace AdjustNamespace.Adjusting
                 rootName!,
                 _targetNamespace
                 );
-            xamlEngine.RemoveObsoleteClrNamespaces();
+
             xamlEngine.SaveIfChangesExists();
 
             return true;

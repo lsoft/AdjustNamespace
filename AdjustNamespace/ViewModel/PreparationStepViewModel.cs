@@ -124,7 +124,7 @@ namespace AdjustNamespace.ViewModel
             {
                 MainMessage = $"Processing {subjectFilePath}";
 
-                var subjectProjectItem = dte.Solution.GetProjectItem(subjectFilePath);
+                var subjectProjectItem = dte.Solution.TryGetProjectItem(subjectFilePath);
                 if (subjectProjectItem == null)
                 {
                     continue;
@@ -136,15 +136,13 @@ namespace AdjustNamespace.ViewModel
                     continue;
                 }
 
-                var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
-
                 var subjectDocument = workspace.GetDocument(subjectFilePath);
-                if (subjectDocument == null)
+                if (!subjectDocument.IsDocumentInScope())
                 {
                     continue;
                 }
 
-                var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
+                var subjectSemanticModel = await subjectDocument!.GetSemanticModelAsync();
                 if (subjectSemanticModel == null)
                 {
                     continue;
@@ -156,16 +154,15 @@ namespace AdjustNamespace.ViewModel
                     continue;
                 }
 
+                var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
+
                 var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(targetNamespace);
                 if (namespaceInfos.Count == 0)
                 {
                     continue;
                 }
 
-
                 var namespaceRenameDict = namespaceInfos.BuildRenameDict();
-
-
 
                 // get all types in the target namespace
                 var foundTypesInTargetNamespace = await workspace.GetAllTypesInNamespaceRecursivelyAsync(new[] { targetNamespace });

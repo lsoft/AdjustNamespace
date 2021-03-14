@@ -102,7 +102,7 @@ namespace AdjustNamespace.ViewModel
 
                 #region build target namespace
 
-                var subjectProjectItem = dte.Solution.GetProjectItem(subjectFilePath);
+                var subjectProjectItem = dte.Solution.TryGetProjectItem(subjectFilePath);
                 if (subjectProjectItem == null)
                 {
                     continue;
@@ -114,22 +114,29 @@ namespace AdjustNamespace.ViewModel
                     continue;
                 }
 
-                var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
-
                 #endregion
 
                 if (subjectFilePath.EndsWith(".xaml"))
                 {
                     //it's a xaml
 
+                    var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
+
                     var xamlAdjuster = new XamlAdjuster(subjectFilePath, targetNamespace);
 
                     xamlAdjuster.Adjust();
-
-                    continue;
                 }
                 else
                 {
+                    //we can do nothing with not a C# documents
+                    var subjectDocument = workspace.GetDocument(subjectFilePath);
+                    if (!subjectDocument.IsDocumentInScope())
+                    {
+                        continue;
+                    }
+
+                    var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
+
                     var csAdjuster = new CsAdjuster(
                         workspace,
                         subjectFilePath,
