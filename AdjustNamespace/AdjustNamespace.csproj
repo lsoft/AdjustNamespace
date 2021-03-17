@@ -50,9 +50,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Adjusting\CsAdjuster.cs" />
+    <Compile Include="Adjusting\NamespaceCenter.cs" />
     <Compile Include="Adjusting\XamlAdjuster.cs" />
     <Compile Include="AdjustNamespaceCommand.cs" />
-    <Compile Include="Control\PerformingUserControl.xaml.cs">
+    <Compile Include="UI\Control\PerformingUserControl.xaml.cs">
       <DependentUpon>PerformingUserControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="Adjusting\Fixer\IFixer.cs" />
@@ -80,11 +81,11 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>AdjustNamespace.vsct</DependentUpon>
     </Compile>
-    <Compile Include="Control\PreparationUserControl.xaml.cs">
+    <Compile Include="UI\Control\PreparationUserControl.xaml.cs">
       <DependentUpon>PreparationUserControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="ViewModel\PerformingViewModel.cs" />
-    <Compile Include="ViewModel\PreparationStepViewModel.cs" />
+    <Compile Include="UI\ViewModel\PerformingViewModel.cs" />
+    <Compile Include="UI\ViewModel\PreparationStepViewModel.cs" />
     <Compile Include="Window\AdjustNamespaceWindow.xaml.cs">
       <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>
     </Compile>
@@ -162,11 +163,11 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
-    <Page Include="Control\PerformingUserControl.xaml">
+    <Page Include="UI\Control\PerformingUserControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="Control\PreparationUserControl.xaml">
+    <Page Include="UI\Control\PreparationUserControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

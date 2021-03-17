@@ -17,12 +17,14 @@ namespace AdjustNamespace.Adjusting
     public class CsAdjuster
     {
         private readonly VisualStudioWorkspace _workspace;
+        private readonly NamespaceCenter _namespaceCenter;
         private readonly string _subjectFilePath;
         private readonly string _targetNamespace;
         private readonly List<string> _xamlFilePaths;
 
         public CsAdjuster(
             VisualStudioWorkspace workspace,
+            NamespaceCenter namespaceCenter,
             string subjectFilePath,
             string targetNamespace,
             List<string> xamlFilePaths
@@ -31,6 +33,11 @@ namespace AdjustNamespace.Adjusting
             if (workspace is null)
             {
                 throw new ArgumentNullException(nameof(workspace));
+            }
+
+            if (namespaceCenter is null)
+            {
+                throw new ArgumentNullException(nameof(namespaceCenter));
             }
 
             if (subjectFilePath is null)
@@ -49,6 +56,7 @@ namespace AdjustNamespace.Adjusting
             }
 
             _workspace = workspace;
+            _namespaceCenter = namespaceCenter;
             _subjectFilePath = subjectFilePath;
             _targetNamespace = targetNamespace;
             _xamlFilePaths = xamlFilePaths;
@@ -176,6 +184,7 @@ namespace AdjustNamespace.Adjusting
                 }
 
                 processedTypes.Add(symbolInfo);
+                _namespaceCenter.TypeRemoved(symbolInfo);
             }
 
             foreach (var group in toProcess)
@@ -202,22 +211,15 @@ namespace AdjustNamespace.Adjusting
                 processedTypes
                 );
 
-            await RemoveEmptyUsingStatementsAsync(namespaceRenameDict);
+            await RemoveEmptyUsingStatementsAsync();
 
 
             return true;
         }
 
         private async Task RemoveEmptyUsingStatementsAsync(
-            Dictionary<string, NamespaceInfo> namespaceRenameDict
             )
         {
-            if (namespaceRenameDict is null)
-            {
-                throw new ArgumentNullException(nameof(namespaceRenameDict));
-            }
-
-            var allSolutionNamespaces = await _workspace.GetAllNamespacesAsync();
 
             foreach (Document document in _workspace.EnumerateAllDocuments(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
             {
@@ -259,13 +261,7 @@ namespace AdjustNamespace.Adjusting
                     {
                         var nname = n.Name.ToString();
 
-                        if (!namespaceRenameDict.ContainsKey(nname))
-                        {
-                            //this namespace is not what we changed
-                            continue;
-                        }
-
-                        if (allSolutionNamespaces.Contains(nname))
+                        if (!_namespaceCenter.NamespacesToRemove.Contains(nname))
                         {
                             //there is a types in this namespace
                             continue;

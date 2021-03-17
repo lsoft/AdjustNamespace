@@ -71,11 +71,21 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(workspace));
             }
 
-            var allSolutionNamespaces =
-                (await workspace.GetAllTypesInNamespaceRecursivelyAsync(null))
-                    .Values
-                    .Select(t => t.ContainingNamespace.ToDisplayString())
-                    .ToHashSet();
+            var typeDict = await workspace.GetAllTypesInNamespaceRecursivelyAsync(null);
+
+            //var ddd = new Dictionary<string, List<ITypeSymbol>>();
+            //foreach (var t in typeDict.Values)
+            //{
+            //    if (!ddd.ContainsKey(t.ContainingNamespace.ToDisplayString()))
+            //    {
+            //        ddd[t.ContainingNamespace.ToDisplayString()] = new List<ITypeSymbol>();
+            //    }
+
+
+            //    ddd[t.ContainingNamespace.ToDisplayString()].Add(t);
+            //}
+
+            var allSolutionNamespaces = typeDict.Values.Select(t => t.ContainingNamespace.ToDisplayString()).ToHashSet();
 
             return allSolutionNamespaces;
         }

@@ -226,12 +226,14 @@ namespace AdjustNamespace.Xaml
             }
 
             var reloadedXmlns = ReadXmlns().ToList();
-
-            var indexToInsert = reloadedXmlns.Max(x => x.Index + x.Length);
-
-            foreach (var xmlns in Xmlns.Where(x => !x.Saved))
+            if (reloadedXmlns.Count > 0)
             {
-                xmlns.SaveTo(ref _xaml, ref indexToInsert);
+                var indexToInsert = reloadedXmlns.Max(x => x.Index + x.Length);
+
+                foreach (var xmlns in Xmlns.Where(x => !x.Saved))
+                {
+                    xmlns.SaveTo(ref _xaml, ref indexToInsert);
+                }
             }
 
         }

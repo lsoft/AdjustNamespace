@@ -86,7 +86,11 @@ namespace AdjustNamespace.ViewModel
                 return;
             }
 
-            #region get all interestring files in current solution
+            var namespaceCenter = new NamespaceCenter(
+                (await workspace.GetAllTypesInNamespaceRecursivelyAsync()).Values
+                );
+
+            #region get all xaml files in current solution
 
             var filePaths = dte.Solution.ProcessSolution();
             var xamlFilePaths = filePaths.FindAll(fp => fp.EndsWith(".xaml"));
@@ -97,8 +101,8 @@ namespace AdjustNamespace.ViewModel
             {
                 var subjectFilePath = _subjectFilePaths[i];
 
-                ProgressMessage = $"File #{i + 1} out of #{_subjectFilePaths.Count}";
-
+                ProgressMessage = $"{i + 1}/{_subjectFilePaths.Count}: {subjectFilePath}";
+                Debug.WriteLine($"----------------------------> {i} {subjectFilePath}");
 
                 #region build target namespace
 
@@ -139,6 +143,7 @@ namespace AdjustNamespace.ViewModel
 
                     var csAdjuster = new CsAdjuster(
                         workspace,
+                        namespaceCenter,
                         subjectFilePath,
                         targetNamespace,
                         xamlFilePaths
