@@ -70,8 +70,6 @@
     <Compile Include="Helper\WpfHelper.cs" />
     <Compile Include="ImageMonikers.cs" />
     <Compile Include="Logging.cs" />
-    <Compile Include="Mover\AdjustChainMover.cs" />
-    <Compile Include="Mover\IChainMoverState.cs" />
     <Compile Include="Predicate.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="AdjustNamespacePackage.cs" />
@@ -84,7 +82,10 @@
     <Compile Include="UI\Control\PreparationUserControl.xaml.cs">
       <DependentUpon>PreparationUserControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="UI\StepFactory\IStepFactory.cs" />
+    <Compile Include="UI\StepFactory\PerformingStepFactory.cs" />
     <Compile Include="UI\ViewModel\PerformingViewModel.cs" />
+    <Compile Include="UI\StepFactory\PreparationStepFactory.cs" />
     <Compile Include="UI\ViewModel\PreparationStepViewModel.cs" />
     <Compile Include="Window\AdjustNamespaceWindow.xaml.cs">
       <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>

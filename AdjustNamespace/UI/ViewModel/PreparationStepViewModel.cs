@@ -1,27 +1,34 @@
 ﻿using AdjustNamespace.Helper;
-using AdjustNamespace.Mover;
 using EnvDTE80;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
+using Microsoft.VisualStudio.PlatformUI;
+using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Collections.ObjectModel;
 using System.Linq;
+using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
+using AdjustNamespace.UI.StepFactory;
 
-namespace AdjustNamespace.ViewModel
+namespace AdjustNamespace.UI.ViewModel
 {
     public class PreparationStepViewModel : ChainViewModel
     {
-        private readonly IChainMoverState _moverState;
+        private readonly IAsyncServiceProvider _serviceProvider;
+        private readonly IStepFactory _nextStepFactory;
         private readonly List<string> _filePaths;
 
-        private string _detectedMessages;
         private Brush _foreground;
         private string _mainMessage;
+        private bool _isInProgress = false;
+        private bool _blocked = false;
+
+        private ICommand? _closeCommand;
+        private ICommand? _nextCommand;
 
         public string MainMessage
         {
@@ -33,14 +40,10 @@ namespace AdjustNamespace.ViewModel
             }
         }
 
-        public string DetectedMessages
+        public ObservableCollection<string> DetectedMessages
         {
-            get => _detectedMessages;
-            private set
-            {
-                _detectedMessages = value;
-                OnPropertyChanged(nameof(DetectedMessages));
-            }
+            get;
+            private set;
         }
 
         public Brush Foreground
@@ -53,38 +56,86 @@ namespace AdjustNamespace.ViewModel
             }
         }
 
+
+        public ICommand CloseCommand
+        {
+            get
+            {
+                if (_closeCommand == null)
+                {
+                    _closeCommand = new RelayCommand(
+                        a =>
+                        {
+                            if (a is DialogWindow w)
+                            {
+                                w.Close();
+                            }
+                        },
+                        r => !_isInProgress
+                        );
+                }
+
+                return _closeCommand;
+            }
+        }
+
+        public ICommand NextCommand
+        {
+            get
+            {
+                if (_nextCommand == null)
+                {
+                    _nextCommand = new AsyncRelayCommand(
+                        async a => await _nextStepFactory.CreateAsync(_filePaths),
+                        r => !_blocked && !_isInProgress
+                        );
+                }
+
+                return _nextCommand;
+            }
+        }
+
         public PreparationStepViewModel(
-            IChainMoverState moverState,
-            Dispatcher dispatcher,
+            IAsyncServiceProvider serviceProvider,
+            IStepFactory nextStepFactory,
             List<string> filePaths
             )
-            : base(dispatcher)
         {
-            if (moverState is null)
+            if (serviceProvider is null)
             {
-                throw new ArgumentNullException(nameof(moverState));
+                throw new ArgumentNullException(nameof(serviceProvider));
+            }
+
+            if (nextStepFactory is null)
+            {
+                throw new ArgumentNullException(nameof(nextStepFactory));
             }
 
             if (filePaths is null)
             {
                 throw new ArgumentNullException(nameof(filePaths));
             }
-            _moverState = moverState;
+            _serviceProvider = serviceProvider;
+            _nextStepFactory = nextStepFactory;
             _filePaths = filePaths;
-            _detectedMessages = string.Empty;
             _foreground = Brushes.Green;
             _mainMessage = "Scanning solution...";
+
+            DetectedMessages = new ObservableCollection<string>();
         }
 
         public override async System.Threading.Tasks.Task StartAsync()
         {
-            var dte = await _moverState.ServiceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
+            _isInProgress = true;
+            OnPropertyChanged();
+
+            var dte = await _serviceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
             if (dte == null)
             {
                 return;
             }
 
-            var componentModel = (IComponentModel)await _moverState.ServiceProvider.GetServiceAsync(typeof(SComponentModel));
+            var componentModel = (IComponentModel)await _serviceProvider.GetServiceAsync(typeof(SComponentModel));
             if (componentModel == null)
             {
                 return;
@@ -111,7 +162,9 @@ namespace AdjustNamespace.ViewModel
                     if (compilation.GetDiagnostics().Any(j => j.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     {
                         Foreground = Brushes.Red;
-                        DetectedMessages += Environment.NewLine + $"Compilation of {project.Name} fails. Adjust namespace can produce an incorrect results.";
+                        DetectedMessages.Add(
+                            $"Compilation of {project.Name} fails. Adjust namespace can produce an incorrect results."
+                            );
                     }
                 }
             }
@@ -181,8 +234,10 @@ namespace AdjustNamespace.ViewModel
                     if (foundTypesInTargetNamespace.ContainsKey($"{targetNamespaceInfo}.{symbolInfo.Name}"))
                     {
                         Foreground = Brushes.Red;
-                        DetectedMessages += Environment.NewLine + $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'";
-                        _moverState.BlockMovingForward = true;
+                        DetectedMessages.Add(
+                            $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'"
+                            );
+                        _blocked = true;
                         return;
                     }
                 }
@@ -191,6 +246,8 @@ namespace AdjustNamespace.ViewModel
             #endregion
 
             MainMessage = $"Let's move next!";
+            _isInProgress = false;
+            OnPropertyChanged();
         }
     }
 }

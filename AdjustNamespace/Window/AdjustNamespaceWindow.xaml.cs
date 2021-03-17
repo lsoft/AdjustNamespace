@@ -1,20 +1,8 @@
-﻿using AdjustNamespace.Mover;
-using Microsoft.VisualStudio.PlatformUI;
-using Microsoft.VisualStudio.Shell;
+﻿using Microsoft.VisualStudio.PlatformUI;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using Task = System.Threading.Tasks.Task;
 
 namespace AdjustNamespace.Window
 {
@@ -23,81 +11,32 @@ namespace AdjustNamespace.Window
     /// </summary>
     public partial class AdjustNamespaceWindow : DialogWindow
     {
-        private readonly AdjustChainMover? _mover;
+        private readonly Func<AdjustNamespaceWindow, Task> _factory;
 
-        public AdjustNamespaceWindow()
+        public AdjustNamespaceWindow(
+            List<string> filePaths,
+            Func<AdjustNamespaceWindow, Task> factory
+            )
         {
-            InitializeComponent();
-        }
-
-        public AdjustNamespaceWindow(AdjustChainMover mover)
-        {
-            if (mover is null)
+            if (filePaths is null)
             {
-                throw new ArgumentNullException(nameof(mover));
+                throw new ArgumentNullException(nameof(filePaths));
             }
 
-            _mover = mover;
+            if (factory is null)
+            {
+                throw new ArgumentNullException(nameof(factory));
+            }
+
+            _factory = factory;
 
             InitializeComponent();
         }
+
 
         private async void DialogWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            await SetNextPageAsync();
-        }
-
-        private async void NextButton_Click(object sender, RoutedEventArgs e)
-        {
-            await SetNextPageAsync();
-        }
-
-        private async System.Threading.Tasks.Task SetNextPageAsync()
-        {
-            if (!_mover!.TryToMove(Dispatcher, out var vm, out var uc))
-            {
-                Close();
-                return;
-            }
-
-            ButtonGrid.IsEnabled = false;
-
-            uc!.DataContext = vm;
-            CenterContentControl.Content = uc;
-
-            try
-            {
-                await vm!.StartAsync();
-
-                ButtonGrid.IsEnabled = true;
-            }
-            catch (Exception excp)
-            {
-                CriticalErrorTextBlock.Text = excp.Message;
-                Logging.LogVS(excp);
-            }
-
-            //ThreadHelper.JoinableTaskFactory.RunAsync(
-            //    async () => 
-            //    {
-            //        try
-            //        {
-            //            await vm!.StartAsync();
-
-            //            ButtonGrid.IsEnabled = true;
-            //        }
-            //        catch (Exception excp)
-            //        {
-            //            CriticalErrorTextBlock.Text = excp.Message;
-            //            Logging.LogVS(excp);
-            //        }
-            //    }).FileAndForget(nameof(SetNextPage));
-
-        }
-
-        private void CancelButton_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
+            await _factory(this);
         }
     }
 }

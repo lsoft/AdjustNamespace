@@ -1,12 +1,6 @@
 ﻿using AdjustNamespace.Adjusting;
 using AdjustNamespace.Helper;
-using AdjustNamespace.Mover;
-using AdjustNamespace.Xaml;
 using EnvDTE80;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Shell;
@@ -14,20 +8,15 @@ using Microsoft.VisualStudio.Threading;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Threading;
-using System.Xml;
-using System.Xml.Linq;
 
-namespace AdjustNamespace.ViewModel
+
+namespace AdjustNamespace.UI.ViewModel
 {
     public class PerformingViewModel : ChainViewModel
     {
-        private readonly IChainMoverState _moverState;
+        private readonly IAsyncServiceProvider _serviceProvider;
+        private readonly Action _formCloser;
         private readonly List<string> _subjectFilePaths;
 
         private string _progressMessage;
@@ -43,15 +32,19 @@ namespace AdjustNamespace.ViewModel
         }
 
         public PerformingViewModel(
-            IChainMoverState moverState,
-            Dispatcher dispatcher,
+            IAsyncServiceProvider serviceProvider,
+            Action formCloser,
             List<string> subjectFilePaths
             )
-            : base(dispatcher)
         {
-            if (moverState is null)
+            if (serviceProvider is null)
             {
-                throw new ArgumentNullException(nameof(moverState));
+                throw new ArgumentNullException(nameof(serviceProvider));
+            }
+
+            if (formCloser is null)
+            {
+                throw new ArgumentNullException(nameof(formCloser));
             }
 
             if (subjectFilePaths is null)
@@ -59,7 +52,8 @@ namespace AdjustNamespace.ViewModel
                 throw new ArgumentNullException(nameof(subjectFilePaths));
             }
 
-            _moverState = moverState;
+            _serviceProvider = serviceProvider;
+            _formCloser = formCloser;
             _subjectFilePaths = subjectFilePaths;
             _progressMessage = string.Empty;
         }
@@ -68,13 +62,13 @@ namespace AdjustNamespace.ViewModel
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            var dte = await _moverState.ServiceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
+            var dte = await _serviceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
             if (dte == null)
             {
                 return;
             }
 
-            var componentModel = (IComponentModel)await _moverState.ServiceProvider.GetServiceAsync(typeof(SComponentModel));
+            var componentModel = (IComponentModel)await _serviceProvider.GetServiceAsync(typeof(SComponentModel));
             if (componentModel == null)
             {
                 return;
@@ -154,6 +148,7 @@ namespace AdjustNamespace.ViewModel
             }
 
             ProgressMessage = $"Completed";
+            _formCloser();
         }
     }
 }

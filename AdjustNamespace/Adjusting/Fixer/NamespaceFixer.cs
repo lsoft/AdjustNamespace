@@ -2,13 +2,12 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Editing;
 using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace AdjustNamespace
+namespace AdjustNamespace.Adjusting.Fixer
 {
     public class NamespaceFixer : IFixer
     {

@@ -1,28 +1,15 @@
 ﻿using AdjustNamespace.Helper;
-using AdjustNamespace.Mover;
 using AdjustNamespace.Window;
 using EnvDTE;
 using EnvDTE80;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Editing;
-using Microsoft.CodeAnalysis.FindSymbols;
-using Microsoft.CodeAnalysis.Rename;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.Shell.Interop;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Document = Microsoft.CodeAnalysis.Document;
 using Task = System.Threading.Tasks.Task;
+using AdjustNamespace.UI.StepFactory;
 
 namespace AdjustNamespace
 {
@@ -159,12 +146,38 @@ namespace AdjustNamespace
 
                 if (filePaths.Count > 0)
                 {
-                    var mover = new AdjustChainMover(
-                        ServiceProvider,
-                        filePaths
+
+                    var window = new AdjustNamespaceWindow(
+                        filePaths,
+                        async anw =>
+                        {
+                            var perfsf = new PerformingStepFactory(
+                                ServiceProvider,
+                                anw,
+                                anw.CenterContentControl
+                                );
+
+                            var prepsf = new PreparationStepFactory(
+                                ServiceProvider,
+                                anw.CenterContentControl,
+                                perfsf
+                                );
+
+                            await prepsf.CreateAsync(filePaths);
+                        }
                         );
 
-                    var window = new AdjustNamespaceWindow(mover);
+                    //var pps = new PreparationPageSetter(
+                    //    ServiceProvider,
+                    //    window.Dispatcher,
+                    //    window.CenterContentControl
+                    //    );
+
+                    //var psf = new PreparationStepFactory(
+                    //    ServiceProvider,
+                    //    window.Dispatcher
+                    //    );
+
                     window.ShowModal();
                 }
             }

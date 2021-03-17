@@ -1,14 +1,17 @@
-﻿<UserControl x:Class="AdjustNamespace.Control.PreparationUserControl"
+<UserControl x:Class="AdjustNamespace.UI.Control.PreparationUserControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
+             xmlns:main="clr-namespace:AdjustNamespace"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
             <RowDefinition/>
-            <RowDefinition/>
+            <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock
@@ -19,13 +22,71 @@
             Text="{Binding MainMessage}"
             />
 
-        <TextBlock
+        <ListBox
             Grid.Row="1"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            TextWrapping="Wrap"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            ItemsSource="{Binding DetectedMessages}"
             Foreground="{Binding Foreground}"
-            Text="{Binding DetectedMessages}"
+            Background="Transparent"
             />
+
+        <Grid
+            Grid.Row="2"
+            Name="ButtonGrid"
+            HorizontalAlignment="Stretch"
+            Margin="0,10,0,0"
+            >
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button
+                Grid.Column="0"
+                Margin="2"
+                Padding="10,5,10,5"
+                HorizontalAlignment="Left"
+                Content="Cancel"
+                Width="80"
+                Command="{Binding CloseCommand}"
+                CommandParameter="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window} }}"
+                />
+
+            <!--<TextBlock
+                Grid.Column="1"
+                Name="CriticalErrorTextBlock"
+                Foreground="Red"
+                TextWrapping="Wrap"
+                HorizontalAlignment="Stretch"
+                />-->
+
+            <Button
+                Grid.Column="3"
+                Margin="2"
+                Padding="10,5,10,5"
+                HorizontalAlignment="Right"
+                Width="80"
+                Name="NextButton"
+                Command="{Binding NextCommand}"
+                >
+                <Button.Content>
+                    <StackPanel Orientation="Horizontal">
+                        <imaging:CrispImage
+                            Moniker="{x:Static main:ImageMonikers.Logo}"
+                            Width="10"
+                            Height="10"
+                            />
+                        <TextBlock
+                            Margin="10,0,0,0"
+                            Text="{Binding NextButtonTitle, FallbackValue=Next}"
+                            />
+                    </StackPanel>
+                </Button.Content>
+            </Button>
+
+        </Grid>
+
     </Grid>
 </UserControl>

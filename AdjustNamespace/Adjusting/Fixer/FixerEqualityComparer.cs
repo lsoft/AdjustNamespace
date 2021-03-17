@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace AdjustNamespace
+namespace AdjustNamespace.Adjusting.Fixer
 {
     public class FixerEqualityComparer : IEqualityComparer<IFixer>
     {
