@@ -11,9 +11,11 @@ namespace AdjustNamespace.Helper
         public static string ProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 
 
-        public static ProjectItem? TryGetProjectItem(
+        public static bool TryGetProjectItem(
             this Solution solution,
-            string filePath
+            string filePath,
+            out Project? rProject,
+            out ProjectItem? rProjectItem
             )
         {
             if (solution is null)
@@ -48,7 +50,9 @@ namespace AdjustNamespace.Helper
                                     {
                                         if (itemPath == filePath)
                                         {
-                                            return prjItem;
+                                            rProject = project;
+                                            rProjectItem = prjItem;
+                                            return true;
                                         }
                                     }
                                 }
@@ -58,7 +62,9 @@ namespace AdjustNamespace.Helper
                 }
             }
 
-            return null;
+            rProject = null;
+            rProjectItem = null;
+            return false;
         }
 
         public static bool TryGetFileName(

@@ -4,6 +4,10 @@
     <MinimumVisualStudioVersion>16.0</MinimumVisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
     <TargetFrameworkProfile />
+    <InstallRoot>Default</InstallRoot>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -27,6 +31,15 @@
     <IncludeDebugSymbolsInLocalVSIXDeployment>true</IncludeDebugSymbolsInLocalVSIXDeployment>
     <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
     <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
+    <!--
+    <IncludeCopyLocalReferencesInVSIXContainer>true</IncludeCopyLocalReferencesInVSIXContainer>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>true</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>true</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <IncludeOutputGroupsInVSIX>BuiltProjectOutputGroup;BuiltProjectOutputGroupDependencies;GetCopyToOutputDirectoryItems;</IncludeOutputGroupsInVSIX>
+    <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
+-->
     <StartAction>Program</StartAction>
     <StartProgram Condition="'$(DevEnvDir)' != ''">$(DevEnvDir)devenv.exe</StartProgram>
     <StartArguments>/rootsuffix Exp</StartArguments>
@@ -79,13 +92,19 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>AdjustNamespace.vsct</DependentUpon>
     </Compile>
+    <Compile Include="UI\Control\SelectedUserControl.xaml.cs">
+      <DependentUpon>SelectedUserControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="UI\Control\PreparationUserControl.xaml.cs">
       <DependentUpon>PreparationUserControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="UI\Control\SpaceKeyUpEventTrigger.cs" />
     <Compile Include="UI\StepFactory\IStepFactory.cs" />
     <Compile Include="UI\StepFactory\PerformingStepFactory.cs" />
+    <Compile Include="UI\StepFactory\SelectedStepFactory.cs" />
     <Compile Include="UI\ViewModel\PerformingViewModel.cs" />
     <Compile Include="UI\StepFactory\PreparationStepFactory.cs" />
+    <Compile Include="UI\ViewModel\SelectedStepViewModel.cs" />
     <Compile Include="UI\ViewModel\PreparationStepViewModel.cs" />
     <Compile Include="Window\AdjustNamespaceWindow.xaml.cs">
       <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>
@@ -145,6 +164,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf">
+      <Version>1.1.31</Version>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <VSCTCompile Include="AdjustNamespace.vsct">
@@ -167,6 +189,10 @@
     <Page Include="UI\Control\PerformingUserControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UI\Control\SelectedUserControl.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
     <Page Include="UI\Control\PreparationUserControl.xaml">
       <SubType>Designer</SubType>

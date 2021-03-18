@@ -100,13 +100,12 @@ namespace AdjustNamespace.UI.ViewModel
 
                 #region build target namespace
 
-                var subjectProjectItem = dte.Solution.TryGetProjectItem(subjectFilePath);
-                if (subjectProjectItem == null)
+                if (!dte.Solution.TryGetProjectItem(subjectFilePath, out var subjectProject, out var subjectProjectItem))
                 {
                     continue;
                 }
 
-                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem.ContainingProject.FullName);
+                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem!.ContainingProject.FullName);
                 if (roslynProject == null)
                 {
                     continue;

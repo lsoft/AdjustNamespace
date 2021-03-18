@@ -13,7 +13,7 @@
                          Background="{DynamicResource {x:Static vsshell:VsBrushes.WindowKey}}"
                          Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
                          WindowStartupLocation="CenterOwner"
-                         Height="300" Width="400"
+                         Height="400" Width="700"
                          d:DesignHeight="300" d:DesignWidth="400">
     <ContentControl
         x:Name="CenterContentControl"

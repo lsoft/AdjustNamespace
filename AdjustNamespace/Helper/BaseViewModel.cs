@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Windows.Input;
 
 namespace AdjustNamespace.Helper
 {
@@ -50,6 +51,8 @@ namespace AdjustNamespace.Helper
                 var e = new PropertyChangedEventArgs(propertyName);
                 handler(this, e);
             }
+
+            CommandManager.InvalidateRequerySuggested();
         }
 
         [Conditional("DEBUG")]

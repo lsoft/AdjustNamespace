@@ -110,7 +110,14 @@ namespace AdjustNamespace.Adjusting
                     continue;
                 }
 
-                var targetNamespaceInfo = namespaceRenameDict[symbolInfo.ContainingNamespace.ToDisplayString()];
+                var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
+                var targetNamespaceInfo = namespaceRenameDict[symbolNamespace];
+
+                if (symbolNamespace == targetNamespaceInfo.ModifiedName)
+                {
+                    //current symbol is in target namespace already
+                    continue;
+                }
 
                 var foundReferences = await SymbolFinder.FindReferencesAsync(symbolInfo, _workspace.CurrentSolution);
                 foreach (var foundReference in foundReferences)

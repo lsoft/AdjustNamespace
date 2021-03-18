@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.ComponentModel.Design;
 using Task = System.Threading.Tasks.Task;
 using AdjustNamespace.UI.StepFactory;
+using System.Linq;
 
 namespace AdjustNamespace
 {
@@ -157,26 +158,22 @@ namespace AdjustNamespace
                                 anw.CenterContentControl
                                 );
 
-                            var prepsf = new PreparationStepFactory(
+                            var selsf = new SelectedStepFactory(
                                 ServiceProvider,
                                 anw.CenterContentControl,
                                 perfsf
+                                );
+
+                            var prepsf = new PreparationStepFactory(
+                                ServiceProvider,
+                                anw.CenterContentControl,
+                                selsf
                                 );
 
                             await prepsf.CreateAsync(filePaths);
                         }
                         );
 
-                    //var pps = new PreparationPageSetter(
-                    //    ServiceProvider,
-                    //    window.Dispatcher,
-                    //    window.CenterContentControl
-                    //    );
-
-                    //var psf = new PreparationStepFactory(
-                    //    ServiceProvider,
-                    //    window.Dispatcher
-                    //    );
 
                     window.ShowModal();
                 }
