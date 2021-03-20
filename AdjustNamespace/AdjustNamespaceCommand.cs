@@ -149,7 +149,6 @@ namespace AdjustNamespace
                 {
 
                     var window = new AdjustNamespaceWindow(
-                        filePaths,
                         async anw =>
                         {
                             var perfsf = new PerformingStepFactory(

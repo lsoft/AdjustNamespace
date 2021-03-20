@@ -386,6 +386,43 @@ namespace AdjustNamespace.Adjusting
                         fNamespace,
                         fixedNamespace
                         );
+
+
+                    //class a : ia {}
+                    //we're moving a into a different namespace, but ia are not
+                    //we need to insert 'using old namespace'
+                    //otherwise ia will not be resolved
+
+                    //we can't determite it is the case or it's not.
+                    //so add at 100% cases
+
+                    var usingSyntaxes = syntaxRoot
+                        .DescendantNodes()
+                        .OfType<UsingDirectiveSyntax>()
+                        .ToList();
+
+                    if (usingSyntaxes.Count > 0)
+                    {
+                        subjectDocumentEditor.InsertAfter(
+                            usingSyntaxes.Last(),
+                            SyntaxFactory.UsingDirective(
+                                SyntaxFactory.ParseName(
+                                    " " + fNamespace.Name
+                                    )
+                                ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                            );
+                    }
+                    else
+                    {
+                        subjectDocumentEditor.InsertBefore(
+                            subjectDocumentEditor.OriginalRoot.DescendantNodes().First(),
+                            SyntaxFactory.UsingDirective(
+                                SyntaxFactory.ParseName(
+                                    " " + fNamespace.Name
+                                    )
+                                ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                            );
+                    }
                 }
 
                 var changedDocument = subjectDocumentEditor.GetChangedDocument();

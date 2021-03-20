@@ -14,15 +14,9 @@ namespace AdjustNamespace.Window
         private readonly Func<AdjustNamespaceWindow, Task> _factory;
 
         public AdjustNamespaceWindow(
-            List<string> filePaths,
             Func<AdjustNamespaceWindow, Task> factory
             )
         {
-            if (filePaths is null)
-            {
-                throw new ArgumentNullException(nameof(filePaths));
-            }
-
             if (factory is null)
             {
                 throw new ArgumentNullException(nameof(factory));

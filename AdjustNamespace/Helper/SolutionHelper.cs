@@ -30,30 +30,29 @@ namespace AdjustNamespace.Helper
 
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            var prjItems = new List<ProjectItem>();
-            if (solution.Projects != null)
-            {
-                foreach (EnvDTE.Project project in solution.Projects)
-                {
-                    if (project.ProjectItems != null && project.ProjectItems.Count > 0)
-                    {
-                        foreach (ProjectItem projectItem in project.ProjectItems)
-                        {
-                            prjItems.Clear();
-                            ProcessProjectItem2(projectItem, ref prjItems);
+            var projectList = solution.GetAllProjectsRecursively();
 
-                            foreach (var prjItem in prjItems)
+            var prjItems = new List<ProjectItem>();
+            foreach (EnvDTE.Project project in projectList)
+            {
+                if (project.ProjectItems != null && project.ProjectItems.Count > 0)
+                {
+                    foreach (ProjectItem projectItem in project.ProjectItems)
+                    {
+                        prjItems.Clear();
+                        ProcessProjectItem2(projectItem, ref prjItems);
+
+                        foreach (var prjItem in prjItems)
+                        {
+                            for (var i = 0; i < prjItem.FileCount; i++)
                             {
-                                for (var i = 0; i < prjItem.FileCount; i++)
+                                if (prjItem.TryGetFileName(i, out var itemPath))
                                 {
-                                    if (prjItem.TryGetFileName(i, out var itemPath))
+                                    if (itemPath == filePath)
                                     {
-                                        if (itemPath == filePath)
-                                        {
-                                            rProject = project;
-                                            rProjectItem = prjItem;
-                                            return true;
-                                        }
+                                        rProject = project;
+                                        rProjectItem = prjItem;
+                                        return true;
                                     }
                                 }
                             }
@@ -65,6 +64,46 @@ namespace AdjustNamespace.Helper
             rProject = null;
             rProjectItem = null;
             return false;
+        }
+
+        private static void GetSolutionFolderProjects(
+            this Project project,
+            ref List<Project> foundTrueProjects
+            )
+        {
+            if (project == null)
+            {
+                return;
+            }
+
+            if (project.Kind == EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder)
+            {
+                for (var i = 1; i <= project.ProjectItems.Count; i++)
+                {
+                    var subProject = project.ProjectItems.Item(i);
+                    if (subProject == null)
+                    {
+                        continue;
+                    }
+                    if (subProject.SubProject == null)
+                    {
+                        continue;
+                    }
+
+                    if (subProject.Kind == EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder)
+                    {
+                        subProject.SubProject.GetSolutionFolderProjects(ref foundTrueProjects);
+                    }
+                    else
+                    {
+                        foundTrueProjects.Add(subProject.SubProject);
+                    }
+                }
+            }
+            else
+            {
+                foundTrueProjects.Add(project);
+            }
         }
 
         public static bool TryGetFileName(
@@ -108,6 +147,22 @@ namespace AdjustNamespace.Helper
             }
         }
 
+        public static List<Project> GetAllProjectsRecursively(
+            this EnvDTE.Solution solution
+            )
+        {
+            var projectList = new List<Project>();
+            if (solution.Projects != null)
+            {
+                foreach (EnvDTE.Project project in solution.Projects)
+                {
+                    GetSolutionFolderProjects(project, ref projectList);
+                }
+            }
+
+            return projectList;
+        }
+
         public static List<string> ProcessSolution(
             this EnvDTE.Solution solution
             )
@@ -119,9 +174,11 @@ namespace AdjustNamespace.Helper
 
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            var filePaths = new List<string>();
 
-            foreach (EnvDTE.Project prj in solution.Projects)
+            var projectList = solution.GetAllProjectsRecursively();
+
+            var filePaths = new List<string>();
+            foreach (EnvDTE.Project prj in projectList)
             {
                 filePaths.AddRange(prj.ProcessProject());
             }
