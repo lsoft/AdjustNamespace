@@ -329,7 +329,7 @@ namespace AdjustNamespace.Adjusting
         }
 
         private async Task FixSubjectFileNamespacesAsync(
-            Document subjectDocument, 
+            Document subjectDocument,
             List<NamespaceInfo> namespaceInfos
             )
         {
@@ -343,51 +343,30 @@ namespace AdjustNamespace.Adjusting
                 throw new ArgumentNullException(nameof(namespaceInfos));
             }
 
-            var changedDocumentInvocationCount = 0;
-            bool r = true;
-            do
+            foreach (var namespaceInfo in namespaceInfos.Where(ni => ni.IsRoot))
             {
-                var subjectDocumentEditor = await _workspace.CreateDocumentEditorAsync(subjectDocument.FilePath!);
-                if (subjectDocumentEditor == null)
+                bool r = true;
+                do
                 {
-                    //skip this document
-                    continue;
-                }
+                    var openedDocument = _workspace.GetDocument(subjectDocument.FilePath!);
+                    if (openedDocument == null)
+                    {
+                        //skip this document
+                        return;
+                    }
 
-                var syntaxRoot = await subjectDocumentEditor.OriginalDocument.GetSyntaxRootAsync();
-                if (syntaxRoot == null)
-                {
-                    //skip this document
-                    continue;
-                }
+                    var syntaxRoot = await openedDocument.GetSyntaxRootAsync();
+                    if (syntaxRoot == null)
+                    {
+                        //skip this document
+                        return;
+                    }
 
-                var foundNamespaces = syntaxRoot
-                    .DescendantNodes()
-                    .OfType<NamespaceDeclarationSyntax>()
-                    .ToDictionary(n => n.Name.ToString(), n => n);
-
-
-                foreach (var namespaceInfo in namespaceInfos.Where(ni => ni.IsRoot))
-                {
-                    if (!foundNamespaces.TryGetValue(namespaceInfo.OriginalName, out var fNamespace))
+                    if (!TryFindNamespaceNode(syntaxRoot, namespaceInfo, out var fNamespace))
                     {
                         //skip this namespace
                         continue;
                     }
-
-                    var fixedNamespace = fNamespace.WithName(
-                        SyntaxFactory.ParseName(
-                            namespaceInfo.ModifiedName
-                            ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                        )
-                        .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                        ;
-
-                    subjectDocumentEditor.ReplaceNode(
-                        fNamespace,
-                        fixedNamespace
-                        );
-
 
                     //class a : ia {}
                     //we're moving a into a different namespace, but ia are not
@@ -398,51 +377,73 @@ namespace AdjustNamespace.Adjusting
                     //it's a subject for a future work
                     //so add at 100% cases now
 
-                    var usingSyntaxes = syntaxRoot
-                        .DescendantNodes()
-                        .OfType<UsingDirectiveSyntax>()
-                        .ToList();
-
-                    if (usingSyntaxes.Count > 0)
+                    var cus = syntaxRoot as CompilationUnitSyntax;
+                    if (cus != null)
                     {
-                        subjectDocumentEditor.InsertAfter(
-                            usingSyntaxes.Last(),
-                            SyntaxFactory.UsingDirective(
-                                SyntaxFactory.ParseName(
-                                    " " + fNamespace.Name
-                                    )
-                                ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                            );
-                    }
-                    else
-                    {
-                        subjectDocumentEditor.InsertBefore(
-                            subjectDocumentEditor.OriginalRoot.DescendantNodes().First(),
-                            SyntaxFactory.UsingDirective(
-                                SyntaxFactory.ParseName(
-                                    " " + fNamespace.Name
-                                    )
-                                ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                            );
-                    }
-                }
+                        var newUsingStatement = SyntaxFactory.UsingDirective(
+                            SyntaxFactory.ParseName(
+                                " " + fNamespace!.Name
+                                )
+                            ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
 
-                try
-                {
-                    var changedDocument = subjectDocumentEditor.GetChangedDocument();
-                    r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
-                }
-                catch (Exception excp) //https://github.com/dotnet/roslyn/issues/52463
-                {
-                    Logging.LogVS(excp);
-
-                    if (++changedDocumentInvocationCount >= 3)
-                    {
-                        throw;
+                        cus = cus.AddUsings(newUsingStatement);
                     }
+
+                    if(!TryFindNamespaceNode(cus!, namespaceInfo, out fNamespace))
+                    {
+                        //skip this namespace
+                        continue;
+                    }
+
+
+                    var fixedNamespace = fNamespace!.WithName(
+                        SyntaxFactory.ParseName(
+                            namespaceInfo.ModifiedName
+                            ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                        )
+                        .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                        ;
+
+                    cus = cus!.ReplaceNode(
+                        fNamespace,
+                        fixedNamespace
+                        );
+
+
+                    openedDocument = openedDocument.WithSyntaxRoot(cus!);
+
+                    r = _workspace.TryApplyChanges(openedDocument.Project.Solution);
                 }
+                while (!r);
             }
-            while (!r);
+        }
+
+        private bool TryFindNamespaceNode(
+            SyntaxNode syntaxRoot,
+            NamespaceInfo namespaceInfo,
+            out NamespaceDeclarationSyntax? fNamespace
+            )
+        {
+            if (syntaxRoot is null)
+            {
+                throw new ArgumentNullException(nameof(syntaxRoot));
+            }
+
+            if (namespaceInfo is null)
+            {
+                throw new ArgumentNullException(nameof(namespaceInfo));
+            }
+
+            var foundNamespaces = syntaxRoot
+                .DescendantNodes()
+                .OfType<NamespaceDeclarationSyntax>()
+                .ToDictionary(n => n.Name.ToString(), n => n)
+                ;
+
+
+            foundNamespaces.TryGetValue(namespaceInfo.OriginalName, out fNamespace);
+
+            return fNamespace != null;
         }
     }
 }
