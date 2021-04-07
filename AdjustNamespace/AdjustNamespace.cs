@@ -28,6 +28,5 @@ namespace AdjustNamespace
     {
         public const int MyMenuGroup = 0x1020;
         public const int DoAdjustCommandId = 0x0100;
-        public const int dispersion16 = 0x0001;
     }
 }

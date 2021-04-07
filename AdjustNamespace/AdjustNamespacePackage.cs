@@ -26,7 +26,6 @@ namespace AdjustNamespace
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [Guid(PackageGuidString)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
-    //[ProvideMenuResource("Menus.ctmenu", 1)]
     public sealed class AdjustNamespacePackage : AsyncPackage
     {
         /// <summary>

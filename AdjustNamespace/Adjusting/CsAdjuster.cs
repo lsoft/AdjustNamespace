@@ -343,6 +343,7 @@ namespace AdjustNamespace.Adjusting
                 throw new ArgumentNullException(nameof(namespaceInfos));
             }
 
+            var changedDocumentInvocationCount = 0;
             bool r = true;
             do
             {
@@ -393,8 +394,9 @@ namespace AdjustNamespace.Adjusting
                     //we need to insert 'using old namespace'
                     //otherwise ia will not be resolved
 
-                    //we can't determite it is the case or it's not.
-                    //so add at 100% cases
+                    //we can't determite it is the case or it's not without a costly analysis
+                    //it's a subject for a future work
+                    //so add at 100% cases now
 
                     var usingSyntaxes = syntaxRoot
                         .DescendantNodes()
@@ -425,8 +427,20 @@ namespace AdjustNamespace.Adjusting
                     }
                 }
 
-                var changedDocument = subjectDocumentEditor.GetChangedDocument();
-                r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
+                try
+                {
+                    var changedDocument = subjectDocumentEditor.GetChangedDocument();
+                    r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
+                }
+                catch (Exception excp) //https://github.com/dotnet/roslyn/issues/52463
+                {
+                    Logging.LogVS(excp);
+
+                    if (++changedDocumentInvocationCount >= 3)
+                    {
+                        throw;
+                    }
+                }
             }
             while (!r);
         }

@@ -73,18 +73,6 @@ namespace AdjustNamespace.Helper
 
             var typeDict = await workspace.GetAllTypesInNamespaceRecursivelyAsync(null);
 
-            //var ddd = new Dictionary<string, List<ITypeSymbol>>();
-            //foreach (var t in typeDict.Values)
-            //{
-            //    if (!ddd.ContainsKey(t.ContainingNamespace.ToDisplayString()))
-            //    {
-            //        ddd[t.ContainingNamespace.ToDisplayString()] = new List<ITypeSymbol>();
-            //    }
-
-
-            //    ddd[t.ContainingNamespace.ToDisplayString()].Add(t);
-            //}
-
             var allSolutionNamespaces = typeDict.Values.Select(t => t.ContainingNamespace.ToDisplayString()).ToHashSet();
 
             return allSolutionNamespaces;
@@ -111,7 +99,7 @@ namespace AdjustNamespace.Helper
                     continue;
                 }
 
-                foreach (var ctype in ccompilation.GlobalNamespace.GetAllTypes())
+                foreach (var ctype in ccompilation.Assembly.GlobalNamespace.GetAllTypes())
                 {
                     var ctnds = ctype.ContainingNamespace.ToDisplayString();
                     if(sourceNamespaces == null || sourceNamespaces.Length == 0 || sourceNamespaces.Any(sn => ctnds.StartsWith(sn)))
