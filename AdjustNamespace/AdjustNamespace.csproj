@@ -102,6 +102,7 @@
     <Compile Include="UI\StepFactory\IStepFactory.cs" />
     <Compile Include="UI\StepFactory\PerformingStepFactory.cs" />
     <Compile Include="UI\StepFactory\SelectedStepFactory.cs" />
+    <Compile Include="UI\Theme.cs" />
     <Compile Include="UI\ViewModel\PerformingViewModel.cs" />
     <Compile Include="UI\StepFactory\PreparationStepFactory.cs" />
     <Compile Include="UI\ViewModel\SelectedStepViewModel.cs" />

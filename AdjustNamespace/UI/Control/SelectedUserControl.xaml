@@ -21,6 +21,7 @@
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
             TextWrapping="Wrap"
+            Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
             Text="{Binding MainMessage}"
             />
 
@@ -30,7 +31,6 @@
             VerticalAlignment="Stretch"
             ItemsSource="{Binding ToFilterItems}"
             Foreground="{Binding Foreground}"
-            Background="Transparent"
             PreviewKeyDown="ListView_PreviewKeyDown"
             >
             
@@ -60,14 +60,13 @@
                             IsChecked="{Binding IsChecked, Mode=TwoWay}"
                             Content=""
                             Focusable="False"
-                            Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
                             >
                         </CheckBox>
 
                         <TextBlock
                             Grid.Column="1"
-                            Text="{Binding FilePath}"
                             Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                            Text="{Binding FilePath}"
                             >
                         </TextBlock>
 
