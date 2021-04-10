@@ -3,6 +3,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AdjustNamespace.Adjusting.Fixer
@@ -10,17 +12,10 @@ namespace AdjustNamespace.Adjusting.Fixer
     public class QualifiedNameFixer : IFixer
     {
         private readonly Workspace _workspace;
-        private readonly QualifiedNameSyntax _qualifiedNameSyntax;
-        private readonly string _symbolTargetNamespace;
-
-        public string UniqueKey => _symbolTargetNamespace;
-
-        public string OrderingKey => _symbolTargetNamespace;
+        private readonly List<QualifiedNameFixerArgument> _arguments = new ();
 
         public QualifiedNameFixer(
-            Workspace workspace,
-            QualifiedNameSyntax qualifiedNameSyntax,
-            string symbolTargetNamespace
+            Workspace workspace
             )
         {
             if (workspace is null)
@@ -28,18 +23,22 @@ namespace AdjustNamespace.Adjusting.Fixer
                 throw new ArgumentNullException(nameof(workspace));
             }
 
-            if (qualifiedNameSyntax is null)
+            _workspace = workspace;
+        }
+
+        public void AddSubject(object o)
+        {
+            if (o is null)
             {
-                throw new ArgumentNullException(nameof(qualifiedNameSyntax));
+                throw new ArgumentNullException(nameof(o));
             }
 
-            if (symbolTargetNamespace is null)
+            if (!(o is QualifiedNameFixerArgument qnsa))
             {
-                throw new ArgumentNullException(nameof(symbolTargetNamespace));
+                throw new Exception($"incorrect incoming type: {o.GetType()}");
             }
-            _workspace = workspace;
-            _qualifiedNameSyntax = qualifiedNameSyntax;
-            _symbolTargetNamespace = symbolTargetNamespace;
+
+            _arguments.Add(qnsa);
         }
 
         public async Task FixAsync(string filePath)
@@ -52,25 +51,65 @@ namespace AdjustNamespace.Adjusting.Fixer
             bool r;
             do
             {
-                var documentEditor = await _workspace.CreateDocumentEditorAsync(filePath);
-                if (documentEditor == null)
+                var document = _workspace.GetDocument(filePath);
+                if (document == null)
                 {
                     //skip this document
                     return;
                 }
 
-                documentEditor.ReplaceNode(
-                    _qualifiedNameSyntax,
-                    _qualifiedNameSyntax.WithLeft(SyntaxFactory.ParseName(" " + _symbolTargetNamespace))
-                        .WithLeadingTrivia(_qualifiedNameSyntax.GetLeadingTrivia())
-                        .WithTrailingTrivia(_qualifiedNameSyntax.GetTrailingTrivia())
-                    );
+                var syntaxRoot = await document.GetSyntaxRootAsync();
+                if (syntaxRoot == null)
+                {
+                    //skip this document
+                    return;
+                }
 
-                var changedDocument = documentEditor.GetChangedDocument();
+                syntaxRoot = syntaxRoot.ReplaceNodes(
+                    _arguments.ConvertAll(a => a.SourceSyntax),
+                    (n0, n1) =>
+                    {
+                        var founda = _arguments.First(a => ReferenceEquals(a.SourceSyntax, n0));
+
+                        return founda.ToReplaceSyntax;
+                    });
+
+                var changedDocument = document.WithSyntaxRoot(syntaxRoot);
                 r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
             }
             while (!r);
 
+        }
+
+        public class QualifiedNameFixerArgument
+        {
+            public SyntaxNode SourceSyntax
+            {
+                get;
+            }
+            public SyntaxNode ToReplaceSyntax
+            {
+                get;
+            }
+
+            public QualifiedNameFixerArgument(
+                SyntaxNode qualifiedNameSyntax,
+                SyntaxNode toReplaceSyntax
+                )
+            {
+                if (qualifiedNameSyntax is null)
+                {
+                    throw new ArgumentNullException(nameof(qualifiedNameSyntax));
+                }
+
+                if (toReplaceSyntax is null)
+                {
+                    throw new ArgumentNullException(nameof(toReplaceSyntax));
+                }
+
+                SourceSyntax = qualifiedNameSyntax;
+                ToReplaceSyntax = toReplaceSyntax;
+            }
         }
     }
 }

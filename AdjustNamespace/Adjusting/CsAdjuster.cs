@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using AdjustNamespace.Adjusting.Fixer;
+using System.Threading;
 
 namespace AdjustNamespace.Adjusting
 {
@@ -92,12 +93,18 @@ namespace AdjustNamespace.Adjusting
 
             #region fix refs (adding a new using namespace clauses)
 
-            var toProcess = new Dictionary<string, HashSet<IFixer>>();
+            var toProcess = new Dictionary<string, List<IFixer>>();
             var processedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
-            foreach (var foundTypeSyntax in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
+            var foundSyntaxes = (
+                from snode in subjectSyntaxRoot.DescendantNodes()
+                where snode is TypeDeclarationSyntax || snode is EnumDeclarationSyntax || snode is DelegateDeclarationSyntax
+                select snode
+                ).ToList();
+
+            foreach (var foundTypeSyntax in foundSyntaxes)
             {
-                var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundTypeSyntax);
+                var symbolInfo = (INamedTypeSymbol?)subjectSemanticModel.GetDeclaredSymbol(foundTypeSyntax);
                 if (symbolInfo == null)
                 {
                     //skip this type
@@ -119,9 +126,36 @@ namespace AdjustNamespace.Adjusting
                     continue;
                 }
 
-                var foundReferences = await SymbolFinder.FindReferencesAsync(symbolInfo, _workspace.CurrentSolution);
-                foreach (var foundReference in foundReferences)
+                var foundReferences = (await SymbolFinder.FindReferencesAsync(symbolInfo, _workspace.CurrentSolution))
+                    .Select(r => (Reference: r, IsClass : true))
+                    .ToList();
+
+                if (symbolInfo.TypeKind == TypeKind.Class && symbolInfo.IsStatic)
                 {
+                    var extensionMethodSymbols = (
+                        from member in symbolInfo.GetMembers()
+                        where member is IMethodSymbol
+                        let method = member as IMethodSymbol
+                        where method.IsStatic
+                        where method.IsExtensionMethod
+                        select method
+                        )
+                        .ToList();
+
+                    foreach (var extensionMethodSymbol in extensionMethodSymbols)
+                    {
+                        var methodFoundReferences = await SymbolFinder.FindReferencesAsync(extensionMethodSymbol, _workspace.CurrentSolution);
+                        foundReferences.AddRange(
+                            methodFoundReferences.Select(r => (Reference: r, IsClass: false)
+                            ));
+                    }
+                }
+
+                foreach (var foundReferencePair in foundReferences)
+                {
+                    var foundReference = foundReferencePair.Reference;
+                    var isClass = foundReferencePair.IsClass;
+
                     if (foundReference.Definition.ContainingNamespace.ToDisplayString() == targetNamespaceInfo.ModifiedName)
                     {
                         //referenced symbols is in target namespace already
@@ -147,13 +181,19 @@ namespace AdjustNamespace.Adjusting
                             continue;
                         }
 
-                        var refRoot = await location.Location.SourceTree.GetRootAsync();
+                        var refDocument = _workspace.GetDocument(location.Location.SourceTree.FilePath);
+                        if (refDocument == null)
+                        {
+                            continue;
+                        }
+
+                        var refRoot = await refDocument.GetSyntaxRootAsync();
                         if (refRoot == null)
                         {
                             //skip this location
                             continue;
                         }
-
+                        
                         var refSyntax = refRoot.FindNode(location.Location.SourceSpan);
                         if (refSyntax == null)
                         {
@@ -161,31 +201,130 @@ namespace AdjustNamespace.Adjusting
                             continue;
                         }
 
-                        if (!toProcess.ContainsKey(location.Document.FilePath))
+                        var refSemanticModel = await refDocument.GetSemanticModelAsync();
+                        if (refSemanticModel == null)
                         {
-                            toProcess[location.Document.FilePath] = new HashSet<IFixer>(FixerEqualityComparer.Entity);
+                            continue;
                         }
 
-                        if (refSyntax.Parent is QualifiedNameSyntax qns)
+                        var refSymbol = refSemanticModel.GetSymbolInfo(refSyntax).Symbol;
+                        if (refSymbol == null)
                         {
-                            //replace QualifiedNameSyntax
-                            toProcess[location.Document.FilePath].Add(
-                                new QualifiedNameFixer(
-                                    _workspace,
-                                    qns,
-                                    targetNamespaceInfo.ModifiedName
-                                    )
-                                );
+                            continue;
                         }
-                        else
+
+
+                        if (!toProcess.ContainsKey(location.Document.FilePath))
                         {
-                            //add a new using clause
-                            toProcess[location.Document.FilePath].Add(
-                                new NamespaceFixer(
-                                    _workspace,
-                                    targetNamespaceInfo.ModifiedName
-                                    )
-                                );
+                            toProcess[location.Document.FilePath] = new List<IFixer>
+                            {
+                                new QualifiedNameFixer(_workspace),
+                                new NamespaceFixer(_workspace)
+                            };
+                        }
+
+                        //if (isClass)
+                        //{
+                        //    if (refSyntax.Parent is QualifiedNameSyntax qns)
+                        //    {
+                        //        //replace QualifiedNameSyntax
+                        //        var mqns = qns
+                        //            .WithLeft(SyntaxFactory.ParseName((qns.IsGlobal() ? "global::" : "") + " " + targetNamespaceInfo.ModifiedName))
+                        //            .WithLeadingTrivia(qns.GetLeadingTrivia())
+                        //            .WithTrailingTrivia(qns.GetTrailingTrivia())
+                        //            ;
+
+                        //        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
+                        //            .AddSubject(
+                        //                new QualifiedNameFixer.QualifiedNameFixerArgument(
+                        //                    qns,
+                        //                    mqns
+                        //                    )
+                        //            );
+                        //    }
+                        //    else
+                        //    {
+                        //        //add a new using clause
+                        //        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
+                        //            .AddSubject(targetNamespaceInfo.ModifiedName);
+                        //    }
+                        //}
+                        //else
+                        {
+                            if (refSyntax.Parent is QualifiedNameSyntax qns)
+                            {
+                                //replace QualifiedNameSyntax
+                                var mqns = qns
+                                    .WithLeft(SyntaxFactory.ParseName((qns.IsGlobal() ? "global::" : "") + " " + targetNamespaceInfo.ModifiedName))
+                                    .WithLeadingTrivia(qns.GetLeadingTrivia())
+                                    .WithTrailingTrivia(qns.GetTrailingTrivia())
+                                    ;
+
+                                toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
+                                    .AddSubject(
+                                        new QualifiedNameFixer.QualifiedNameFixerArgument(
+                                            qns,
+                                            mqns
+                                            )
+                                    );
+                            }
+                            else if (refSyntax.Parent is MemberAccessExpressionSyntax maes)
+                            {
+                                var maesr = maes.UpTo<MemberAccessExpressionSyntax>()!;
+
+                                if (refSymbol.Kind.NotIn(SymbolKind.Property, SymbolKind.Field, SymbolKind.Method))
+                                {
+                                    if (maesr.Expression is MemberAccessExpressionSyntax typeNameExpression)
+                                    {
+                                        var modifiedTypeNameExpression = SyntaxFactory.ParseExpression(
+                                            (typeNameExpression.IsGlobal() ? "global::" : "") + targetNamespaceInfo.ModifiedName + "." + typeNameExpression.Name
+                                            );
+
+                                        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
+                                            .AddSubject(
+                                                new QualifiedNameFixer.QualifiedNameFixerArgument(
+                                                    typeNameExpression,
+                                                    modifiedTypeNameExpression
+                                                    )
+                                            );
+                                    }
+                                    else
+                                    {
+                                        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
+                                            .AddSubject(targetNamespaceInfo.ModifiedName);
+                                    }
+                                }
+                                else
+                                {
+                                    //if (targetExpression is MemberAccessExpressionSyntax typeNameExpression)
+                                    //{
+                                    //    var modifiedTypeNameExpression = SyntaxFactory.ParseExpression(
+                                    //        (typeNameExpression.IsGlobal() ? "global::" : "") + targetNamespaceInfo.ModifiedName + "." + typeNameExpression.Name
+                                    //        );
+
+                                    //    toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
+                                    //        .AddSubject(
+                                    //            new QualifiedNameFixer.QualifiedNameFixerArgument(
+                                    //                typeNameExpression,
+                                    //                modifiedTypeNameExpression
+                                    //                )
+                                    //        );
+                                    //}
+                                    //else
+                                    {
+                                        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
+                                            .AddSubject(targetNamespaceInfo.ModifiedName);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                //i don't know why we are here
+
+                                //add a new using clause
+                                toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
+                                    .AddSubject(targetNamespaceInfo.ModifiedName);
+                            }
                         }
                     }
                 }
@@ -200,10 +339,11 @@ namespace AdjustNamespace.Adjusting
 
                 Debug.WriteLine($"Fix references in {targetFilePath}");
 
-                foreach (var fixer in group.Value.OrderBy(a => a.OrderingKey))
-                {
-                    await fixer.FixAsync(targetFilePath);
-                }
+                var qnf = group.Value.First(f => f.GetType() == typeof(QualifiedNameFixer));
+                await qnf.FixAsync(targetFilePath);
+
+                var nsf = group.Value.First(f => f.GetType() == typeof(NamespaceFixer));
+                await nsf.FixAsync(targetFilePath);
             }
 
             #endregion
@@ -227,27 +367,9 @@ namespace AdjustNamespace.Adjusting
         private async Task RemoveEmptyUsingStatementsAsync(
             )
         {
-
-            foreach (Document document in _workspace.EnumerateAllDocuments(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
+            foreach (var documentFilePath in _workspace.EnumerateAllDocumentFilePaths(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
             {
-                if (document.FilePath == null)
-                {
-                    continue;
-                }
-
-                var syntaxRoot = await document.GetSyntaxRootAsync();
-                if (syntaxRoot == null)
-                {
-                    continue;
-                }
-
-                var namespaces = syntaxRoot
-                    .DescendantNodes()
-                    .OfType<UsingDirectiveSyntax>()
-                    .ToList()
-                    ;
-
-                if (namespaces.Count == 0)
+                if (documentFilePath == null)
                 {
                     continue;
                 }
@@ -255,15 +377,31 @@ namespace AdjustNamespace.Adjusting
                 bool r = true;
                 do
                 {
-                    var documentEditor = await _workspace.CreateDocumentEditorAsync(document.FilePath);
-                    if (documentEditor == null)
+                    var document = _workspace.GetDocument(documentFilePath);
+                    if (document == null)
                     {
-                        //skip this document
                         continue;
                     }
 
+                    var syntaxRoot = await document.GetSyntaxRootAsync();
+                    if (syntaxRoot == null)
+                    {
+                        continue;
+                    }
 
-                    var changed = false;
+                    var namespaces = syntaxRoot
+                        .DescendantNodes()
+                        .OfType<UsingDirectiveSyntax>()
+                        .ToList()
+                        ;
+
+                    if (namespaces.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var toRemove = new List<SyntaxNode>();
+
                     foreach (var n in namespaces)
                     {
                         var nname = n.Name.ToString();
@@ -274,15 +412,18 @@ namespace AdjustNamespace.Adjusting
                             continue;
                         }
 
-                        documentEditor.RemoveNode(n, SyntaxRemoveOptions.KeepNoTrivia);
-
-                        changed = true;
+                        toRemove.Add(n);
                     }
 
-                    if (changed)
+                    if (toRemove.Count > 0)
                     {
-                        var changedDocument = documentEditor.GetChangedDocument();
-                        r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
+                        syntaxRoot = syntaxRoot!.RemoveNodes(toRemove, SyntaxRemoveOptions.KeepNoTrivia);
+                        if (syntaxRoot != null)
+                        {
+                            var changedDocument = document.WithSyntaxRoot(syntaxRoot);
+
+                            r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
+                        }
                     }
                 }
                 while (!r);

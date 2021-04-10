@@ -112,8 +112,7 @@ namespace AdjustNamespace.Helper
             return result;
         }
 
-
-        public static IEnumerable<Document> EnumerateAllDocuments(
+        public static IReadOnlyList<string> EnumerateAllDocumentFilePaths(
             this Workspace workspace,
             Func<Project, bool> projectPredicate,
             Func<Document, bool> documentPredicate
@@ -134,6 +133,8 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(documentPredicate));
             }
 
+            var result = new List<string>();
+
             foreach (var project in workspace.CurrentSolution.Projects)
             {
                 if (!projectPredicate(project))
@@ -148,9 +149,14 @@ namespace AdjustNamespace.Helper
                         continue;
                     }
 
-                    yield return document;
+                    if (!string.IsNullOrEmpty(document.FilePath))
+                    {
+                        result.Add(document.FilePath!);
+                    }
                 }
             }
+
+            return result;
         }
 
         public static Document? GetDocument(this Workspace workspace, string filePath)

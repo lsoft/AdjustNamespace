@@ -6,6 +6,36 @@ namespace AdjustNamespace.Helper
 {
     public static class RoslynHelper
     {
+        public static bool IsGlobal(this SyntaxNode node)
+        {
+            if (node is null)
+            {
+                throw new System.ArgumentNullException(nameof(node));
+            }
+
+            return node.ToString().StartsWith("global::");
+        }
+
+        public static T? UpTo<T>(this SyntaxNode node)
+            where T : SyntaxNode
+        {
+            //if (node is T t)
+            //{
+            //    return t;
+            //}
+
+            while (node != null)
+            {
+                if (!(node.Parent is T))
+                {
+                    return (T)node;
+                }
+
+                node = node.Parent;
+            }
+
+            return default;
+        }
 
         //public static string GetTargetNamespaceName(
         //    this NamespaceDeclarationSyntax n,

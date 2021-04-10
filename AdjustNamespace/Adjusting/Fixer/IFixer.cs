@@ -4,15 +4,8 @@ namespace AdjustNamespace.Adjusting.Fixer
 {
     public interface IFixer
     {
-        string UniqueKey
-        {
-            get;
-        }
 
-        string OrderingKey
-        {
-            get;
-        }
+        void AddSubject(object o);
 
         Task FixAsync(string filePath);
     }

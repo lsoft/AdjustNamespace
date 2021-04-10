@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,15 +13,10 @@ namespace AdjustNamespace.Adjusting.Fixer
     public class NamespaceFixer : IFixer
     {
         private readonly Workspace _workspace;
-        private readonly string _symbolTargetNamespace;
-
-        public string UniqueKey => _symbolTargetNamespace;
-
-        public string OrderingKey => _symbolTargetNamespace;
+        private readonly HashSet<string> _symbolTargetNamespaces = new ();
 
         public NamespaceFixer(
-            Workspace workspace,
-            string symbolTargetNamespace
+            Workspace workspace
             )
         {
             if (workspace is null)
@@ -28,13 +24,24 @@ namespace AdjustNamespace.Adjusting.Fixer
                 throw new ArgumentNullException(nameof(workspace));
             }
 
-            if (symbolTargetNamespace is null)
-            {
-                throw new ArgumentNullException(nameof(symbolTargetNamespace));
-            }
             _workspace = workspace;
-            _symbolTargetNamespace = symbolTargetNamespace;
         }
+
+        public void AddSubject(object o)
+        {
+            if (o is null)
+            {
+                throw new ArgumentNullException(nameof(o));
+            }
+
+            if (!(o is string symbolTargetNamespace))
+            {
+                throw new Exception($"incorrect incoming type: {o.GetType()}");
+            }
+
+            _symbolTargetNamespaces.Add(symbolTargetNamespace);
+        }
+
 
         public async Task FixAsync(string filePath)
         {
@@ -46,56 +53,63 @@ namespace AdjustNamespace.Adjusting.Fixer
             bool r;
             do
             {
-                var documentEditor = await _workspace.CreateDocumentEditorAsync(filePath);
-                if (documentEditor == null)
+                var document = _workspace.GetDocument(filePath)!;
+                if (document == null)
                 {
                     //skip this document
                     return;
                 }
 
-                var syntaxRoot = await documentEditor.OriginalDocument.GetSyntaxRootAsync();
+                var syntaxRoot = await document.GetSyntaxRootAsync();
                 if (syntaxRoot == null)
                 {
                     //skip this document
                     return;
                 }
 
-                var usingSyntaxes = syntaxRoot
-                    .DescendantNodes()
-                    .OfType<UsingDirectiveSyntax>()
-                    .ToList();
-
-
-                if (usingSyntaxes.Count == 0)
+                foreach (var symbolTargetNamespace in _symbolTargetNamespaces)
                 {
-                    //no namespaces exists
-                    //no need to insert new in this file
-                    return;
+                    var usingSyntaxes = syntaxRoot
+                        .DescendantNodes()
+                        .OfType<UsingDirectiveSyntax>()
+                        .ToList();
+
+
+                    if (usingSyntaxes.Count == 0)
+                    {
+                        //no namespaces exists
+                        //no need to insert new in this file
+                        continue;
+                    }
+
+                    if (usingSyntaxes.Any(s => s.Name.ToString() == symbolTargetNamespace))
+                    {
+                        //that using already exists
+                        continue;
+                    }
+
+                    var lastUsing = usingSyntaxes.Last();
+
+                    Debug.WriteLine($"Fix references in {filePath}: '{lastUsing.Name}' -> '{symbolTargetNamespace}' ");
+
+                    syntaxRoot = syntaxRoot.InsertNodesAfter(
+                        lastUsing,
+                        new[]
+                        {
+                            SyntaxFactory.UsingDirective(
+                                SyntaxFactory.ParseName(
+                                    " " + symbolTargetNamespace
+                                    )
+                                ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                        });
+
                 }
 
-                if (usingSyntaxes.Any(s => s.Name.ToString() == _symbolTargetNamespace))
-                {
-                    //that using already exists
-                    return;
-                }
-
-                var lastUsing = usingSyntaxes.Last();
-
-                Debug.WriteLine($"Fix references in {documentEditor.OriginalDocument.FilePath}: '{lastUsing.Name}' -> '{_symbolTargetNamespace}' ");
-
-                documentEditor.InsertAfter(
-                    lastUsing,
-                    SyntaxFactory.UsingDirective(
-                        SyntaxFactory.ParseName(
-                            " " + _symbolTargetNamespace
-                            )
-                        ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                    );
-
-                var changedDocument = documentEditor.GetChangedDocument();
+                var changedDocument = document.WithSyntaxRoot(syntaxRoot);
                 r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
             }
             while (!r);
         }
+
     }
 }

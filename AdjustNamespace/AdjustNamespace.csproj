@@ -70,7 +70,6 @@
       <DependentUpon>PerformingUserControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="Adjusting\Fixer\IFixer.cs" />
-    <Compile Include="Adjusting\Fixer\FixerEqualityComparer.cs" />
     <Compile Include="Adjusting\Fixer\NamespaceFixer.cs" />
     <Compile Include="Adjusting\Fixer\QualifiedNameFixer.cs" />
     <Compile Include="Helper\BaseViewModel.cs" />
