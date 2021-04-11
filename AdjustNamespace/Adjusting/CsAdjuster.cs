@@ -201,6 +201,19 @@ namespace AdjustNamespace.Adjusting
                             continue;
                         }
 
+                        if (refSyntax is TypeConstraintSyntax tcs)
+                        {
+                            refSyntax = tcs.Type;
+                        }
+                        if (refSyntax is SimpleBaseTypeSyntax sbts)
+                        {
+                            refSyntax = sbts.Type;
+                        }
+                        if (refSyntax is ArgumentSyntax args)
+                        {
+                            refSyntax = args.Expression;
+                        }
+
                         var refSemanticModel = await refDocument.GetSemanticModelAsync();
                         if (refSemanticModel == null)
                         {
@@ -223,108 +236,76 @@ namespace AdjustNamespace.Adjusting
                             };
                         }
 
-                        //if (isClass)
-                        //{
-                        //    if (refSyntax.Parent is QualifiedNameSyntax qns)
-                        //    {
-                        //        //replace QualifiedNameSyntax
-                        //        var mqns = qns
-                        //            .WithLeft(SyntaxFactory.ParseName((qns.IsGlobal() ? "global::" : "") + " " + targetNamespaceInfo.ModifiedName))
-                        //            .WithLeadingTrivia(qns.GetLeadingTrivia())
-                        //            .WithTrailingTrivia(qns.GetTrailingTrivia())
-                        //            ;
-
-                        //        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
-                        //            .AddSubject(
-                        //                new QualifiedNameFixer.QualifiedNameFixerArgument(
-                        //                    qns,
-                        //                    mqns
-                        //                    )
-                        //            );
-                        //    }
-                        //    else
-                        //    {
-                        //        //add a new using clause
-                        //        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
-                        //            .AddSubject(targetNamespaceInfo.ModifiedName);
-                        //    }
-                        //}
-                        //else
+                        if (refSyntax.Parent is QualifiedNameSyntax qns)
                         {
-                            if (refSyntax.Parent is QualifiedNameSyntax qns)
-                            {
-                                //replace QualifiedNameSyntax
-                                var mqns = qns
-                                    .WithLeft(SyntaxFactory.ParseName((qns.IsGlobal() ? "global::" : "") + " " + targetNamespaceInfo.ModifiedName))
-                                    .WithLeadingTrivia(qns.GetLeadingTrivia())
-                                    .WithTrailingTrivia(qns.GetTrailingTrivia())
-                                    ;
+                            //replace QualifiedNameSyntax
+                            var mqns = qns
+                                .WithLeft(SyntaxFactory.ParseName((qns.IsGlobal() ? "global::" : "") + " " + targetNamespaceInfo.ModifiedName))
+                                .WithLeadingTrivia(qns.GetLeadingTrivia())
+                                .WithTrailingTrivia(qns.GetTrailingTrivia())
+                                ;
 
-                                toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
-                                    .AddSubject(
-                                        new QualifiedNameFixer.QualifiedNameFixerArgument(
-                                            qns,
-                                            mqns
-                                            )
-                                    );
-                            }
-                            else if (refSyntax.Parent is MemberAccessExpressionSyntax maes)
-                            {
-                                var maesr = maes.UpTo<MemberAccessExpressionSyntax>()!;
+                            toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
+                                .AddSubject(
+                                    new QualifiedNameFixer.QualifiedNameFixerArgument(
+                                        qns,
+                                        mqns
+                                        )
+                                );
+                        }
+                        else if (refSyntax.Parent is MemberAccessExpressionSyntax maes)
+                        {
+                            var maesr = maes.UpTo<MemberAccessExpressionSyntax>()!;
 
-                                if (refSymbol.Kind.NotIn(SymbolKind.Property, SymbolKind.Field, SymbolKind.Method))
+                            if (refSymbol.Kind.NotIn(SymbolKind.Property, SymbolKind.Field, SymbolKind.Method))
+                            {
+                                var isGlobal = maesr.IsGlobal();
+
+                                var inss = (
+                                    from desc in maesr.DescendantNodes()
+                                    where desc is IdentifierNameSyntax || desc is GenericNameSyntax
+                                    select desc
+                                    ).ToList();
+
+                                var withoutNamespaceNodes = inss
+                                    .SkipWhile(s => !ReferenceEquals(s, refSyntax))
+                                    .ToList();
+
+                                var withoutNamespacesText = string.Join(".", withoutNamespaceNodes);
+
+                                if(inss.IndexOf(refSyntax) > 0) //namespace clauses exists
                                 {
-                                    if (maesr.Expression is MemberAccessExpressionSyntax typeNameExpression)
-                                    {
-                                        var modifiedTypeNameExpression = SyntaxFactory.ParseExpression(
-                                            (typeNameExpression.IsGlobal() ? "global::" : "") + targetNamespaceInfo.ModifiedName + "." + typeNameExpression.Name
-                                            );
+                                    var modifiedMaesr = SyntaxFactory.ParseExpression(
+                                        (isGlobal ? "global::" : "") + targetNamespaceInfo.ModifiedName + "." + withoutNamespacesText
+                                        );
 
-                                        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
-                                            .AddSubject(
-                                                new QualifiedNameFixer.QualifiedNameFixerArgument(
-                                                    typeNameExpression,
-                                                    modifiedTypeNameExpression
-                                                    )
-                                            );
-                                    }
-                                    else
-                                    {
-                                        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
-                                            .AddSubject(targetNamespaceInfo.ModifiedName);
-                                    }
+                                    toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
+                                        .AddSubject(
+                                            new QualifiedNameFixer.QualifiedNameFixerArgument(
+                                                maesr,
+                                                modifiedMaesr
+                                                )
+                                        );
                                 }
                                 else
                                 {
-                                    //if (targetExpression is MemberAccessExpressionSyntax typeNameExpression)
-                                    //{
-                                    //    var modifiedTypeNameExpression = SyntaxFactory.ParseExpression(
-                                    //        (typeNameExpression.IsGlobal() ? "global::" : "") + targetNamespaceInfo.ModifiedName + "." + typeNameExpression.Name
-                                    //        );
-
-                                    //    toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
-                                    //        .AddSubject(
-                                    //            new QualifiedNameFixer.QualifiedNameFixerArgument(
-                                    //                typeNameExpression,
-                                    //                modifiedTypeNameExpression
-                                    //                )
-                                    //        );
-                                    //}
-                                    //else
-                                    {
-                                        toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
-                                            .AddSubject(targetNamespaceInfo.ModifiedName);
-                                    }
+                                    toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
+                                        .AddSubject(targetNamespaceInfo.ModifiedName);
                                 }
                             }
                             else
                             {
-                                //i don't know why we are here
-
-                                //add a new using clause
                                 toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
                                     .AddSubject(targetNamespaceInfo.ModifiedName);
                             }
+                        }
+                        else
+                        {
+                            //i don't know why we are here
+
+                            //add a new using clause
+                            toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
+                                .AddSubject(targetNamespaceInfo.ModifiedName);
                         }
                     }
                 }
