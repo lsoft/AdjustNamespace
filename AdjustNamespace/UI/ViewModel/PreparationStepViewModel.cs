@@ -206,9 +206,12 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
+                if (!roslynProject.TryGetTargetNamespace(subjectFilePath, out var targetNamespace))
+                {
+                    continue;
+                }
 
-                var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(targetNamespace);
+                var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(targetNamespace!);
                 if (namespaceInfos.Count == 0)
                 {
                     continue;
@@ -217,7 +220,9 @@ namespace AdjustNamespace.UI.ViewModel
                 var namespaceRenameDict = namespaceInfos.BuildRenameDict();
 
                 // get all types in the target namespace
-                var foundTypesInTargetNamespace = await workspace.GetAllTypesInNamespaceRecursivelyAsync(new[] { targetNamespace });
+                var foundTypesInTargetNamespace = await workspace.GetAllTypesInNamespaceRecursivelyAsync(
+                    new[] { targetNamespace! }
+                    );
 
                 //check for same types already exists in the destination namespace
                 foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())

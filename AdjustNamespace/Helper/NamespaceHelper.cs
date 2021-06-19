@@ -9,9 +9,10 @@ namespace AdjustNamespace.Helper
 {
     public static class NamespaceHelper
     {
-        public static string GetTargetNamespace(
+        public static bool TryGetTargetNamespace(
             this Project project,
-            string documentFilePath
+            string documentFilePath,
+            out string? targetNamespace
             )
         {
             if (project is null)
@@ -25,14 +26,22 @@ namespace AdjustNamespace.Helper
             }
 
             var projectFolderPath = new FileInfo(project.FilePath).Directory.FullName;
-            var suffix = new FileInfo(documentFilePath).Directory.FullName.Substring(projectFolderPath.Length);
-            var targetNamespace = project.DefaultNamespace +
+            var documentFolderPath = new FileInfo(documentFilePath).Directory.FullName;
+
+            if (documentFolderPath.Length < projectFolderPath.Length || !documentFolderPath.StartsWith(projectFolderPath))
+            {
+                targetNamespace = null;
+                return false;
+            }
+
+            var suffix = documentFolderPath.Substring(projectFolderPath.Length);
+            targetNamespace = project.DefaultNamespace +
                 suffix
                     .Replace(Path.DirectorySeparatorChar, '.')
                     .Replace(Path.AltDirectorySeparatorChar, '.')
                     ;
 
-            return targetNamespace;
+            return true;
         }
 
 

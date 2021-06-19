@@ -218,9 +218,12 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
+                if (!roslynProject.TryGetTargetNamespace(subjectFilePath, out var targetNamespace))
+                {
+                    continue;
+                }
 
-                var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(targetNamespace);
+                var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(targetNamespace!);
                 if (namespaceInfos.Count == 0)
                 {
                     continue;

@@ -117,11 +117,11 @@ namespace AdjustNamespace.UI.ViewModel
                 {
                     //it's a xaml
 
-                    var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
-
-                    var xamlAdjuster = new XamlAdjuster(subjectFilePath, targetNamespace);
-
-                    xamlAdjuster.Adjust();
+                    if (roslynProject.TryGetTargetNamespace(subjectFilePath, out var targetNamespace))
+                    {
+                        var xamlAdjuster = new XamlAdjuster(subjectFilePath, targetNamespace!);
+                        xamlAdjuster.Adjust();
+                    }
                 }
                 else
                 {
@@ -132,17 +132,18 @@ namespace AdjustNamespace.UI.ViewModel
                         continue;
                     }
 
-                    var targetNamespace = roslynProject.GetTargetNamespace(subjectFilePath);
+                    if (roslynProject.TryGetTargetNamespace(subjectFilePath, out var targetNamespace))
+                    {
+                        var csAdjuster = new CsAdjuster(
+                            workspace,
+                            namespaceCenter,
+                            subjectFilePath,
+                            targetNamespace!,
+                            xamlFilePaths
+                            );
 
-                    var csAdjuster = new CsAdjuster(
-                        workspace,
-                        namespaceCenter,
-                        subjectFilePath,
-                        targetNamespace,
-                        xamlFilePaths
-                        );
-
-                    await csAdjuster.AdjustAsync();
+                        await csAdjuster.AdjustAsync();
+                    }
                 }
             }
 
