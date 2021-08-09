@@ -106,7 +106,7 @@ namespace AdjustNamespace
                     return;
                 }
 
-                var componentModel = (IComponentModel)await ServiceProvider.GetServiceAsync(typeof(SComponentModel));
+                var componentModel = (IComponentModel)(await ServiceProvider.GetServiceAsync(typeof(SComponentModel)))!;
                 if (componentModel == null)
                 {
                     return;

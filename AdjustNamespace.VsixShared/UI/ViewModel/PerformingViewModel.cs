@@ -68,7 +68,7 @@ namespace AdjustNamespace.UI.ViewModel
                 return;
             }
 
-            var componentModel = (IComponentModel)await _serviceProvider.GetServiceAsync(typeof(SComponentModel));
+            var componentModel = (await _serviceProvider.GetServiceAsync(typeof(SComponentModel)) as IComponentModel)!;
             if (componentModel == null)
             {
                 return;

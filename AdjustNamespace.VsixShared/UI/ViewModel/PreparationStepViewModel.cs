@@ -13,11 +13,10 @@ using System.Linq;
 using System.Windows.Input;
 using System.Windows.Media;
 using AdjustNamespace.UI.StepFactory;
-using Microsoft.CodeAnalysis;
 
 namespace AdjustNamespace.UI.ViewModel
 {
-    public class SelectedStepViewModel : ChainViewModel
+    public class PreparationStepViewModel : ChainViewModel
     {
         private readonly IAsyncServiceProvider _serviceProvider;
         private readonly IStepFactory _nextStepFactory;
@@ -26,10 +25,10 @@ namespace AdjustNamespace.UI.ViewModel
         private Brush _foreground;
         private string _mainMessage;
         private bool _isInProgress = false;
+        private bool _blocked = false;
 
         private ICommand? _closeCommand;
         private ICommand? _nextCommand;
-        private ICommand? _invertStatusCommand;
 
         public string MainMessage
         {
@@ -41,7 +40,7 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
-        public ObservableCollection<SelectItemViewModel> ToFilterItems
+        public ObservableCollection<string> DetectedMessages
         {
             get;
             private set;
@@ -87,10 +86,8 @@ namespace AdjustNamespace.UI.ViewModel
                 if (_nextCommand == null)
                 {
                     _nextCommand = new AsyncRelayCommand(
-                        async a => await _nextStepFactory.CreateAsync(
-                            ToFilterItems.Where(s => s.IsChecked).Select(s => s.FilePath).ToList()
-                            ),
-                        r => !_isInProgress && ToFilterItems.Any(s => s.IsChecked)
+                        async a => await _nextStepFactory.CreateAsync(_filePaths),
+                        r => !_blocked && !_isInProgress
                         );
                 }
 
@@ -98,35 +95,7 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
-
-        public ICommand InvertStatusCommand
-        {
-            get
-            {
-                if (_invertStatusCommand == null)
-                {
-                    _invertStatusCommand = new RelayCommand(
-                        a =>
-                        {
-                            var selected = ToFilterItems.Where(i => i.IsSelected).ToList();
-
-                            if (selected.Count == 0)
-                            {
-                                return;
-                            }
-
-                            var newValue = !selected[0].IsChecked;
-                            selected.ForEach(s => s.IsChecked = newValue);
-                        }
-                        );
-                }
-
-                return _invertStatusCommand;
-            }
-        }
-
-
-        public SelectedStepViewModel(
+        public PreparationStepViewModel(
             IAsyncServiceProvider serviceProvider,
             IStepFactory nextStepFactory,
             List<string> filePaths
@@ -149,10 +118,10 @@ namespace AdjustNamespace.UI.ViewModel
             _serviceProvider = serviceProvider;
             _nextStepFactory = nextStepFactory;
             _filePaths = filePaths;
-
             _foreground = Brushes.Green;
-            _mainMessage = "Choose files to process...";
-            ToFilterItems = new ObservableCollection<SelectItemViewModel>();
+            _mainMessage = "Scanning solution...";
+
+            DetectedMessages = new ObservableCollection<string>();
         }
 
         public override async System.Threading.Tasks.Task StartAsync()
@@ -166,11 +135,12 @@ namespace AdjustNamespace.UI.ViewModel
                 return;
             }
 
-            var componentModel = (IComponentModel)await _serviceProvider.GetServiceAsync(typeof(SComponentModel));
+            var componentModel = (await _serviceProvider.GetServiceAsync(typeof(SComponentModel)) as IComponentModel)!;
             if (componentModel == null)
             {
                 return;
             }
+
 
             var workspace = componentModel.GetService<VisualStudioWorkspace>();
             if (workspace == null)
@@ -180,34 +150,52 @@ namespace AdjustNamespace.UI.ViewModel
 
             #region check for solution compilation
 
-            for (var i = 0; i < _filePaths.Count; i++)
+            //await System.Threading.Tasks.Task.Delay(5000);
+
+            foreach (var project in workspace.CurrentSolution.Projects)
             {
-                var subjectFilePath = _filePaths[i];
+                MainMessage = $"Processing {project.Name}";
 
-                if (subjectFilePath.EndsWith(".xaml"))
+                var compilation = await project.GetCompilationAsync();
+                if (compilation != null)
                 {
-                    ToFilterItems.Add(
-                       new SelectItemViewModel(
-                            subjectFilePath
-                        )
-                    );
-
-                    continue;
+                    if (compilation.GetDiagnostics().Any(j => j.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                    {
+                        Foreground = Brushes.Red;
+                        DetectedMessages.Add(
+                            $"Compilation of {project.Name} fails. Adjust namespace can produce an incorrect results."
+                            );
+                    }
                 }
+            }
+
+            #endregion
+
+            #region check for the target namespace already contains a type with same name
+
+            foreach (var subjectFilePath in _filePaths)
+            {
+                MainMessage = $"Processing {subjectFilePath}";
 
                 if (!dte.Solution.TryGetProjectItem(subjectFilePath, out var subjectProject, out var subjectProjectItem))
                 {
                     continue;
                 }
 
-                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProject!.FullName);
+                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem!.ContainingProject.FullName);
                 if (roslynProject == null)
                 {
                     continue;
                 }
 
                 var subjectDocument = workspace.GetDocument(subjectFilePath);
-                if (subjectDocument == null)
+                if (!subjectDocument.IsDocumentInScope())
+                {
+                    continue;
+                }
+
+                var subjectSemanticModel = await subjectDocument!.GetSemanticModelAsync();
+                if (subjectSemanticModel == null)
                 {
                     continue;
                 }
@@ -229,55 +217,41 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                ToFilterItems.Add(
-                    new SelectItemViewModel(
-                        subjectFilePath
-                    )
-                );
+                var namespaceRenameDict = namespaceInfos.BuildRenameDict();
+
+                // get all types in the target namespace
+                var foundTypesInTargetNamespace = await workspace.GetAllTypesInNamespaceRecursivelyAsync(
+                    new[] { targetNamespace! }
+                    );
+
+                //check for same types already exists in the destination namespace
+                foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
+                    if (symbolInfo == null)
+                    {
+                        continue;
+                    }
+
+                    var targetNamespaceInfo = namespaceRenameDict[symbolInfo.ContainingNamespace.ToDisplayString()];
+
+                    if (foundTypesInTargetNamespace.ContainsKey($"{targetNamespaceInfo}.{symbolInfo.Name}"))
+                    {
+                        Foreground = Brushes.Red;
+                        DetectedMessages.Add(
+                            $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'"
+                            );
+                        _blocked = true;
+                        return;
+                    }
+                }
             }
 
             #endregion
 
+            MainMessage = $"Let's move next!";
             _isInProgress = false;
             OnPropertyChanged();
-        }
-    }
-
-    public class SelectItemViewModel : BaseViewModel
-    {
-        private bool _isChecked;
-        private bool _isSelected;
-
-        public bool IsChecked
-        {
-            get => _isChecked;
-            set
-            {
-                _isChecked = value;
-                OnPropertyChanged(nameof(IsChecked));
-            }
-        }
-
-        public bool IsSelected
-        {
-            get => _isSelected;
-            set => _isSelected = value;
-        }
-
-        public string FilePath
-        {
-            get;
-        }
-
-        public SelectItemViewModel(string filePath)
-        {
-            if (filePath is null)
-            {
-                throw new ArgumentNullException(nameof(filePath));
-            }
-
-            FilePath = filePath;
-            IsChecked = true;
         }
     }
 }

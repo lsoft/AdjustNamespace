@@ -1,0 +1,85 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>b8f4de5d-eeff-4f14-9c3d-2a6ee41db482</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>AdjustNamespace.VsixShared</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\CsAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\IFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\NamespaceFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\QualifiedNameFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\NamespaceCenter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\XamlAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)AdjustNamespaceCommand.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)AdjustNamespacePackage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\BaseViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\ChainViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\ListHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\NamespaceHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\RoslynHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\SolutionHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\WorkspaceHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\WpfHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ImageMonikers.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Logging.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Predicate.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)RelayCommand.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Control\PerformingUserControl.xaml.cs">
+      <DependentUpon>PerformingUserControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Control\PreparationUserControl.xaml.cs">
+      <DependentUpon>PreparationUserControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Control\SelectedUserControl.xaml.cs">
+      <DependentUpon>SelectedUserControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Control\SpaceKeyUpEventTrigger.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\IStepFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\PerformingStepFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\PreparationStepFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\SelectedStepFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Theme.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PerformingViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PreparationStepViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\SelectedStepViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Window\AdjustNamespaceWindow.xaml.cs">
+      <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXamlPerformable.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXamlPositioned.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXmlnsProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlAttributeReference.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlClass.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlControl.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlDocument.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlEngine.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlX.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlXmlns.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="$(MSBuildThisFileDirectory)UI\Control\PerformingUserControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="$(MSBuildThisFileDirectory)UI\Control\PreparationUserControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="$(MSBuildThisFileDirectory)UI\Control\SelectedUserControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="$(MSBuildThisFileDirectory)Window\AdjustNamespaceWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)LICENSE.txt" />
+  </ItemGroup>
+</Project>
