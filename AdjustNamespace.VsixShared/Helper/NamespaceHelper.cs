@@ -70,8 +70,55 @@ namespace AdjustNamespace.Helper
                 select ni
                 ).ToList();
 
+#if VS2022
+            var candidateNamespaces2 = (
+                from dnode in node.DescendantNodesAndSelf()
+                let fsndnode = dnode as FileScopedNamespaceDeclarationSyntax
+                where fsndnode != null
+                let ni = fsndnode.TryGetNamespaceInfo(root)
+                where ni != null
+                select ni
+                ).ToList();
+
+            candidateNamespaces.AddRange(candidateNamespaces2);
+#endif
+
             return candidateNamespaces;
         }
+
+#if VS2022
+
+        public static NamespaceInfo? TryGetNamespaceInfo(
+            this FileScopedNamespaceDeclarationSyntax n,
+            string root
+            )
+        {
+            if (n is null)
+            {
+                throw new ArgumentNullException(nameof(n));
+            }
+
+            if (root is null)
+            {
+                throw new ArgumentNullException(nameof(root));
+            }
+
+            var originalNamespace = n.Name.ToString();
+            var clonedNamespace = root;
+
+            if (originalNamespace == clonedNamespace)
+            {
+                return null;
+            }
+
+            return new NamespaceInfo(
+                originalNamespace,
+                clonedNamespace,
+                true
+                );
+        }
+
+#endif
 
         public static NamespaceInfo? TryGetNamespaceInfo(
             this NamespaceDeclarationSyntax n,

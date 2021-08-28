@@ -517,11 +517,17 @@ namespace AdjustNamespace.Adjusting
                         continue;
                     }
 
+                    var newName = SyntaxFactory.ParseName(
+                        namespaceInfo.ModifiedName
+                        );
+
+                    if(fNamespace is NamespaceDeclarationSyntax)
+                    {
+                        newName = newName.WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+                    }
 
                     var fixedNamespace = fNamespace!.WithName(
-                        SyntaxFactory.ParseName(
-                            namespaceInfo.ModifiedName
-                            ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                        newName
                         )
                         .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
                         ;
@@ -543,7 +549,7 @@ namespace AdjustNamespace.Adjusting
         private bool TryFindNamespaceNode(
             SyntaxNode syntaxRoot,
             NamespaceInfo namespaceInfo,
-            out NamespaceDeclarationSyntax? fNamespace
+            out BaseNamespaceDeclarationSyntax? fNamespace
             )
         {
             if (syntaxRoot is null)
@@ -558,7 +564,7 @@ namespace AdjustNamespace.Adjusting
 
             var foundNamespaces = syntaxRoot
                 .DescendantNodes()
-                .OfType<NamespaceDeclarationSyntax>()
+                .OfType<BaseNamespaceDeclarationSyntax>()
                 .ToDictionary(n => n.Name.ToString(), n => n)
                 ;
 
