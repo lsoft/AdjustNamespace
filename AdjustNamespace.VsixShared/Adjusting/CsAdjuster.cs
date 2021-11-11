@@ -549,7 +549,11 @@ namespace AdjustNamespace.Adjusting
         private bool TryFindNamespaceNode(
             SyntaxNode syntaxRoot,
             NamespaceInfo namespaceInfo,
+#if VS2022
             out BaseNamespaceDeclarationSyntax? fNamespace
+#else
+            out NamespaceDeclarationSyntax? fNamespace
+#endif
             )
         {
             if (syntaxRoot is null)
@@ -564,7 +568,11 @@ namespace AdjustNamespace.Adjusting
 
             var foundNamespaces = syntaxRoot
                 .DescendantNodes()
+#if VS2022
                 .OfType<BaseNamespaceDeclarationSyntax>()
+#else
+                .OfType<NamespaceDeclarationSyntax>()
+#endif
                 .ToDictionary(n => n.Name.ToString(), n => n)
                 ;
 
