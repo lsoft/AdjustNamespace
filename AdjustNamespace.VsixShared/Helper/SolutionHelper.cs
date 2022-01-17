@@ -90,7 +90,8 @@ namespace AdjustNamespace.Helper
                         continue;
                     }
 
-                    if (subProject.Kind == EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder)
+                    if (subProject.Kind != EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder
+                        && ((dynamic)subProject.Object).Kind == EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder)
                     {
                         subProject.SubProject.GetSolutionFolderProjects(ref foundTrueProjects);
                     }
