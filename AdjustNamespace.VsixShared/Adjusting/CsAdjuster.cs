@@ -12,6 +12,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AdjustNamespace.Adjusting.Fixer;
 using System.Threading;
+using System.Xml.Linq;
 
 namespace AdjustNamespace.Adjusting
 {
@@ -484,11 +485,13 @@ namespace AdjustNamespace.Adjusting
                         return;
                     }
 
-                    if (!TryFindNamespaceNode(syntaxRoot, namespaceInfo, out var fNamespace))
+                    if (!TryFindNamespaceNode(syntaxRoot, namespaceInfo, out var ufNamespaces))
                     {
                         //skip this namespace
                         continue;
                     }
+
+                    var ufNamespace = ufNamespaces.First();
 
                     //class a : ia {}
                     //we're moving a into a different namespace, but ia are not
@@ -504,39 +507,41 @@ namespace AdjustNamespace.Adjusting
                     {
                         var newUsingStatement = SyntaxFactory.UsingDirective(
                             SyntaxFactory.ParseName(
-                                " " + fNamespace!.Name
+                                " " + ufNamespace!.Name
                                 )
                             ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
 
                         cus = cus.AddUsings(newUsingStatement);
                     }
 
-                    if(!TryFindNamespaceNode(cus!, namespaceInfo, out fNamespace))
+                    if(!TryFindNamespaceNode(cus!, namespaceInfo, out var fNamespaces))
                     {
                         //skip this namespace
                         continue;
                     }
 
-                    var newName = SyntaxFactory.ParseName(
-                        namespaceInfo.ModifiedName
-                        );
-
-                    if(fNamespace is NamespaceDeclarationSyntax)
+                    foreach (var fNamespace in fNamespaces!)
                     {
-                        newName = newName.WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+                        var newName = SyntaxFactory.ParseName(
+                            namespaceInfo.ModifiedName
+                            );
+
+                        if (fNamespace is NamespaceDeclarationSyntax)
+                        {
+                            newName = newName.WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+                        }
+
+                        var fixedNamespace = fNamespace!.WithName(
+                            newName
+                            )
+                            .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                            ;
+
+                        cus = cus!.ReplaceNode(
+                            fNamespace,
+                            fixedNamespace
+                            );
                     }
-
-                    var fixedNamespace = fNamespace!.WithName(
-                        newName
-                        )
-                        .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                        ;
-
-                    cus = cus!.ReplaceNode(
-                        fNamespace,
-                        fixedNamespace
-                        );
-
 
                     openedDocument = openedDocument.WithSyntaxRoot(cus!);
 
@@ -550,9 +555,9 @@ namespace AdjustNamespace.Adjusting
             SyntaxNode syntaxRoot,
             NamespaceInfo namespaceInfo,
 #if VS2022
-            out BaseNamespaceDeclarationSyntax? fNamespace
+            out List<BaseNamespaceDeclarationSyntax>? fNamespace
 #else
-            out NamespaceDeclarationSyntax? fNamespace
+            out List<NamespaceDeclarationSyntax>? fNamespace
 #endif
             )
         {
@@ -566,6 +571,15 @@ namespace AdjustNamespace.Adjusting
                 throw new ArgumentNullException(nameof(namespaceInfo));
             }
 
+            var foundNamespacesDict = new Dictionary<
+                string,
+#if VS2022
+                List<BaseNamespaceDeclarationSyntax>
+#else
+                List<NamespaceDeclarationSyntax>
+#endif
+                >();
+
             var foundNamespaces = syntaxRoot
                 .DescendantNodes()
 #if VS2022
@@ -573,11 +587,20 @@ namespace AdjustNamespace.Adjusting
 #else
                 .OfType<NamespaceDeclarationSyntax>()
 #endif
-                .ToDictionary(n => n.Name.ToString(), n => n)
-                ;
+                .ToList();
 
 
-            foundNamespaces.TryGetValue(namespaceInfo.OriginalName, out fNamespace);
+            foreach (var foundNamespace in foundNamespaces)
+            {
+                var nn = foundNamespace.Name.ToString();
+                if (!foundNamespacesDict.ContainsKey(nn))
+                {
+                    foundNamespacesDict[nn] = new();
+                }
+                foundNamespacesDict[nn].Add(foundNamespace);
+            }
+
+            foundNamespacesDict.TryGetValue(namespaceInfo.OriginalName, out fNamespace);
 
             return fNamespace != null;
         }

@@ -61,6 +61,7 @@ namespace AdjustNamespace.UI.StepFactory
             catch (Exception excp)
             {
                 _targetControl.Content = excp.Message + Environment.NewLine + excp.StackTrace;
+                _targetControl.Foreground = System.Windows.Media.Brushes.Red;
                 Logging.LogVS(excp);
             }
         }
