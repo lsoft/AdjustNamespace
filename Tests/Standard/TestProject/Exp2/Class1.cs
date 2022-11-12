@@ -5,8 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TestProject.Exp1;
+namespace SubjectWrong.Exp2;
 
-internal class Exp1Class4
+internal class Class1
 {
 }

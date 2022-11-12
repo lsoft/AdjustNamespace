@@ -9,6 +9,62 @@ namespace AdjustNamespace.Helper
 {
     public static class NamespaceHelper
     {
+        public static bool TryFindNamespaceNodesFor(
+            this SyntaxNode syntaxRoot,
+            NamespaceInfo namespaceInfo,
+#if VS2022
+            out List<BaseNamespaceDeclarationSyntax>? fNamespace
+#else
+            out List<NamespaceDeclarationSyntax>? fNamespace
+#endif
+            )
+        {
+            if (syntaxRoot is null)
+            {
+                throw new ArgumentNullException(nameof(syntaxRoot));
+            }
+
+            if (namespaceInfo is null)
+            {
+                throw new ArgumentNullException(nameof(namespaceInfo));
+            }
+
+            //we need for List of namespac syntax because the following code may exists in single file:
+            //namespace a { class a1 {} } namespace a { class a2 {} } namespace a { class a3 {} }
+            var foundNamespacesDict = new Dictionary<
+                string,
+#if VS2022
+                List<BaseNamespaceDeclarationSyntax>
+#else
+                List<NamespaceDeclarationSyntax>
+#endif
+                >();
+
+            var foundNamespaces = syntaxRoot
+                .DescendantNodes()
+#if VS2022
+                .OfType<BaseNamespaceDeclarationSyntax>()
+#else
+                .OfType<NamespaceDeclarationSyntax>()
+#endif
+                .ToList();
+
+
+            foreach (var foundNamespace in foundNamespaces)
+            {
+                var nn = foundNamespace.Name.ToString();
+                if (!foundNamespacesDict.ContainsKey(nn))
+                {
+                    foundNamespacesDict[nn] = new();
+                }
+                foundNamespacesDict[nn].Add(foundNamespace);
+            }
+
+            foundNamespacesDict.TryGetValue(namespaceInfo.OriginalName, out fNamespace);
+
+            return fNamespace != null;
+        }
+
         public static bool TryGetTargetNamespace(
             this Project project,
             string documentFilePath,

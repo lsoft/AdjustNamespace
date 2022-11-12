@@ -4,9 +4,11 @@ namespace AdjustNamespace.Adjusting.Fixer
 {
     public interface IFixer
     {
+        public string FilePath
+        {
+            get;
+        }
 
-        void AddSubject(object o);
-
-        Task FixAsync(string filePath);
+        Task FixAsync();
     }
 }

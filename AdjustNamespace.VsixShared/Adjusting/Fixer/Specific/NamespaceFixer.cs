@@ -10,13 +10,22 @@ using System.Threading.Tasks;
 
 namespace AdjustNamespace.Adjusting.Fixer
 {
+    /// <summary>
+    /// Fixer for namespace using statements like <code>using System.Threading.Tasks</code>
+    /// </summary>
     public class NamespaceFixer : IFixer
     {
         private readonly Workspace _workspace;
         private readonly HashSet<string> _symbolTargetNamespaces = new ();
 
+        public string FilePath
+        {
+            get;
+        }
+
         public NamespaceFixer(
-            Workspace workspace
+            Workspace workspace,
+            string filePath
             )
         {
             if (workspace is null)
@@ -24,44 +33,34 @@ namespace AdjustNamespace.Adjusting.Fixer
                 throw new ArgumentNullException(nameof(workspace));
             }
 
-            _workspace = workspace;
-        }
-
-        public void AddSubject(object o)
-        {
-            if (o is null)
+            if (filePath is null)
             {
-                throw new ArgumentNullException(nameof(o));
+                throw new ArgumentNullException(nameof(filePath));
             }
 
-            if (!(o is string symbolTargetNamespace))
+            _workspace = workspace;
+            FilePath = filePath;
+        }
+
+
+        public void AddSubject(string symbolTargetNamespace)
+        {
+            if (symbolTargetNamespace is null)
             {
-                throw new Exception($"incorrect incoming type: {o.GetType()}");
+                throw new ArgumentNullException(nameof(symbolTargetNamespace));
             }
 
             _symbolTargetNamespaces.Add(symbolTargetNamespace);
         }
 
 
-        public async Task FixAsync(string filePath)
+        public async Task FixAsync()
         {
-            if (filePath is null)
-            {
-                throw new ArgumentNullException(nameof(filePath));
-            }
-
             bool r;
             do
             {
-                var document = _workspace.GetDocument(filePath)!;
-                if (document == null)
-                {
-                    //skip this document
-                    return;
-                }
-
-                var syntaxRoot = await document.GetSyntaxRootAsync();
-                if (syntaxRoot == null)
+                var (document, syntaxRoot) = await _workspace.GetDocumentAndSyntaxRootAsync(FilePath);
+                if (document == null || syntaxRoot == null)
                 {
                     //skip this document
                     return;
@@ -74,10 +73,9 @@ namespace AdjustNamespace.Adjusting.Fixer
                         .OfType<UsingDirectiveSyntax>()
                         .ToList();
 
-
                     if (usingSyntaxes.Count == 0)
                     {
-                        //no namespaces exists
+                        //no using namespaces exists
                         //no need to insert new in this file
                         continue;
                     }
@@ -90,7 +88,7 @@ namespace AdjustNamespace.Adjusting.Fixer
 
                     var lastUsing = usingSyntaxes.Last();
 
-                    Debug.WriteLine($"Fix references in {filePath}: '{lastUsing.Name}' -> '{symbolTargetNamespace}' ");
+                    Debug.WriteLine($"Fix references in {FilePath}: '{lastUsing.Name}' -> '{symbolTargetNamespace}' ");
 
                     syntaxRoot = syntaxRoot.InsertNodesAfter(
                         lastUsing,
@@ -101,6 +99,7 @@ namespace AdjustNamespace.Adjusting.Fixer
                                     " " + symbolTargetNamespace
                                     )
                                 ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                                .WithLeadingTrivia(lastUsing.GetLeadingTrivia())
                         });
 
                 }
@@ -110,6 +109,5 @@ namespace AdjustNamespace.Adjusting.Fixer
             }
             while (!r);
         }
-
     }
 }

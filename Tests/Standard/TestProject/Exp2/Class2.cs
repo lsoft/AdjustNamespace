@@ -5,23 +5,18 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TestProject.Exp1
+namespace TestProject.Exp2
 {
-    internal class Exp1Class1
+    internal class Class2 : SubjectWrong.Exp2.Class1
     {
     }
 }
 
-namespace TestProject.Exp1
+namespace TestProject.Exp2
 {
-    internal class Exp1Class2
-    {
-    }
-}
+    using SubjectWrong.Exp2;
 
-namespace TestProject.Exp1
-{
-    internal class Exp1Class3
+    internal class Class3 : Class1
     {
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Subject
+namespace TestProject
 {
     internal class Program
     {

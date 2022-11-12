@@ -10,9 +10,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\CsAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\FixerContainer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\FixerSet.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\IFixer.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\NamespaceFixer.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\QualifiedNameFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\NamespaceFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\QualifiedNameFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\NamespaceCenter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\XamlAdjuster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AdjustNamespaceCommand.cs" />
@@ -81,5 +83,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="$(MSBuildThisFileDirectory)LICENSE.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\" />
   </ItemGroup>
 </Project>

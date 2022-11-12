@@ -3,6 +3,9 @@ using System;
 
 namespace AdjustNamespace.Adjusting
 {
+    /// <summary>
+    /// Adjuster for xaml file.
+    /// </summary>
     public class XamlAdjuster
     {
         private readonly string _subjectFilePath;

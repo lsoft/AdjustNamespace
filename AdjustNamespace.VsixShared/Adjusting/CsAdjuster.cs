@@ -11,11 +11,13 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using AdjustNamespace.Adjusting.Fixer;
-using System.Threading;
-using System.Xml.Linq;
+using AdjustNamespace.VsixShared.Adjusting.Fixer;
 
 namespace AdjustNamespace.Adjusting
 {
+    /// <summary>
+    /// Adjuster for cs file.
+    /// </summary>
     public class CsAdjuster
     {
         private readonly VisualStudioWorkspace _workspace;
@@ -66,27 +68,24 @@ namespace AdjustNamespace.Adjusting
 
         public async Task<bool> AdjustAsync()
         {
-            var subjectDocument = _workspace.GetDocument(_subjectFilePath);
-            if (subjectDocument == null)
+            var (subjectDocument, subjectSyntaxRoot) = await _workspace.GetDocumentAndSyntaxRootAsync(_subjectFilePath);
+            if (subjectDocument == null || subjectSyntaxRoot == null)
             {
+                //skip this document
                 return false;
             }
 
             var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
             if (subjectSemanticModel == null)
             {
-                return false;
-            }
-
-            var subjectSyntaxRoot = await subjectDocument.GetSyntaxRootAsync();
-            if (subjectSyntaxRoot == null)
-            {
+                //skip this document
                 return false;
             }
 
             var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(_targetNamespace);
             if (namespaceInfos.Count == 0)
             {
+                //skip this document
                 return false;
             }
 
@@ -94,7 +93,7 @@ namespace AdjustNamespace.Adjusting
 
             #region fix refs (adding a new using namespace clauses)
 
-            var toProcess = new Dictionary<string, List<IFixer>>();
+            var fixerContainer = new FixerContainer(_workspace);
             var processedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
             var foundSyntaxes = (
@@ -227,15 +226,7 @@ namespace AdjustNamespace.Adjusting
                             continue;
                         }
 
-
-                        if (!toProcess.ContainsKey(location.Document.FilePath))
-                        {
-                            toProcess[location.Document.FilePath] = new List<IFixer>
-                            {
-                                new QualifiedNameFixer(_workspace),
-                                new NamespaceFixer(_workspace)
-                            };
-                        }
+                        fixerContainer.TryAddFixersFor(location.Document.FilePath);
 
                         if (refSyntax.Parent is QualifiedNameSyntax qns)
                         {
@@ -246,13 +237,14 @@ namespace AdjustNamespace.Adjusting
                                 .WithTrailingTrivia(qns.GetTrailingTrivia())
                                 ;
 
-                            toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
+                            fixerContainer
+                                .Fixer<QualifiedNameFixer>(location.Document.FilePath)
                                 .AddSubject(
                                     new QualifiedNameFixer.QualifiedNameFixerArgument(
                                         qns,
                                         mqns
                                         )
-                                );
+                                    );
                         }
                         else if (refSyntax.Parent is MemberAccessExpressionSyntax maes)
                         {
@@ -280,23 +272,26 @@ namespace AdjustNamespace.Adjusting
                                         (isGlobal ? "global::" : "") + targetNamespaceInfo.ModifiedName + "." + withoutNamespacesText
                                         );
 
-                                    toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(QualifiedNameFixer))
+                                    fixerContainer
+                                        .Fixer<QualifiedNameFixer>(location.Document.FilePath)
                                         .AddSubject(
                                             new QualifiedNameFixer.QualifiedNameFixerArgument(
                                                 maesr,
                                                 modifiedMaesr
                                                 )
-                                        );
+                                            );
                                 }
                                 else
                                 {
-                                    toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
+                                    fixerContainer
+                                        .Fixer<NamespaceFixer>(location.Document.FilePath)
                                         .AddSubject(targetNamespaceInfo.ModifiedName);
                                 }
                             }
                             else
                             {
-                                toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
+                                fixerContainer
+                                    .Fixer<NamespaceFixer>(location.Document.FilePath)
                                     .AddSubject(targetNamespaceInfo.ModifiedName);
                             }
                         }
@@ -305,7 +300,8 @@ namespace AdjustNamespace.Adjusting
                             //i don't know why we are here
 
                             //add a new using clause
-                            toProcess[location.Document.FilePath].First(f => f.GetType() == typeof(NamespaceFixer))
+                            fixerContainer
+                                .Fixer<NamespaceFixer>(location.Document.FilePath)
                                 .AddSubject(targetNamespaceInfo.ModifiedName);
                         }
                     }
@@ -315,17 +311,13 @@ namespace AdjustNamespace.Adjusting
                 _namespaceCenter.TypeRemoved(symbolInfo);
             }
 
-            foreach (var group in toProcess)
+            foreach (var pair in fixerContainer.Dict)
             {
-                var targetFilePath = group.Key;
+                var targetFilePath = pair.Key;
 
                 Debug.WriteLine($"Fix references in {targetFilePath}");
 
-                var qnf = group.Value.First(f => f.GetType() == typeof(QualifiedNameFixer));
-                await qnf.FixAsync(targetFilePath);
-
-                var nsf = group.Value.First(f => f.GetType() == typeof(NamespaceFixer));
-                await nsf.FixAsync(targetFilePath);
+                await pair.Value.FixAllAsync();
             }
 
             #endregion
@@ -359,16 +351,11 @@ namespace AdjustNamespace.Adjusting
                 bool r = true;
                 do
                 {
-                    var document = _workspace.GetDocument(documentFilePath);
-                    if (document == null)
+                    var (document, syntaxRoot) = await _workspace.GetDocumentAndSyntaxRootAsync(documentFilePath);
+                    if (document == null || syntaxRoot == null)
                     {
-                        continue;
-                    }
-
-                    var syntaxRoot = await document.GetSyntaxRootAsync();
-                    if (syntaxRoot == null)
-                    {
-                        continue;
+                        //skip this document
+                        return;
                     }
 
                     var namespaces = syntaxRoot
@@ -471,21 +458,14 @@ namespace AdjustNamespace.Adjusting
                 bool r = true;
                 do
                 {
-                    var openedDocument = _workspace.GetDocument(subjectDocument.FilePath!);
-                    if (openedDocument == null)
+                    var (openedDocument, syntaxRoot) = await _workspace.GetDocumentAndSyntaxRootAsync(subjectDocument.FilePath!);
+                    if (openedDocument == null || syntaxRoot == null)
                     {
                         //skip this document
                         return;
                     }
 
-                    var syntaxRoot = await openedDocument.GetSyntaxRootAsync();
-                    if (syntaxRoot == null)
-                    {
-                        //skip this document
-                        return;
-                    }
-
-                    if (!TryFindNamespaceNode(syntaxRoot, namespaceInfo, out var ufNamespaces))
+                    if (!syntaxRoot.TryFindNamespaceNodesFor(namespaceInfo, out var ufNamespaces))
                     {
                         //skip this namespace
                         continue;
@@ -493,8 +473,8 @@ namespace AdjustNamespace.Adjusting
 
                     var ufNamespace = ufNamespaces.First();
 
-                    //class a : ia {}
-                    //we're moving a into a different namespace, but ia are not
+                    //class A : IA {}
+                    //we're moving A into a different namespace, but IA are not.
                     //we need to insert 'using old namespace'
                     //otherwise ia will not be resolved
 
@@ -514,7 +494,7 @@ namespace AdjustNamespace.Adjusting
                         cus = cus.AddUsings(newUsingStatement);
                     }
 
-                    if(!TryFindNamespaceNode(cus!, namespaceInfo, out var fNamespaces))
+                    if(!cus!.TryFindNamespaceNodesFor(namespaceInfo, out var fNamespaces))
                     {
                         //skip this namespace
                         continue;
@@ -528,12 +508,15 @@ namespace AdjustNamespace.Adjusting
 
                         if (fNamespace is NamespaceDeclarationSyntax)
                         {
-                            newName = newName.WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+                            newName = newName
+                                .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                                ;
                         }
 
                         var fixedNamespace = fNamespace!.WithName(
                             newName
                             )
+                            .WithLeadingTrivia(fNamespace.GetLeadingTrivia())
                             .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
                             ;
 
@@ -549,60 +532,6 @@ namespace AdjustNamespace.Adjusting
                 }
                 while (!r);
             }
-        }
-
-        private bool TryFindNamespaceNode(
-            SyntaxNode syntaxRoot,
-            NamespaceInfo namespaceInfo,
-#if VS2022
-            out List<BaseNamespaceDeclarationSyntax>? fNamespace
-#else
-            out List<NamespaceDeclarationSyntax>? fNamespace
-#endif
-            )
-        {
-            if (syntaxRoot is null)
-            {
-                throw new ArgumentNullException(nameof(syntaxRoot));
-            }
-
-            if (namespaceInfo is null)
-            {
-                throw new ArgumentNullException(nameof(namespaceInfo));
-            }
-
-            var foundNamespacesDict = new Dictionary<
-                string,
-#if VS2022
-                List<BaseNamespaceDeclarationSyntax>
-#else
-                List<NamespaceDeclarationSyntax>
-#endif
-                >();
-
-            var foundNamespaces = syntaxRoot
-                .DescendantNodes()
-#if VS2022
-                .OfType<BaseNamespaceDeclarationSyntax>()
-#else
-                .OfType<NamespaceDeclarationSyntax>()
-#endif
-                .ToList();
-
-
-            foreach (var foundNamespace in foundNamespaces)
-            {
-                var nn = foundNamespace.Name.ToString();
-                if (!foundNamespacesDict.ContainsKey(nn))
-                {
-                    foundNamespacesDict[nn] = new();
-                }
-                foundNamespacesDict[nn].Add(foundNamespace);
-            }
-
-            foundNamespacesDict.TryGetValue(namespaceInfo.OriginalName, out fNamespace);
-
-            return fNamespace != null;
         }
     }
 }

@@ -1,7 +1,5 @@
 ﻿using AdjustNamespace.Helper;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,13 +7,22 @@ using System.Threading.Tasks;
 
 namespace AdjustNamespace.Adjusting.Fixer
 {
+    /// <summary>
+    /// Fixer for fully qualified names like <code>AdjustNamespace.Adjusting.Fixer.QualifiedNameFixer</code>
+    /// </summary>
     public class QualifiedNameFixer : IFixer
     {
         private readonly Workspace _workspace;
         private readonly List<QualifiedNameFixerArgument> _arguments = new ();
 
+        public string FilePath
+        {
+            get;
+        }
+
         public QualifiedNameFixer(
-            Workspace workspace
+            Workspace workspace,
+            string filePath
             )
         {
             if (workspace is null)
@@ -23,43 +30,32 @@ namespace AdjustNamespace.Adjusting.Fixer
                 throw new ArgumentNullException(nameof(workspace));
             }
 
-            _workspace = workspace;
-        }
-
-        public void AddSubject(object o)
-        {
-            if (o is null)
-            {
-                throw new ArgumentNullException(nameof(o));
-            }
-
-            if (!(o is QualifiedNameFixerArgument qnsa))
-            {
-                throw new Exception($"incorrect incoming type: {o.GetType()}");
-            }
-
-            _arguments.Add(qnsa);
-        }
-
-        public async Task FixAsync(string filePath)
-        {
             if (filePath is null)
             {
                 throw new ArgumentNullException(nameof(filePath));
             }
 
+            _workspace = workspace;
+            FilePath = filePath;
+        }
+
+        public void AddSubject(QualifiedNameFixerArgument qnsa)
+        {
+            if (qnsa is null)
+            {
+                throw new ArgumentNullException(nameof(qnsa));
+            }
+
+            _arguments.Add(qnsa);
+        }
+
+        public async Task FixAsync()
+        {
             bool r;
             do
             {
-                var document = _workspace.GetDocument(filePath);
-                if (document == null)
-                {
-                    //skip this document
-                    return;
-                }
-
-                var syntaxRoot = await document.GetSyntaxRootAsync();
-                if (syntaxRoot == null)
+                var (document, syntaxRoot) = await _workspace.GetDocumentAndSyntaxRootAsync(FilePath);
+                if (document == null || syntaxRoot == null)
                 {
                     //skip this document
                     return;

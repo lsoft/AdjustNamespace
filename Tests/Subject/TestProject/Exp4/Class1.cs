@@ -5,8 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TestProject.Exp1;
-
-internal class Exp1Class4
+namespace TestProject.Exp4
 {
+    internal enum MyEnum
+    {
+        MustBeCrossCluster
+    }
 }
