@@ -13,6 +13,11 @@ using System.Linq;
 using System.Windows.Input;
 using System.Windows.Media;
 using AdjustNamespace.UI.StepFactory;
+using System.Threading.Tasks;
+using Microsoft.VisualStudio.Threading;
+using System.IO.Packaging;
+using EnvDTE;
+using Microsoft.CodeAnalysis;
 
 namespace AdjustNamespace.UI.ViewModel
 {
@@ -22,7 +27,6 @@ namespace AdjustNamespace.UI.ViewModel
         private readonly IStepFactory _nextStepFactory;
         private readonly List<string> _filePaths;
 
-        private Brush _foreground;
         private string _mainMessage;
         private bool _isInProgress = false;
         private bool _blocked = false;
@@ -44,16 +48,6 @@ namespace AdjustNamespace.UI.ViewModel
         {
             get;
             private set;
-        }
-
-        public Brush Foreground
-        {
-            get => _foreground;
-            private set
-            {
-                _foreground = value;
-                OnPropertyChanged(nameof(Foreground));
-            }
         }
 
 
@@ -118,7 +112,6 @@ namespace AdjustNamespace.UI.ViewModel
             _serviceProvider = serviceProvider;
             _nextStepFactory = nextStepFactory;
             _filePaths = filePaths;
-            _foreground = Brushes.Green;
             _mainMessage = "Scanning solution...";
 
             DetectedMessages = new ObservableCollection<string>();
@@ -141,16 +134,15 @@ namespace AdjustNamespace.UI.ViewModel
                 return;
             }
 
-
             var workspace = componentModel.GetService<VisualStudioWorkspace>();
             if (workspace == null)
             {
                 return;
             }
 
-            #region check for solution compilation
+            await TaskScheduler.Default;
 
-            //await System.Threading.Tasks.Task.Delay(5000);
+            #region check for solution compilation
 
             foreach (var project in workspace.CurrentSolution.Projects)
             {
@@ -161,8 +153,7 @@ namespace AdjustNamespace.UI.ViewModel
                 {
                     if (compilation.GetDiagnostics().Any(j => j.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
                     {
-                        Foreground = Brushes.Red;
-                        DetectedMessages.Add(
+                        await AddMessageAsync(
                             $"Compilation of {project.Name} fails. Adjust namespace can produce an incorrect results."
                             );
                     }
@@ -171,16 +162,32 @@ namespace AdjustNamespace.UI.ViewModel
 
             #endregion
 
-            #region check for the target namespace already contains a type with same name
+            #region extract project items (we need perform this in main thread)
 
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            var pathAndProjectItemList = new List<(string, EnvDTE.Project?, EnvDTE.ProjectItem?)>();
             foreach (var subjectFilePath in _filePaths)
             {
-                MainMessage = $"Processing {subjectFilePath}";
-
                 if (!dte.Solution.TryGetProjectItem(subjectFilePath, out var subjectProject, out var subjectProjectItem))
                 {
                     continue;
                 }
+
+                pathAndProjectItemList.Add((subjectFilePath, subjectProject, subjectProjectItem));
+            }
+
+            await TaskScheduler.Default;
+
+            #endregion
+
+            //the below we may run into background thread
+
+            #region check for the target namespace already contains a type with same name
+
+            foreach (var (subjectFilePath, subjectProject, subjectProjectItem) in pathAndProjectItemList)
+            {
+                MainMessage = $"Processing {subjectFilePath}";
 
                 var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem!.ContainingProject.FullName);
                 if (roslynProject == null)
@@ -237,8 +244,7 @@ namespace AdjustNamespace.UI.ViewModel
 
                     if (foundTypesInTargetNamespace.ContainsKey($"{targetNamespaceInfo}.{symbolInfo.Name}"))
                     {
-                        Foreground = Brushes.Red;
-                        DetectedMessages.Add(
+                        await AddMessageAsync(
                             $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'"
                             );
                         _blocked = true;
@@ -249,9 +255,21 @@ namespace AdjustNamespace.UI.ViewModel
 
             #endregion
 
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
             MainMessage = $"Let's move next!";
             _isInProgress = false;
+
             OnPropertyChanged();
+        }
+
+        private async Task AddMessageAsync(string message)
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            DetectedMessages.Add(message);
+
+            await TaskScheduler.Default;
         }
     }
 }
