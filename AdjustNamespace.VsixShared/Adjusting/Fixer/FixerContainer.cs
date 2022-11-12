@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace AdjustNamespace.VsixShared.Adjusting.Fixer
+namespace AdjustNamespace.Adjusting.Fixer
 {
     /// <summary>
     /// Container for all fixers we produce.

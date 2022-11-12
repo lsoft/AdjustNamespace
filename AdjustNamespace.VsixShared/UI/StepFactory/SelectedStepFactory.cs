@@ -47,7 +47,7 @@ namespace AdjustNamespace.UI.StepFactory
             var vm  = new SelectedStepViewModel(
                 _serviceProvider,
                 _nextStepFactory,
-                (List<string>)argument
+                (List<FileExtension>)argument
                 );
 
             v.DataContext = vm;

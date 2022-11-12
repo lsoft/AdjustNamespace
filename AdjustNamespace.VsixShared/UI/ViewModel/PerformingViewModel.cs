@@ -81,9 +81,7 @@ namespace AdjustNamespace.UI.ViewModel
                 return;
             }
 
-            var namespaceCenter = new NamespaceCenter(
-                (await workspace.GetAllTypesInNamespaceRecursivelyAsync()).Values
-                );
+            var namespaceCenter = await NamespaceCenter.CreateForAsync(workspace);
 
             #region get all xaml files in current solution
 

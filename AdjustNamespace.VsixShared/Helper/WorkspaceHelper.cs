@@ -61,57 +61,6 @@ namespace AdjustNamespace.Helper
             return documentEditor;
         }
 
-
-        public static async Task<HashSet<string>> GetAllNamespacesAsync(
-            this VisualStudioWorkspace workspace
-            )
-        {
-            if (workspace is null)
-            {
-                throw new ArgumentNullException(nameof(workspace));
-            }
-
-            var typeDict = await workspace.GetAllTypesInNamespaceRecursivelyAsync(null);
-
-            var allSolutionNamespaces = typeDict.Values.Select(t => t.ContainingNamespace.ToDisplayString()).ToHashSet();
-
-            return allSolutionNamespaces;
-        }
-
-
-        public static async Task<Dictionary<string, INamedTypeSymbol>> GetAllTypesInNamespaceRecursivelyAsync(
-            this Workspace workspace,
-            string[]? sourceNamespaces = null
-            )
-        {
-            if (workspace is null)
-            {
-                throw new ArgumentNullException(nameof(workspace));
-            }
-
-
-            var result = new Dictionary<string, INamedTypeSymbol>();
-            foreach (var cproject in workspace.CurrentSolution.Projects)
-            {
-                var ccompilation = await cproject.GetCompilationAsync();
-                if (ccompilation == null)
-                {
-                    continue;
-                }
-
-                foreach (var ctype in ccompilation.Assembly.GlobalNamespace.GetAllTypes())
-                {
-                    var ctnds = ctype.ContainingNamespace.ToDisplayString();
-                    if(sourceNamespaces == null || sourceNamespaces.Length == 0 || sourceNamespaces.Any(sn => ctnds.StartsWith(sn)))
-                    {
-                        result[ctype.ToDisplayString()] = ctype;
-                    }
-                }
-            }
-
-            return result;
-        }
-
         public static IReadOnlyList<string> EnumerateAllDocumentFilePaths(
             this Workspace workspace,
             Func<Project, bool> projectPredicate,

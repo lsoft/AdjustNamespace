@@ -29,6 +29,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Helper\WpfHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ImageMonikers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logging.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TypeContainer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionPage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Options\DialogPageProvider.cs" />
@@ -50,6 +51,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\PreparationStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\SelectedStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Theme.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\FileExtension.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PerformingViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PreparationStepViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\SelectedStepViewModel.cs" />

@@ -21,7 +21,7 @@
     <RootNamespace>AdjustNamespace</RootNamespace>
     <AssemblyName>AdjustNamespace</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <LangVersion>9.0</LangVersion>
+    <LangVersion>Latest</LangVersion>
     <Nullable>enable</Nullable>
     <WarningsAsErrors>nullable;CS8766;CS8767</WarningsAsErrors>
     <GeneratePkgDefFile>true</GeneratePkgDefFile>

@@ -11,12 +11,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
-using System.Windows.Media;
 using AdjustNamespace.UI.StepFactory;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
-using System.IO.Packaging;
-using EnvDTE;
 using Microsoft.CodeAnalysis;
 
 namespace AdjustNamespace.UI.ViewModel
@@ -33,6 +30,8 @@ namespace AdjustNamespace.UI.ViewModel
 
         private ICommand? _closeCommand;
         private ICommand? _nextCommand;
+
+        private List<FileExtension>? _fileExtensions = null;
 
         public string MainMessage
         {
@@ -80,7 +79,13 @@ namespace AdjustNamespace.UI.ViewModel
                 if (_nextCommand == null)
                 {
                     _nextCommand = new AsyncRelayCommand(
-                        async a => await _nextStepFactory.CreateAsync(_filePaths),
+                        async a =>
+                        {
+                            if (_fileExtensions != null)
+                            {
+                                await _nextStepFactory.CreateAsync(_fileExtensions);
+                            }
+                        },
                         r => !_blocked && !_isInProgress
                         );
                 }
@@ -162,31 +167,20 @@ namespace AdjustNamespace.UI.ViewModel
 
             #endregion
 
-            #region extract project items (we need perform this in main thread)
-
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            var pathAndProjectItemList = new List<(string, EnvDTE.Project?, EnvDTE.ProjectItem?)>();
-            foreach (var subjectFilePath in _filePaths)
-            {
-                if (!dte.Solution.TryGetProjectItem(subjectFilePath, out var subjectProject, out var subjectProjectItem))
-                {
-                    continue;
-                }
-
-                pathAndProjectItemList.Add((subjectFilePath, subjectProject, subjectProjectItem));
-            }
-
-            await TaskScheduler.Default;
-
-            #endregion
+            //extract project items (we need perform this in main thread)
+            await FillFileExtensionAsync(dte);
 
             //the below we may run into background thread
+            //await TaskScheduler.Default;
 
             #region check for the target namespace already contains a type with same name
 
-            foreach (var (subjectFilePath, subjectProject, subjectProjectItem) in pathAndProjectItemList)
+            foreach (var fileExtension in _fileExtensions!)
             {
+                var subjectFilePath = fileExtension.FilePath;
+                var subjectProject = fileExtension.Project;
+                var subjectProjectItem = fileExtension.ProjectItem;
+
                 MainMessage = $"Processing {subjectFilePath}";
 
                 var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem!.ContainingProject.FullName);
@@ -227,7 +221,8 @@ namespace AdjustNamespace.UI.ViewModel
                 var namespaceRenameDict = namespaceInfos.BuildRenameDict();
 
                 // get all types in the target namespace
-                var foundTypesInTargetNamespace = await workspace.GetAllTypesInNamespaceRecursivelyAsync(
+                var typesInTargetNamespace = await TypeContainer.CreateForAsync(
+                    workspace,
                     new[] { targetNamespace! }
                     );
 
@@ -242,7 +237,7 @@ namespace AdjustNamespace.UI.ViewModel
 
                     var targetNamespaceInfo = namespaceRenameDict[symbolInfo.ContainingNamespace.ToDisplayString()];
 
-                    if (foundTypesInTargetNamespace.ContainsKey($"{targetNamespaceInfo}.{symbolInfo.Name}"))
+                    if (typesInTargetNamespace.ContainsType($"{targetNamespaceInfo}.{symbolInfo.Name}"))
                     {
                         await AddMessageAsync(
                             $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'"
@@ -261,6 +256,22 @@ namespace AdjustNamespace.UI.ViewModel
             _isInProgress = false;
 
             OnPropertyChanged();
+        }
+
+        private async Task FillFileExtensionAsync(DTE2 dte)
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            _fileExtensions = new List<FileExtension>();
+            foreach (var filePath in _filePaths)
+            {
+                if (!dte.Solution.TryGetProjectItem(filePath, out var subjectProject, out var subjectProjectItem))
+                {
+                    continue;
+                }
+
+                _fileExtensions.Add(new FileExtension(filePath, subjectProject!, subjectProjectItem!));
+            }
         }
 
         private async Task AddMessageAsync(string message)

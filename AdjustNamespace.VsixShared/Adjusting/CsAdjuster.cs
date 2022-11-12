@@ -11,7 +11,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using AdjustNamespace.Adjusting.Fixer;
-using AdjustNamespace.VsixShared.Adjusting.Fixer;
 
 namespace AdjustNamespace.Adjusting
 {

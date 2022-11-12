@@ -14,6 +14,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using AdjustNamespace.UI.StepFactory;
 using Microsoft.CodeAnalysis;
+using System.Threading.Tasks;
+using Microsoft.VisualStudio.Threading;
 
 namespace AdjustNamespace.UI.ViewModel
 {
@@ -21,7 +23,7 @@ namespace AdjustNamespace.UI.ViewModel
     {
         private readonly IAsyncServiceProvider _serviceProvider;
         private readonly IStepFactory _nextStepFactory;
-        private readonly List<string> _filePaths;
+        private readonly List<FileExtension> _fileExtensions;
 
         private Brush _foreground;
         private string _mainMessage;
@@ -129,7 +131,7 @@ namespace AdjustNamespace.UI.ViewModel
         public SelectedStepViewModel(
             IAsyncServiceProvider serviceProvider,
             IStepFactory nextStepFactory,
-            List<string> filePaths
+            List<FileExtension> fileExtensions
             )
         {
             if (serviceProvider is null)
@@ -142,13 +144,13 @@ namespace AdjustNamespace.UI.ViewModel
                 throw new ArgumentNullException(nameof(nextStepFactory));
             }
 
-            if (filePaths is null)
+            if (fileExtensions is null)
             {
-                throw new ArgumentNullException(nameof(filePaths));
+                throw new ArgumentNullException(nameof(fileExtensions));
             }
             _serviceProvider = serviceProvider;
             _nextStepFactory = nextStepFactory;
-            _filePaths = filePaths;
+            _fileExtensions = fileExtensions;
 
             _foreground = Brushes.Green;
             _mainMessage = "Choose files to process...";
@@ -157,6 +159,8 @@ namespace AdjustNamespace.UI.ViewModel
 
         public override async System.Threading.Tasks.Task StartAsync()
         {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
             _isInProgress = true;
             OnPropertyChanged();
 
@@ -178,29 +182,24 @@ namespace AdjustNamespace.UI.ViewModel
                 return;
             }
 
+            await TaskScheduler.Default;
+
             #region check for solution compilation
 
-            for (var i = 0; i < _filePaths.Count; i++)
+            for (var i = 0; i < _fileExtensions.Count; i++)
             {
-                var subjectFilePath = _filePaths[i];
+                var fileExtension = _fileExtensions[i];
+
+                var subjectFilePath = fileExtension.FilePath;
 
                 if (subjectFilePath.EndsWith(".xaml"))
                 {
-                    ToFilterItems.Add(
-                       new SelectItemViewModel(
-                            subjectFilePath
-                        )
-                    );
+                    await AddToListAsync(subjectFilePath);
 
                     continue;
                 }
 
-                if (!dte.Solution.TryGetProjectItem(subjectFilePath, out var subjectProject, out var subjectProjectItem))
-                {
-                    continue;
-                }
-
-                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProject!.FullName);
+                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == fileExtension.ProjectPath);
                 if (roslynProject == null)
                 {
                     continue;
@@ -229,17 +228,31 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                ToFilterItems.Add(
-                    new SelectItemViewModel(
-                        subjectFilePath
-                    )
-                );
+                await AddToListAsync(subjectFilePath);
             }
 
             #endregion
 
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
             _isInProgress = false;
             OnPropertyChanged();
+        }
+
+        private async Task AddToListAsync(string subjectFilePath)
+        {
+            if (subjectFilePath is null)
+            {
+                throw new ArgumentNullException(nameof(subjectFilePath));
+            }
+
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            ToFilterItems.Add(
+               new SelectItemViewModel(
+                    subjectFilePath
+                )
+            );
         }
     }
 

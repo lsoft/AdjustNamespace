@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AdjustNamespace.VsixShared.Adjusting.Fixer
+namespace AdjustNamespace.Adjusting.Fixer
 {
     /// <summary>
     /// All fixer for specific file.
