@@ -29,6 +29,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Helper\WpfHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ImageMonikers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logging.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionPage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Options\DialogPageProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Options\GeneralOptions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Predicate.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)RelayCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Control\PerformingUserControl.xaml.cs">

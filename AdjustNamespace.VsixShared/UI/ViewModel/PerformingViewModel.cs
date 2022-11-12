@@ -1,5 +1,6 @@
 ﻿using AdjustNamespace.Adjusting;
 using AdjustNamespace.Helper;
+using AdjustNamespace.Options;
 using EnvDTE80;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
@@ -148,6 +149,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
 
             ProgressMessage = $"Completed";
+
+            GeneralOptions.Instance.FilesAdjusted += _subjectFilePaths.Count;
+            
             _formCloser();
         }
     }
