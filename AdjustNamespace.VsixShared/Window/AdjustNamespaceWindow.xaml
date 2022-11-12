@@ -1,24 +1,40 @@
-﻿<platformUi:DialogWindow 
+﻿<platformUi:DialogWindow
     x:Class="AdjustNamespace.Window.AdjustNamespaceWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-    xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
-    xmlns:platformUi="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
-    xmlns:ui="clr-namespace:AdjustNamespace.UI"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:imaging="clr-namespace:Microsoft.VisualStudio.Imaging;assembly=Microsoft.VisualStudio.Imaging"
     xmlns:main="clr-namespace:AdjustNamespace"
-    mc:Ignorable="d" 
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:platformUi="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0"
+    xmlns:ui="clr-namespace:AdjustNamespace.UI"
+    xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
     Title="Adjust namespaces..."
+    Width="700"
+    Height="400"
+    d:DesignHeight="300"
+    d:DesignWidth="400"
+    ui:VsTheme.UseVsTheme="True"
+    Closed="DialogWindow_Closed"
     Loaded="DialogWindow_Loaded"
     WindowStartupLocation="CenterOwner"
-    Height="400" Width="700"
-    d:DesignHeight="300" d:DesignWidth="400"
-    ui:VsTheme.UseVsTheme="True"
+    mc:Ignorable="d"
     >
-    
-    <ContentControl
-        x:Name="CenterContentControl"
-        />
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition />
+            <RowDefinition Height="auto" />
+        </Grid.RowDefinitions>
+
+        <ContentControl x:Name="CenterContentControl" Grid.Row="0" />
+
+        <CheckBox
+            Name="AwardCheckBox"
+            Grid.Row="1"
+            Margin="5"
+            Content="Open the VS Marketplace page in my browser when completed to award a star."
+            />
+
+    </Grid>
 </platformUi:DialogWindow>

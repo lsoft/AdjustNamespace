@@ -32,5 +32,17 @@ namespace AdjustNamespace.Window
         {
             await _factory(this);
         }
+
+        private void DialogWindow_Closed(object sender, EventArgs e)
+        {
+            if(this.AwardCheckBox.IsChecked.GetValueOrDefault(false))
+            {
+#if VS2022
+                System.Diagnostics.Process.Start("https://marketplace.visualstudio.com/items?itemName=lsoft.AdjustNamespaceVisualStudioExtension2022&ssr=false#review-details");
+#else
+                System.Diagnostics.Process.Start("https://marketplace.visualstudio.com/items?itemName=lsoft.AdjustNamespaceVisualStudioExtension&ssr=false#review-details");
+#endif
+            }
+        }
     }
 }
