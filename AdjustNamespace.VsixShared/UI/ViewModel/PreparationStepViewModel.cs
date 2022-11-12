@@ -15,6 +15,7 @@ using AdjustNamespace.UI.StepFactory;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 using Microsoft.CodeAnalysis;
+using EnvDTE;
 
 namespace AdjustNamespace.UI.ViewModel
 {
@@ -31,7 +32,7 @@ namespace AdjustNamespace.UI.ViewModel
         private ICommand? _closeCommand;
         private ICommand? _nextCommand;
 
-        private List<FileExtension>? _fileExtensions = null;
+        private List<FileEx>? _filteredFileExs = null;
 
         public string MainMessage
         {
@@ -81,9 +82,9 @@ namespace AdjustNamespace.UI.ViewModel
                     _nextCommand = new AsyncRelayCommand(
                         async a =>
                         {
-                            if (_fileExtensions != null)
+                            if (_filteredFileExs != null)
                             {
-                                await _nextStepFactory.CreateAsync(_fileExtensions);
+                                await _nextStepFactory.CreateAsync(_filteredFileExs);
                             }
                         },
                         r => !_blocked && !_isInProgress
@@ -168,14 +169,16 @@ namespace AdjustNamespace.UI.ViewModel
             #endregion
 
             //extract project items (we need perform this in main thread)
-            await FillFileExtensionAsync(dte);
+            var fileExtensions = await FillFileExtensionAsync(dte);
 
             //the below we may run into background thread
             //await TaskScheduler.Default;
 
             #region check for the target namespace already contains a type with same name
 
-            foreach (var fileExtension in _fileExtensions!)
+            _filteredFileExs = new List<FileEx>();
+
+            foreach (var fileExtension in fileExtensions)
             {
                 var subjectFilePath = fileExtension.FilePath;
                 var subjectProject = fileExtension.Project;
@@ -186,6 +189,15 @@ namespace AdjustNamespace.UI.ViewModel
                 var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem!.ContainingProject.FullName);
                 if (roslynProject == null)
                 {
+                    continue;
+                }
+
+                if (subjectFilePath.EndsWith(".xaml"))
+                {
+                    //we want to process XAML documents! no need for additional checks
+                    _filteredFileExs.Add(
+                        new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
+                        );
                     continue;
                 }
 
@@ -242,10 +254,16 @@ namespace AdjustNamespace.UI.ViewModel
                         await AddMessageAsync(
                             $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'"
                             );
+
                         _blocked = true;
+                        _filteredFileExs.Clear();
                         return;
                     }
                 }
+
+                _filteredFileExs.Add(
+                    new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
+                    );
             }
 
             #endregion
@@ -258,11 +276,11 @@ namespace AdjustNamespace.UI.ViewModel
             OnPropertyChanged();
         }
 
-        private async Task FillFileExtensionAsync(DTE2 dte)
+        private async Task<List<FileExtension>> FillFileExtensionAsync(DTE2 dte)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            _fileExtensions = new List<FileExtension>();
+            var fileExtensions = new List<FileExtension>(_filePaths.Count);
             foreach (var filePath in _filePaths)
             {
                 if (!dte.Solution.TryGetProjectItem(filePath, out var subjectProject, out var subjectProjectItem))
@@ -270,8 +288,10 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                _fileExtensions.Add(new FileExtension(filePath, subjectProject!, subjectProjectItem!));
+                fileExtensions.Add(new FileExtension(filePath, subjectProject!, subjectProjectItem!));
             }
+
+            return fileExtensions;
         }
 
         private async Task AddMessageAsync(string message)
@@ -280,7 +300,40 @@ namespace AdjustNamespace.UI.ViewModel
 
             DetectedMessages.Add(message);
 
-            await TaskScheduler.Default;
+            //await TaskScheduler.Default;
         }
+
+
+        /// <summary>
+        /// Extension for file from workspace.
+        /// </summary>
+        private readonly struct FileExtension
+        {
+            public readonly string FilePath;
+            public readonly EnvDTE.Project Project;
+            public readonly string ProjectPath;
+            public readonly ProjectItem ProjectItem;
+
+            public FileExtension(
+                string filePath,
+                EnvDTE.Project project,
+                ProjectItem projectItem
+                )
+            {
+                Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
+
+                if (filePath is null)
+                {
+                    throw new ArgumentNullException(nameof(filePath));
+                }
+
+                FilePath = filePath;
+                Project = project;
+                ProjectPath = project.FullName;
+                ProjectItem = projectItem;
+            }
+
+        }
+
     }
 }

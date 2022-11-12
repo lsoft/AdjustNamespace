@@ -23,11 +23,10 @@ namespace AdjustNamespace.UI.ViewModel
     {
         private readonly IAsyncServiceProvider _serviceProvider;
         private readonly IStepFactory _nextStepFactory;
-        private readonly List<FileExtension> _fileExtensions;
+        private readonly List<FileEx> _filteredFileExs;
 
         private Brush _foreground;
         private string _mainMessage;
-        private bool _isInProgress = false;
 
         private ICommand? _closeCommand;
         private ICommand? _nextCommand;
@@ -73,8 +72,7 @@ namespace AdjustNamespace.UI.ViewModel
                             {
                                 w.Close();
                             }
-                        },
-                        r => !_isInProgress
+                        }
                         );
                 }
 
@@ -92,7 +90,7 @@ namespace AdjustNamespace.UI.ViewModel
                         async a => await _nextStepFactory.CreateAsync(
                             ToFilterItems.Where(s => s.IsChecked).Select(s => s.FilePath).ToList()
                             ),
-                        r => !_isInProgress && ToFilterItems.Any(s => s.IsChecked)
+                        r => ToFilterItems.Any(s => s.IsChecked)
                         );
                 }
 
@@ -131,7 +129,7 @@ namespace AdjustNamespace.UI.ViewModel
         public SelectedStepViewModel(
             IAsyncServiceProvider serviceProvider,
             IStepFactory nextStepFactory,
-            List<FileExtension> fileExtensions
+            List<FileEx> fileExtensions
             )
         {
             if (serviceProvider is null)
@@ -150,7 +148,7 @@ namespace AdjustNamespace.UI.ViewModel
             }
             _serviceProvider = serviceProvider;
             _nextStepFactory = nextStepFactory;
-            _fileExtensions = fileExtensions;
+            _filteredFileExs = fileExtensions;
 
             _foreground = Brushes.Green;
             _mainMessage = "Choose files to process...";
@@ -161,98 +159,36 @@ namespace AdjustNamespace.UI.ViewModel
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            _isInProgress = true;
+            //var dte = await _serviceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
+            //if (dte == null)
+            //{
+            //    return;
+            //}
+
+            //var componentModel = (await _serviceProvider.GetServiceAsync(typeof(SComponentModel)) as IComponentModel)!;
+            //if (componentModel == null)
+            //{
+            //    return;
+            //}
+
+            //var workspace = componentModel.GetService<VisualStudioWorkspace>();
+            //if (workspace == null)
+            //{
+            //    return;
+            //}
+
+            foreach(var fileEx in _filteredFileExs)
+            {
+                var subjectFilePath = fileEx.FilePath;
+
+                ToFilterItems.Add(
+                    new SelectItemViewModel(
+                        subjectFilePath
+                    )
+                );
+            }
+
             OnPropertyChanged();
-
-            var dte = await _serviceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
-            if (dte == null)
-            {
-                return;
-            }
-
-            var componentModel = (await _serviceProvider.GetServiceAsync(typeof(SComponentModel)) as IComponentModel)!;
-            if (componentModel == null)
-            {
-                return;
-            }
-
-            var workspace = componentModel.GetService<VisualStudioWorkspace>();
-            if (workspace == null)
-            {
-                return;
-            }
-
-            await TaskScheduler.Default;
-
-            #region check for solution compilation
-
-            for (var i = 0; i < _fileExtensions.Count; i++)
-            {
-                var fileExtension = _fileExtensions[i];
-
-                var subjectFilePath = fileExtension.FilePath;
-
-                if (subjectFilePath.EndsWith(".xaml"))
-                {
-                    await AddToListAsync(subjectFilePath);
-
-                    continue;
-                }
-
-                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == fileExtension.ProjectPath);
-                if (roslynProject == null)
-                {
-                    continue;
-                }
-
-                var subjectDocument = workspace.GetDocument(subjectFilePath);
-                if (subjectDocument == null)
-                {
-                    continue;
-                }
-
-                var subjectSyntaxRoot = await subjectDocument.GetSyntaxRootAsync();
-                if (subjectSyntaxRoot == null)
-                {
-                    continue;
-                }
-
-                if (!roslynProject.TryGetTargetNamespace(subjectFilePath, out var targetNamespace))
-                {
-                    continue;
-                }
-
-                var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(targetNamespace!);
-                if (namespaceInfos.Count == 0)
-                {
-                    continue;
-                }
-
-                await AddToListAsync(subjectFilePath);
-            }
-
-            #endregion
-
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            _isInProgress = false;
-            OnPropertyChanged();
-        }
-
-        private async Task AddToListAsync(string subjectFilePath)
-        {
-            if (subjectFilePath is null)
-            {
-                throw new ArgumentNullException(nameof(subjectFilePath));
-            }
-
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            ToFilterItems.Add(
-               new SelectItemViewModel(
-                    subjectFilePath
-                )
-            );
         }
     }
 

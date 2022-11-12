@@ -46,12 +46,12 @@
       <DependentUpon>SelectedUserControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)UI\Control\SpaceKeyUpEventTrigger.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\FileEx.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\IStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\PerformingStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\PreparationStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\SelectedStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Theme.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)UI\FileExtension.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PerformingViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PreparationStepViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\SelectedStepViewModel.cs" />
