@@ -9,14 +9,16 @@
     <Import_RootNamespace>AdjustNamespace.VsixShared</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\CsAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\AdjusterFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\CsAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\IAdjuster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\FixerContainer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\FixerSet.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\IFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\NamespaceFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\QualifiedNameFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\NamespaceCenter.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\XamlAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\XamlAdjuster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AdjustNamespaceCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AdjustNamespacePackage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\BaseViewModel.cs" />
@@ -58,6 +60,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectedStepViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectFileViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectFolderViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)VsServices.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Window\AdjustNamespaceWindow.xaml.cs">
       <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>
     </Compile>

@@ -100,27 +100,11 @@ namespace AdjustNamespace
             {
                 var filePaths = new List<string>();
 
-                var dte = await ServiceProvider.GetServiceAsync(typeof(DTE)) as DTE2;
-                if (dte == null)
-                {
-                    return;
-                }
+                var vss = await VsServices.CreateAsync(ServiceProvider);
 
-                var componentModel = (IComponentModel)(await ServiceProvider.GetServiceAsync(typeof(SComponentModel)))!;
-                if (componentModel == null)
+                if (vss.Dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
                 {
-                    return;
-                }
-
-                var workspace = componentModel.GetService<VisualStudioWorkspace>();
-                if (workspace == null)
-                {
-                    return;
-                }
-
-                if (dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
-                {
-                    var uih = dte.ToolWindows.SolutionExplorer;
+                    var uih = vss.Dte.ToolWindows.SolutionExplorer;
                     var selectedItems = (Array)uih.SelectedItems;
 
                     if (null != selectedItems)
@@ -129,7 +113,7 @@ namespace AdjustNamespace
                         {
                             if ((selItem.Object as dynamic).ExtenderCATID == ProjectKind)
                             {
-                                filePaths.AddRange(dte.Solution.ProcessSolution());
+                                filePaths.AddRange(vss.Dte.Solution.ProcessSolution());
                             }
 
                             if (selItem.Object is EnvDTE.Project project)
@@ -147,24 +131,23 @@ namespace AdjustNamespace
 
                 if (filePaths.Count > 0)
                 {
-
                     var window = new AdjustNamespaceWindow(
                         async anw =>
                         {
                             var perfsf = new PerformingStepFactory(
-                                ServiceProvider,
+                                vss,
                                 anw,
                                 anw.CenterContentControl
                                 );
 
                             var selsf = new SelectedStepFactory(
-                                ServiceProvider,
+                                vss,
                                 anw.CenterContentControl,
                                 perfsf
                                 );
 
                             var prepsf = new PreparationStepFactory(
-                                ServiceProvider,
+                                vss,
                                 anw.CenterContentControl,
                                 selsf
                                 );

@@ -7,11 +7,17 @@ using System.Threading.Tasks;
 
 namespace AdjustNamespace.Adjusting
 {
+    /// <summary>
+    /// Namespace state container. It accumulates a changes during adjusting.
+    /// </summary>
     public class NamespaceCenter
     {
         private readonly Dictionary<string, HashSet<string>> _types;
         private readonly HashSet<string> _namespacesToRemove;
 
+        /// <summary>
+        /// Emptyfied namespaces. They need to be removed at the end of adjusting procedure.
+        /// </summary>
         public IReadOnlyCollection<string> NamespacesToRemove => _namespacesToRemove;
 
         private NamespaceCenter(
@@ -30,14 +36,13 @@ namespace AdjustNamespace.Adjusting
         public void TypeRemoved(ITypeSymbol type)
         {
             var cnn = type.ContainingNamespace.ToDisplayString();
-            if (!_types.ContainsKey(cnn))
+            if (!_types.TryGetValue(cnn, out var set))
             {
                 return;
             }
 
             var tn = type.ToDisplayString();
 
-            var set = _types[cnn];
             if (!set.Contains(tn))
             {
                 return;
@@ -65,7 +70,7 @@ namespace AdjustNamespace.Adjusting
 
             var typeContainer = await TypeContainer.CreateForAsync(workspace);
 
-            var types = new Dictionary<string, HashSet<string>>();
+            var types = new Dictionary<string, HashSet<string>>(typeContainer.Dict.Count);
             foreach (var nte in typeContainer.Dict.Values)
             {
                 var key = nte.ContainingNamespaceName;

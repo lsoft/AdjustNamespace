@@ -35,25 +35,27 @@ namespace AdjustNamespace.Helper
             var prjItems = new List<ProjectItem>();
             foreach (EnvDTE.Project project in projectList)
             {
-                if (project.ProjectItems != null && project.ProjectItems.Count > 0)
+                if (project.ProjectItems == null || project.ProjectItems.Count <= 0)
                 {
-                    foreach (ProjectItem projectItem in project.ProjectItems)
-                    {
-                        prjItems.Clear();
-                        ProcessProjectItem2(projectItem, ref prjItems);
+                    continue;
+                }
 
-                        foreach (var prjItem in prjItems)
+                foreach (ProjectItem projectItem in project.ProjectItems)
+                {
+                    prjItems.Clear();
+                    ProcessProjectItem2(projectItem, ref prjItems);
+
+                    foreach (var prjItem in prjItems)
+                    {
+                        for (var i = 0; i < prjItem.FileCount; i++)
                         {
-                            for (var i = 0; i < prjItem.FileCount; i++)
+                            if (prjItem.TryGetFileName(i, out var itemPath))
                             {
-                                if (prjItem.TryGetFileName(i, out var itemPath))
+                                if (itemPath == filePath)
                                 {
-                                    if (itemPath == filePath)
-                                    {
-                                        rProject = project;
-                                        rProjectItem = prjItem;
-                                        return true;
-                                    }
+                                    rProject = project;
+                                    rProjectItem = prjItem;
+                                    return true;
                                 }
                             }
                         }
@@ -76,34 +78,35 @@ namespace AdjustNamespace.Helper
                 return;
             }
 
-            if (project.Kind == EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder)
-            {
-                for (var i = 1; i <= project.ProjectItems.Count; i++)
-                {
-                    var subProject = project.ProjectItems.Item(i);
-                    if (subProject == null)
-                    {
-                        continue;
-                    }
-                    if (subProject.SubProject == null)
-                    {
-                        continue;
-                    }
+            ThreadHelper.ThrowIfNotOnUIThread();
 
-                    if (subProject.Kind != EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder
-                        && ((dynamic)subProject.Object).Kind == EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder)
-                    {
-                        subProject.SubProject.GetSolutionFolderProjects(ref foundTrueProjects);
-                    }
-                    else
-                    {
-                        foundTrueProjects.Add(subProject.SubProject);
-                    }
-                }
-            }
-            else
+            if (project.Kind != EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder)
             {
                 foundTrueProjects.Add(project);
+                return;
+            }
+
+            for (var i = 1; i <= project.ProjectItems.Count; i++)
+            {
+                var subProject = project.ProjectItems.Item(i);
+                if (subProject == null)
+                {
+                    continue;
+                }
+                if (subProject.SubProject == null)
+                {
+                    continue;
+                }
+
+                if (subProject.Kind != EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder
+                    && ((dynamic)subProject.Object).Kind == EnvDTE80.ProjectKinds.vsProjectKindSolutionFolder)
+                {
+                    subProject.SubProject.GetSolutionFolderProjects(ref foundTrueProjects);
+                }
+                else
+                {
+                    foundTrueProjects.Add(subProject.SubProject);
+                }
             }
         }
 
@@ -113,6 +116,8 @@ namespace AdjustNamespace.Helper
             out string? fileName
             )
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             try
             {
                 fileName = prjItem.FileNames[(short)index];
@@ -152,6 +157,8 @@ namespace AdjustNamespace.Helper
             this EnvDTE.Solution solution
             )
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             var projectList = new List<Project>();
             if (solution.Projects != null)
             {

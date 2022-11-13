@@ -11,21 +11,16 @@ namespace AdjustNamespace.UI.StepFactory
 {
     public class PerformingStepFactory : IStepFactory
     {
-        private readonly IAsyncServiceProvider _serviceProvider;
+        private readonly VsServices _vss;
         private readonly DialogWindow _window;
         private readonly ContentControl _targetControl;
 
         public PerformingStepFactory(
-            IAsyncServiceProvider serviceProvider,
+            VsServices vss,
             DialogWindow window,
             ContentControl targetControl
             )
         {
-            if (serviceProvider is null)
-            {
-                throw new ArgumentNullException(nameof(serviceProvider));
-            }
-
             if (window is null)
             {
                 throw new ArgumentNullException(nameof(window));
@@ -36,7 +31,7 @@ namespace AdjustNamespace.UI.StepFactory
                 throw new ArgumentNullException(nameof(targetControl));
             }
 
-            _serviceProvider = serviceProvider;
+            _vss = vss;
             _window = window;
             _targetControl = targetControl;
         }
@@ -46,7 +41,7 @@ namespace AdjustNamespace.UI.StepFactory
             var v = new PerformingUserControl();
 
             var vm = new PerformingViewModel(
-                _serviceProvider,
+                _vss,
                 () => _window.Close(),
                 (List<string>)argument
                 );

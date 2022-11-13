@@ -21,7 +21,7 @@ namespace AdjustNamespace.UI.ViewModel
 {
     public class PreparationStepViewModel : ChainViewModel
     {
-        private readonly IAsyncServiceProvider _serviceProvider;
+        private readonly VsServices _vss;
         private readonly IStepFactory _nextStepFactory;
         private readonly List<string> _filePaths;
 
@@ -96,16 +96,11 @@ namespace AdjustNamespace.UI.ViewModel
         }
 
         public PreparationStepViewModel(
-            IAsyncServiceProvider serviceProvider,
+            VsServices vss,
             IStepFactory nextStepFactory,
             List<string> filePaths
             )
         {
-            if (serviceProvider is null)
-            {
-                throw new ArgumentNullException(nameof(serviceProvider));
-            }
-
             if (nextStepFactory is null)
             {
                 throw new ArgumentNullException(nameof(nextStepFactory));
@@ -115,7 +110,7 @@ namespace AdjustNamespace.UI.ViewModel
             {
                 throw new ArgumentNullException(nameof(filePaths));
             }
-            _serviceProvider = serviceProvider;
+            _vss = vss;
             _nextStepFactory = nextStepFactory;
             _filePaths = filePaths;
             _mainMessage = "Scanning solution...";
@@ -128,29 +123,11 @@ namespace AdjustNamespace.UI.ViewModel
             _isInProgress = true;
             OnPropertyChanged();
 
-            var dte = await _serviceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
-            if (dte == null)
-            {
-                return;
-            }
-
-            var componentModel = (await _serviceProvider.GetServiceAsync(typeof(SComponentModel)) as IComponentModel)!;
-            if (componentModel == null)
-            {
-                return;
-            }
-
-            var workspace = componentModel.GetService<VisualStudioWorkspace>();
-            if (workspace == null)
-            {
-                return;
-            }
-
             await TaskScheduler.Default;
 
             #region check for solution compilation
 
-            foreach (var project in workspace.CurrentSolution.Projects)
+            foreach (var project in _vss.Workspace.CurrentSolution.Projects)
             {
                 MainMessage = $"Processing {project.Name}";
 
@@ -169,7 +146,7 @@ namespace AdjustNamespace.UI.ViewModel
             #endregion
 
             //extract project items (we need perform this in main thread)
-            var fileExtensions = await FillFileExtensionAsync(dte);
+            var fileExtensions = await FillFileExtensionAsync();
 
             //the below we may run into background thread
             //await TaskScheduler.Default;
@@ -186,7 +163,7 @@ namespace AdjustNamespace.UI.ViewModel
 
                 MainMessage = $"Processing {subjectFilePath}";
 
-                var roslynProject = workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem!.ContainingProject.FullName);
+                var roslynProject = _vss.Workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem!.ContainingProject.FullName);
                 if (roslynProject == null)
                 {
                     continue;
@@ -201,7 +178,7 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                var subjectDocument = workspace.GetDocument(subjectFilePath);
+                var subjectDocument = _vss.Workspace.GetDocument(subjectFilePath);
                 if (!subjectDocument.IsDocumentInScope())
                 {
                     continue;
@@ -234,7 +211,7 @@ namespace AdjustNamespace.UI.ViewModel
 
                 // get all types in the target namespace
                 var typesInTargetNamespace = await TypeContainer.CreateForAsync(
-                    workspace,
+                    _vss.Workspace,
                     new[] { targetNamespace! }
                     );
 
@@ -276,14 +253,14 @@ namespace AdjustNamespace.UI.ViewModel
             OnPropertyChanged();
         }
 
-        private async Task<List<FileExtension>> FillFileExtensionAsync(DTE2 dte)
+        private async Task<List<FileExtension>> FillFileExtensionAsync()
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             var fileExtensions = new List<FileExtension>(_filePaths.Count);
             foreach (var filePath in _filePaths)
             {
-                if (!dte.Solution.TryGetProjectItem(filePath, out var subjectProject, out var subjectProjectItem))
+                if (!_vss.Dte.Solution.TryGetProjectItem(filePath, out var subjectProject, out var subjectProjectItem))
                 {
                     continue;
                 }

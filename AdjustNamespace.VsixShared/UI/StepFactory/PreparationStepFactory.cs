@@ -10,21 +10,16 @@ namespace AdjustNamespace.UI.StepFactory
 {
     public class PreparationStepFactory : IStepFactory
     {
-        private readonly IAsyncServiceProvider _serviceProvider;
+        private readonly VsServices _vss;
         private readonly ContentControl _targetControl;
         private readonly IStepFactory _nextStepFactory;
 
         public PreparationStepFactory(
-            IAsyncServiceProvider serviceProvider,
+            VsServices vss,
             ContentControl targetControl,
             IStepFactory nextStepFactory
             )
         {
-            if (serviceProvider is null)
-            {
-                throw new ArgumentNullException(nameof(serviceProvider));
-            }
-
             if (targetControl is null)
             {
                 throw new ArgumentNullException(nameof(targetControl));
@@ -35,7 +30,7 @@ namespace AdjustNamespace.UI.StepFactory
                 throw new ArgumentNullException(nameof(nextStepFactory));
             }
 
-            _serviceProvider = serviceProvider;
+            _vss = vss;
             _targetControl = targetControl;
             _nextStepFactory = nextStepFactory;
         }
@@ -45,7 +40,7 @@ namespace AdjustNamespace.UI.StepFactory
             var v = new PreparationUserControl();
 
             var vm  = new PreparationStepViewModel(
-                _serviceProvider,
+                _vss,
                 _nextStepFactory,
                 (List<string>)argument
                 );

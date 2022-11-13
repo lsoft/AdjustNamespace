@@ -11,13 +11,14 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using AdjustNamespace.Adjusting.Fixer;
+using AdjustNamespace.Adjusting.Adjuster;
 
 namespace AdjustNamespace.Adjusting
 {
     /// <summary>
     /// Adjuster for cs file.
     /// </summary>
-    public class CsAdjuster
+    public class CsAdjuster : IAdjuster
     {
         private readonly VisualStudioWorkspace _workspace;
         private readonly NamespaceCenter _namespaceCenter;

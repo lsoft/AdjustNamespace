@@ -1,12 +1,14 @@
-﻿using AdjustNamespace.Xaml;
+﻿using AdjustNamespace.Adjusting.Adjuster;
+using AdjustNamespace.Xaml;
 using System;
+using System.Threading.Tasks;
 
 namespace AdjustNamespace.Adjusting
 {
     /// <summary>
     /// Adjuster for xaml file.
     /// </summary>
-    public class XamlAdjuster
+    public class XamlAdjuster : IAdjuster
     {
         private readonly string _subjectFilePath;
         private readonly string _targetNamespace;
@@ -30,18 +32,18 @@ namespace AdjustNamespace.Adjusting
             _targetNamespace = targetNamespace;
         }
 
-        public bool Adjust()
+        public Task<bool> AdjustAsync()
         {
             var xamlEngine = new XamlEngine(_subjectFilePath);
 
             if (!xamlEngine.GetRootInfo(out var rootNamespace, out var rootName))
             {
-                return false;
+                return Task.FromResult(false);
             }
 
             if (rootNamespace == _targetNamespace)
             {
-                return false;
+                return Task.FromResult(false);
             }
 
             xamlEngine.MoveObject(
@@ -52,7 +54,7 @@ namespace AdjustNamespace.Adjusting
 
             xamlEngine.SaveIfChangesExists();
 
-            return true;
+            return Task.FromResult(true);
         }
     }
 }

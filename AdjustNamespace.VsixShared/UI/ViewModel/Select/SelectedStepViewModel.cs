@@ -25,7 +25,7 @@ namespace AdjustNamespace.UI.ViewModel
 {
     public class SelectedStepViewModel : ChainViewModel
     {
-        private readonly IAsyncServiceProvider _serviceProvider;
+        private readonly VsServices _vss;
         private readonly IStepFactory _nextStepFactory;
         private readonly List<FileEx> _filteredFileExs;
 
@@ -131,16 +131,11 @@ namespace AdjustNamespace.UI.ViewModel
 
 
         public SelectedStepViewModel(
-            IAsyncServiceProvider serviceProvider,
+            VsServices vss,
             IStepFactory nextStepFactory,
             List<FileEx> fileExtensions
             )
         {
-            if (serviceProvider is null)
-            {
-                throw new ArgumentNullException(nameof(serviceProvider));
-            }
-
             if (nextStepFactory is null)
             {
                 throw new ArgumentNullException(nameof(nextStepFactory));
@@ -150,7 +145,7 @@ namespace AdjustNamespace.UI.ViewModel
             {
                 throw new ArgumentNullException(nameof(fileExtensions));
             }
-            _serviceProvider = serviceProvider;
+            _vss = vss;
             _nextStepFactory = nextStepFactory;
             _filteredFileExs = fileExtensions;
 
