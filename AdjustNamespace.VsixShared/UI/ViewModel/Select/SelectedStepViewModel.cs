@@ -16,6 +16,10 @@ using AdjustNamespace.UI.StepFactory;
 using Microsoft.CodeAnalysis;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
+using System.Windows;
+using System.Threading;
+using Newtonsoft.Json.Linq;
+using AdjustNamespace.UI.ViewModel.Select;
 
 namespace AdjustNamespace.UI.ViewModel
 {
@@ -42,7 +46,7 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
-        public ObservableCollection<SelectItemViewModel> ToFilterItems
+        public ObservableCollection<ISelectItemViewModel> ToFilterItems
         {
             get;
             private set;
@@ -88,9 +92,9 @@ namespace AdjustNamespace.UI.ViewModel
                 {
                     _nextCommand = new AsyncRelayCommand(
                         async a => await _nextStepFactory.CreateAsync(
-                            ToFilterItems.Where(s => s.IsChecked).Select(s => s.FilePath).ToList()
+                            ToFilterItems.Where(s => s.FileEx.HasValue && s.IsChecked.GetValueOrDefault(false)).Select(s => s.FileEx!.Value.FilePath).ToList()
                             ),
-                        r => ToFilterItems.Any(s => s.IsChecked)
+                        r => ToFilterItems.Any(s => s.IsChecked.GetValueOrDefault(false))
                         );
                 }
 
@@ -115,7 +119,7 @@ namespace AdjustNamespace.UI.ViewModel
                                 return;
                             }
 
-                            var newValue = !selected[0].IsChecked;
+                            var newValue = !selected[0].IsChecked.GetValueOrDefault(false);
                             selected.ForEach(s => s.IsChecked = newValue);
                         }
                         );
@@ -152,7 +156,7 @@ namespace AdjustNamespace.UI.ViewModel
 
             _foreground = Brushes.Green;
             _mainMessage = "Choose files to process...";
-            ToFilterItems = new ObservableCollection<SelectItemViewModel>();
+            ToFilterItems = new ObservableCollection<ISelectItemViewModel>();
         }
 
         public override async System.Threading.Tasks.Task StartAsync()
@@ -177,56 +181,35 @@ namespace AdjustNamespace.UI.ViewModel
             //    return;
             //}
 
-            foreach(var fileEx in _filteredFileExs)
+            //perform grouping by files physical folder!
+            var dirPaths = _filteredFileExs.Select(f => f.FolderPath).Distinct().ToList();
+            var dirs = new List<SelectFolderViewModel>();
+            foreach(var dirPath in dirPaths)
             {
-                var subjectFilePath = fileEx.FilePath;
+                var dir = new SelectFolderViewModel(
+                    dirPath
+                   );
 
-                ToFilterItems.Add(
-                    new SelectItemViewModel(
-                        subjectFilePath
-                    )
-                );
+                var dirFiles = _filteredFileExs
+                    .Where(f => f.FolderPath == dirPath)
+                    .Select(f => new SelectFileViewModel(f, dir))
+                    .ToList();
+                dir.AddFiles(dirFiles);
+
+                dirs.Add(dir);
+            }
+
+            foreach(var dir in dirs.OrderBy(d => d.ItemPath))
+            {
+                ToFilterItems.Add(dir);
+
+                foreach (var file in dir.Files)
+                {
+                    ToFilterItems.Add(file);
+                }
             }
 
             OnPropertyChanged();
-        }
-    }
-
-    public class SelectItemViewModel : BaseViewModel
-    {
-        private bool _isChecked;
-        private bool _isSelected;
-
-        public bool IsChecked
-        {
-            get => _isChecked;
-            set
-            {
-                _isChecked = value;
-                OnPropertyChanged(nameof(IsChecked));
-            }
-        }
-
-        public bool IsSelected
-        {
-            get => _isSelected;
-            set => _isSelected = value;
-        }
-
-        public string FilePath
-        {
-            get;
-        }
-
-        public SelectItemViewModel(string filePath)
-        {
-            if (filePath is null)
-            {
-                throw new ArgumentNullException(nameof(filePath));
-            }
-
-            FilePath = filePath;
-            IsChecked = true;
         }
     }
 }

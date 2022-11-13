@@ -14,11 +14,12 @@ namespace AdjustNamespace
     /// </summary>
     public readonly struct TypeContainer
     {
-        private readonly Dictionary<string, NamedTypeExtension> _dict = new ();
+        private readonly Dictionary<string, NamedTypeExtension> _dict;
 
         public IReadOnlyDictionary<string, NamedTypeExtension> Dict => _dict;
 
         public TypeContainer(
+            bool unused //here is CS0568 in VS2019 without this
             )
         {
             _dict = new Dictionary<string, NamedTypeExtension>();
@@ -63,7 +64,7 @@ namespace AdjustNamespace
 
             await TaskScheduler.Default;
 
-            var result = new TypeContainer();
+            var result = new TypeContainer(false);
             foreach (var cproject in workspace.CurrentSolution.Projects)
             {
                 var ccompilation = await cproject.GetCompilationAsync();

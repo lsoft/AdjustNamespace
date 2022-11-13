@@ -54,7 +54,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\Theme.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PerformingViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PreparationStepViewModel.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\SelectedStepViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\ISelectItemViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectedStepViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectFileViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectFolderViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Window\AdjustNamespaceWindow.xaml.cs">
       <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>
     </Compile>

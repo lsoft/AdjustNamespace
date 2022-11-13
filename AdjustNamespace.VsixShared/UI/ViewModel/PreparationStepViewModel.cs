@@ -294,7 +294,7 @@ namespace AdjustNamespace.UI.ViewModel
             return fileExtensions;
         }
 
-        private async Task AddMessageAsync(string message)
+        private async System.Threading.Tasks.Task AddMessageAsync(string message)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
