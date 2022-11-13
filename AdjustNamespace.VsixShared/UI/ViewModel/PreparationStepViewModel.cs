@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 using Microsoft.CodeAnalysis;
 using EnvDTE;
+using AdjustNamespace.Namespace;
 
 namespace AdjustNamespace.UI.ViewModel
 {
@@ -196,18 +197,16 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                if (!roslynProject.TryGetTargetNamespace(subjectFilePath, out var targetNamespace))
+                if (!roslynProject.TryDetermineTargetNamespace(subjectFilePath, out var targetNamespace))
                 {
                     continue;
                 }
 
-                var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(targetNamespace!);
-                if (namespaceInfos.Count == 0)
+                var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(subjectSyntaxRoot, targetNamespace!);
+                if (ntc.IsEmpty)
                 {
                     continue;
                 }
-
-                var namespaceRenameDict = namespaceInfos.BuildRenameDict();
 
                 // get all types in the target namespace
                 var typesInTargetNamespace = await TypeContainer.CreateForAsync(
@@ -224,7 +223,7 @@ namespace AdjustNamespace.UI.ViewModel
                         continue;
                     }
 
-                    var targetNamespaceInfo = namespaceRenameDict[symbolInfo.ContainingNamespace.ToDisplayString()];
+                    var targetNamespaceInfo = ntc.TransitionDict[symbolInfo.ContainingNamespace.ToDisplayString()];
 
                     if (typesInTargetNamespace.ContainsType($"{targetNamespaceInfo}.{symbolInfo.Name}"))
                     {

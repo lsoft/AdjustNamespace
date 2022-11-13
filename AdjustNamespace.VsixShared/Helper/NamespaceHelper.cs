@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using AdjustNamespace.Namespace;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
@@ -11,11 +12,11 @@ namespace AdjustNamespace.Helper
     {
         public static bool TryFindNamespaceNodesFor(
             this SyntaxNode syntaxRoot,
-            NamespaceInfo namespaceInfo,
+            string namespaceName,
 #if VS2022
-            out List<BaseNamespaceDeclarationSyntax>? fNamespace
+            out List<BaseNamespaceDeclarationSyntax> result
 #else
-            out List<NamespaceDeclarationSyntax>? fNamespace
+            out List<NamespaceDeclarationSyntax> result
 #endif
             )
         {
@@ -24,23 +25,16 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(syntaxRoot));
             }
 
-            if (namespaceInfo is null)
+            if (namespaceName is null)
             {
-                throw new ArgumentNullException(nameof(namespaceInfo));
+                throw new ArgumentNullException(nameof(namespaceName));
             }
 
-            //we need for List of namespac syntax because the following code may exists in single file:
+            //we need return a List<> of namespaces syntax because the following code may exists in single file:
             //namespace a { class a1 {} } namespace a { class a2 {} } namespace a { class a3 {} }
-            var foundNamespacesDict = new Dictionary<
-                string,
-#if VS2022
-                List<BaseNamespaceDeclarationSyntax>
-#else
-                List<NamespaceDeclarationSyntax>
-#endif
-                >();
+            result = new();
 
-            var foundNamespaces = syntaxRoot
+            var allFoundNamespaceSyntaxes = syntaxRoot
                 .DescendantNodes()
 #if VS2022
                 .OfType<BaseNamespaceDeclarationSyntax>()
@@ -50,22 +44,19 @@ namespace AdjustNamespace.Helper
                 .ToList();
 
 
-            foreach (var foundNamespace in foundNamespaces)
+            foreach (var foundNamespaceSyntax in allFoundNamespaceSyntaxes)
             {
-                var nn = foundNamespace.Name.ToString();
-                if (!foundNamespacesDict.ContainsKey(nn))
+                var fnn = foundNamespaceSyntax.Name.ToString();
+                if (fnn == namespaceName)
                 {
-                    foundNamespacesDict[nn] = new();
+                    result.Add(foundNamespaceSyntax);
                 }
-                foundNamespacesDict[nn].Add(foundNamespace);
             }
 
-            foundNamespacesDict.TryGetValue(namespaceInfo.OriginalName, out fNamespace);
-
-            return fNamespace != null;
+            return result.Count > 0;
         }
 
-        public static bool TryGetTargetNamespace(
+        public static bool TryDetermineTargetNamespace(
             this Project project,
             string documentFilePath,
             out string? targetNamespace
@@ -100,193 +91,5 @@ namespace AdjustNamespace.Helper
             return true;
         }
 
-
-        public static List<NamespaceInfo> GetAllNamespaceInfos(
-            this SyntaxNode node,
-            string root
-            )
-        {
-            if (node is null)
-            {
-                throw new ArgumentNullException(nameof(node));
-            }
-
-            if (root is null)
-            {
-                throw new ArgumentNullException(nameof(root));
-            }
-
-
-            var candidateNamespaces = (
-                from dnode in node.DescendantNodesAndSelf()
-                let tdnode = dnode as NamespaceDeclarationSyntax
-                where tdnode != null
-                let ni = tdnode.TryGetNamespaceInfo(root)
-                where ni != null
-                select ni
-                ).ToList();
-
-#if VS2022
-            var candidateNamespaces2 = (
-                from dnode in node.DescendantNodesAndSelf()
-                let fsndnode = dnode as FileScopedNamespaceDeclarationSyntax
-                where fsndnode != null
-                let ni = fsndnode.TryGetNamespaceInfo(root)
-                where ni != null
-                select ni
-                ).ToList();
-
-            candidateNamespaces.AddRange(candidateNamespaces2);
-#endif
-
-            return candidateNamespaces;
-        }
-
-#if VS2022
-
-        public static NamespaceInfo? TryGetNamespaceInfo(
-            this FileScopedNamespaceDeclarationSyntax n,
-            string root
-            )
-        {
-            if (n is null)
-            {
-                throw new ArgumentNullException(nameof(n));
-            }
-
-            if (root is null)
-            {
-                throw new ArgumentNullException(nameof(root));
-            }
-
-            var originalNamespace = n.Name.ToString();
-            var clonedNamespace = root;
-
-            if (originalNamespace == clonedNamespace)
-            {
-                return null;
-            }
-
-            return new NamespaceInfo(
-                originalNamespace,
-                clonedNamespace,
-                true
-                );
-        }
-
-#endif
-
-        public static NamespaceInfo? TryGetNamespaceInfo(
-            this NamespaceDeclarationSyntax n,
-            string root
-            )
-        {
-            if (n is null)
-            {
-                throw new ArgumentNullException(nameof(n));
-            }
-
-            if (root is null)
-            {
-                throw new ArgumentNullException(nameof(root));
-            }
-
-            var res = new List<string>();
-
-            SyntaxNode? p = n;
-            while (p != null)
-            {
-                if (p is NamespaceDeclarationSyntax nds)
-                {
-                    res.Add(nds.Name.ToString());
-                }
-
-                p = p.Parent;
-            }
-
-            res.Reverse();
-
-            var cloned = new List<string>(res);
-            if (!string.IsNullOrEmpty(root))
-            {
-                cloned[0] = root!;
-            }
-
-            var originalNamespace = string.Join(".", res);
-            var clonedNamespace = string.Join(".", cloned);
-
-            if (originalNamespace == clonedNamespace)
-            {
-                return null;
-            }
-
-            return new NamespaceInfo(
-                originalNamespace,
-                clonedNamespace,
-                res.Count == 1
-                );
-        }
-
-        public static Dictionary<string, NamespaceInfo> BuildRenameDict(
-            this List<NamespaceInfo> infos
-            )
-        {
-            if (infos is null)
-            {
-                throw new ArgumentNullException(nameof(infos));
-            }
-
-            var namespaceRenameDict = new Dictionary<string, NamespaceInfo>();
-            foreach (var info in infos)
-            {
-                var key = info.OriginalName;
-                if (!namespaceRenameDict.ContainsKey(key))
-                {
-                    namespaceRenameDict[key] = info;
-                }
-            }
-
-            return namespaceRenameDict;
-        }
-
     }
-
-    public class NamespaceInfo
-    {
-        public string OriginalName
-        {
-            get;
-        }
-        public string ModifiedName
-        {
-            get;
-        }
-        public bool IsRoot
-        {
-            get;
-        }
-
-        public NamespaceInfo(
-            string originalName,
-            string modifiedName,
-            bool isRoot
-            )
-        {
-            if (originalName is null)
-            {
-                throw new ArgumentNullException(nameof(originalName));
-            }
-
-            if (modifiedName is null)
-            {
-                throw new ArgumentNullException(nameof(modifiedName));
-            }
-
-            OriginalName = originalName;
-            ModifiedName = modifiedName;
-            IsRoot = isRoot;
-        }
-
-    }
-
 }

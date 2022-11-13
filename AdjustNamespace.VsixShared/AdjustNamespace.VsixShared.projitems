@@ -17,7 +17,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\IFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\NamespaceFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\QualifiedNameFixer.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\NamespaceCenter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceCenter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\XamlAdjuster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AdjustNamespaceCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AdjustNamespacePackage.cs" />
@@ -31,6 +31,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Helper\WpfHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ImageMonikers.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logging.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceTransition.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceTransitionContainer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TypeContainer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionPage.cs" />

@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -37,55 +38,19 @@ namespace AdjustNamespace.Helper
             return default;
         }
 
-        //public static string GetTargetNamespaceName(
-        //    this NamespaceDeclarationSyntax n,
-        //    string root
-        //    )
-        //{
-        //    var nn = n.GetFullNamespaceName(root);
-
-        //    if (nn == root)
-        //    {
-        //        return root;
-        //    }
-
-        //    var suffix = nn.Substring(root.Length);
-
-        //    return targetNamespace + suffix;
-        //}
-
-
-        //public static string GetTargetNamespace(
-        //    this INamedTypeSymbol symbol,
-        //    string sourceNamespace,
-        //    string targetNamespace
-        //    )
-        //{
-        //    if (sourceNamespace == targetNamespace)
-        //    {
-        //        return targetNamespace;
-        //    }
-
-        //    var suffix = symbol.ContainingNamespace.ToDisplayString().Substring(sourceNamespace.Length);
-
-        //    return targetNamespace + suffix;
-        //}
-
-        public static int GetDepth(
-            this SyntaxNode? node
+        public static List<T> GetAllDescendants<T>(
+            this SyntaxNode s
             )
+            where T : SyntaxNode
         {
-            var depth = 0;
+            var r = s
+                .DescendantNodes()
+                .OfType<T>()
+                .ToList()
+                ;
 
-            while (node != null)
-            {
-                node = node.Parent;
-                depth++;
-            }
-
-            return depth;
+            return r;
         }
-
 
         public static IEnumerable<INamedTypeSymbol> GetAllTypes(this INamespaceSymbol @namespace)
         {

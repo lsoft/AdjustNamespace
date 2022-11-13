@@ -12,6 +12,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AdjustNamespace.Adjusting.Fixer;
 using AdjustNamespace.Adjusting.Adjuster;
+using AdjustNamespace.Namespace;
 
 namespace AdjustNamespace.Adjusting
 {
@@ -82,16 +83,14 @@ namespace AdjustNamespace.Adjusting
                 return false;
             }
 
-            var namespaceInfos = subjectSyntaxRoot.GetAllNamespaceInfos(_targetNamespace);
-            if (namespaceInfos.Count == 0)
+            var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(subjectSyntaxRoot, _targetNamespace);
+            if (ntc.IsEmpty)
             {
                 //skip this document
                 return false;
             }
 
-            var namespaceRenameDict = namespaceInfos.BuildRenameDict();
-
-            #region fix refs (adding a new using namespace clauses)
+            #region fix refs (adding a new using namespace clauses or edit fully qualified names)
 
             var fixerContainer = new FixerContainer(_workspace);
             var processedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
@@ -118,7 +117,7 @@ namespace AdjustNamespace.Adjusting
                 }
 
                 var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
-                var targetNamespaceInfo = namespaceRenameDict[symbolNamespace];
+                var targetNamespaceInfo = ntc.TransitionDict[symbolNamespace];
 
                 if (symbolNamespace == targetNamespaceInfo.ModifiedName)
                 {
@@ -324,11 +323,11 @@ namespace AdjustNamespace.Adjusting
 
             await FixSubjectFileNamespacesAsync(
                 subjectDocument,
-                namespaceInfos
+                ntc
                 );
 
             FixReferenceInXamlFiles(
-                namespaceRenameDict,
+                ntc,
                 processedTypes
                 );
 
@@ -354,45 +353,25 @@ namespace AdjustNamespace.Adjusting
                     var (document, syntaxRoot) = await _workspace.GetDocumentAndSyntaxRootAsync(documentFilePath);
                     if (document == null || syntaxRoot == null)
                     {
+                        //something went wrong
                         //skip this document
                         return;
                     }
 
-                    var namespaces = syntaxRoot
-                        .DescendantNodes()
-                        .OfType<UsingDirectiveSyntax>()
-                        .ToList()
-                        ;
+                    var namespaces = syntaxRoot.GetAllDescendants<UsingDirectiveSyntax>();
 
-                    if (namespaces.Count == 0)
+                    var toRemove = _namespaceCenter.GetRemovedNamespaces(namespaces);
+                    if (toRemove.Count == 0)
                     {
                         continue;
                     }
 
-                    var toRemove = new List<SyntaxNode>();
-
-                    foreach (var n in namespaces)
+                    syntaxRoot = syntaxRoot.RemoveNodes(toRemove, SyntaxRemoveOptions.KeepNoTrivia);
+                    if (syntaxRoot != null)
                     {
-                        var nname = n.Name.ToString();
+                        var changedDocument = document.WithSyntaxRoot(syntaxRoot);
 
-                        if (!_namespaceCenter.NamespacesToRemove.Contains(nname))
-                        {
-                            //there is a types in this namespace
-                            continue;
-                        }
-
-                        toRemove.Add(n);
-                    }
-
-                    if (toRemove.Count > 0)
-                    {
-                        syntaxRoot = syntaxRoot!.RemoveNodes(toRemove, SyntaxRemoveOptions.KeepNoTrivia);
-                        if (syntaxRoot != null)
-                        {
-                            var changedDocument = document.WithSyntaxRoot(syntaxRoot);
-
-                            r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
-                        }
+                        r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
                     }
                 }
                 while (!r);
@@ -400,15 +379,10 @@ namespace AdjustNamespace.Adjusting
         }
 
         private void FixReferenceInXamlFiles(
-            Dictionary<string, NamespaceInfo> namespaceRenameDict, 
+            NamespaceTransitionContainer ntc,
             HashSet<INamedTypeSymbol> processedTypes
             )
         {
-            if (namespaceRenameDict is null)
-            {
-                throw new ArgumentNullException(nameof(namespaceRenameDict));
-            }
-
             if (processedTypes is null)
             {
                 throw new ArgumentNullException(nameof(processedTypes));
@@ -425,7 +399,7 @@ namespace AdjustNamespace.Adjusting
 
                 foreach (var processedType in processedTypes)
                 {
-                    var targetNamespaceInfo = namespaceRenameDict[processedType.ContainingNamespace.ToDisplayString()];
+                    var targetNamespaceInfo = ntc.TransitionDict[processedType.ContainingNamespace.ToDisplayString()];
 
                     xamlEngine.MoveObject(
                         processedType.ContainingNamespace.ToDisplayString(),
@@ -440,7 +414,7 @@ namespace AdjustNamespace.Adjusting
 
         private async Task FixSubjectFileNamespacesAsync(
             Document subjectDocument,
-            List<NamespaceInfo> namespaceInfos
+            NamespaceTransitionContainer ntc
             )
         {
             if (subjectDocument is null)
@@ -448,12 +422,7 @@ namespace AdjustNamespace.Adjusting
                 throw new ArgumentNullException(nameof(subjectDocument));
             }
 
-            if (namespaceInfos is null)
-            {
-                throw new ArgumentNullException(nameof(namespaceInfos));
-            }
-
-            foreach (var namespaceInfo in namespaceInfos.Where(ni => ni.IsRoot))
+            foreach (var transition in ntc.Transitions.Where(ni => ni.IsRoot))
             {
                 bool r = true;
                 do
@@ -461,14 +430,15 @@ namespace AdjustNamespace.Adjusting
                     var (openedDocument, syntaxRoot) = await _workspace.GetDocumentAndSyntaxRootAsync(subjectDocument.FilePath!);
                     if (openedDocument == null || syntaxRoot == null)
                     {
+                        //something went wrong
                         //skip this document
                         return;
                     }
 
-                    if (!syntaxRoot.TryFindNamespaceNodesFor(namespaceInfo, out var ufNamespaces))
+                    if (!syntaxRoot.TryFindNamespaceNodesFor(transition.OriginalName, out var ufNamespaces))
                     {
                         //skip this namespace
-                        continue;
+                        break;
                     }
 
                     var ufNamespace = ufNamespaces.First();
@@ -483,27 +453,29 @@ namespace AdjustNamespace.Adjusting
                     //so add at 100% cases now
 
                     var cus = syntaxRoot as CompilationUnitSyntax;
-                    if (cus != null)
-                    {
-                        var newUsingStatement = SyntaxFactory.UsingDirective(
-                            SyntaxFactory.ParseName(
-                                " " + ufNamespace!.Name
-                                )
-                            ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
-
-                        cus = cus.AddUsings(newUsingStatement);
-                    }
-
-                    if(!cus!.TryFindNamespaceNodesFor(namespaceInfo, out var fNamespaces))
+                    if (cus == null)
                     {
                         //skip this namespace
-                        continue;
+                        break;
+                    }
+                    var newUsingStatement = SyntaxFactory.UsingDirective(
+                        SyntaxFactory.ParseName(
+                            " " + ufNamespace!.Name
+                            )
+                        ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+
+                    cus = cus.AddUsings(newUsingStatement);
+
+                    if(!cus.TryFindNamespaceNodesFor(transition.OriginalName, out var fNamespaces))
+                    {
+                        //skip this namespace
+                        break;
                     }
 
                     foreach (var fNamespace in fNamespaces!)
                     {
                         var newName = SyntaxFactory.ParseName(
-                            namespaceInfo.ModifiedName
+                            transition.ModifiedName
                             );
 
                         if (fNamespace is NamespaceDeclarationSyntax)

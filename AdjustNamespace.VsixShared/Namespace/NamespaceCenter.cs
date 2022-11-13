@@ -1,9 +1,11 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Threading;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace AdjustNamespace.Adjusting
 {
@@ -13,12 +15,11 @@ namespace AdjustNamespace.Adjusting
     public class NamespaceCenter
     {
         private readonly Dictionary<string, HashSet<string>> _types;
-        private readonly HashSet<string> _namespacesToRemove;
 
         /// <summary>
         /// Emptyfied namespaces. They need to be removed at the end of adjusting procedure.
         /// </summary>
-        public IReadOnlyCollection<string> NamespacesToRemove => _namespacesToRemove;
+        private readonly HashSet<string> _namespacesToRemove;
 
         private NamespaceCenter(
             Dictionary<string, HashSet<string>> types
@@ -31,6 +32,42 @@ namespace AdjustNamespace.Adjusting
 
             _types = types;
             _namespacesToRemove = new HashSet<string>();
+        }
+
+        /// <summary>
+        /// Filter incoming namespaces and return only those are allowed to delete
+        /// (namespaces that does not exists after adjusting).
+        /// </summary>
+        public List<SyntaxNode> GetRemovedNamespaces(
+            IReadOnlyList<UsingDirectiveSyntax> namespacesToCheck
+            )
+        {
+            if (namespacesToCheck is null)
+            {
+                throw new ArgumentNullException(nameof(namespacesToCheck));
+            }
+
+            if (namespacesToCheck.Count == 0)
+            {
+                return new List<SyntaxNode>();
+            }
+
+            var toRemove = new List<SyntaxNode>(namespacesToCheck.Count);
+
+            foreach (var n in namespacesToCheck)
+            {
+                var nname = n.Name.ToString();
+
+                if (!_namespacesToRemove.Contains(nname))
+                {
+                    //there is a types in this namespace
+                    continue;
+                }
+
+                toRemove.Add(n);
+            }
+
+            return toRemove;
         }
 
         public void TypeRemoved(ITypeSymbol type)
