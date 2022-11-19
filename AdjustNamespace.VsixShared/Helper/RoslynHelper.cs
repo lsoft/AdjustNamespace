@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,6 +8,55 @@ namespace AdjustNamespace.Helper
 {
     public static class RoslynHelper
     {
+        public static QualifiedNameSyntax? Upper(
+            this QualifiedNameSyntax qns,
+            SemanticModel semanticModel
+            )
+        {
+            //if (qns.Left.Kind() != SyntaxKind.QualifiedName)
+            //{
+            //    return qns;
+            //}
+
+            while (true)
+            {
+                var symbol = semanticModel.GetSymbolInfo(qns.Left).Symbol;
+                if (symbol == null)
+                {
+                    return null;
+                }
+                if (symbol.Kind != SymbolKind.NamedType)
+                {
+                    return qns;
+                }
+
+                var pqns = qns.Left as QualifiedNameSyntax;
+                if (pqns == null)
+                {
+                    return null;
+                }
+
+                qns = pqns;
+            }
+
+
+            //while (true)
+            //{
+            //    if (qns.Left.Kind() != SyntaxKind.QualifiedName)
+            //    {
+            //        return (qns.Parent as QualifiedNameSyntax)!;
+            //    }
+
+            //    var pqns = qns.Left as QualifiedNameSyntax;
+            //    if (pqns == null)
+            //    {
+            //        return qns;
+            //    }
+
+            //    qns = pqns;
+            //}
+        }
+
         public static bool IsGlobal(this SyntaxNode node)
         {
             if (node is null)

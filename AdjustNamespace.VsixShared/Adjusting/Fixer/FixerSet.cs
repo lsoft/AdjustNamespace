@@ -32,7 +32,7 @@ namespace AdjustNamespace.Adjusting.Fixer
             _fixers = new List<IFixer>
             {
                 new QualifiedNameFixer(workspace, filePath),
-                new NamespaceFixer(workspace, filePath),
+                new AddUsingFixer(workspace, filePath),
             };
         }
 

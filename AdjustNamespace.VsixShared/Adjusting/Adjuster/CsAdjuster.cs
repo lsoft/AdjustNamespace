@@ -229,21 +229,38 @@ namespace AdjustNamespace.Adjusting
 
                         if (refSyntax.Parent is QualifiedNameSyntax qns)
                         {
-                            //replace QualifiedNameSyntax
-                            var mqns = qns
-                                .WithLeft(SyntaxFactory.ParseName((qns.IsGlobal() ? "global::" : "") + " " + targetNamespaceInfo.ModifiedName))
-                                .WithLeadingTrivia(qns.GetLeadingTrivia())
-                                .WithTrailingTrivia(qns.GetTrailingTrivia())
-                                ;
+                            var uqns = qns.Upper(refSemanticModel);
+                            if(uqns != null)
+                            {
+                                //replace QualifiedNameSyntax
+                                var mqns = uqns
+                                    .WithLeft(SyntaxFactory.ParseName((uqns.IsGlobal() ? "global::" : "") + " " + targetNamespaceInfo.ModifiedName))
+                                    .WithLeadingTrivia(uqns.GetLeadingTrivia())
+                                    .WithTrailingTrivia(uqns.GetTrailingTrivia())
+                                    ;
 
-                            fixerContainer
-                                .Fixer<QualifiedNameFixer>(location.Document.FilePath)
-                                .AddSubject(
-                                    new QualifiedNameFixer.QualifiedNameFixerArgument(
-                                        qns,
-                                        mqns
-                                        )
-                                    );
+                                fixerContainer
+                                    .Fixer<QualifiedNameFixer>(location.Document.FilePath)
+                                    .AddSubject(
+                                        new QualifiedNameFixer.QualifiedNameFixerArgument(
+                                            uqns,
+                                            mqns
+                                            )
+                                        );
+                            }
+                            else
+                            {
+                                //we found FullyQualifiedName like `Class1.NestedClass2`
+                                //we need to add using for this reference
+                                //(because these is no guarantee that namespace in THIS file
+                                //will be fixed, THIS file can be excluded from adjusting by the user)
+
+                                fixerContainer
+                                    .Fixer<AddUsingFixer>(location.Document.FilePath)
+                                    .AddSubject(
+                                        targetNamespaceInfo.ModifiedName
+                                        );
+                            }
                         }
                         else if (refSyntax.Parent is MemberAccessExpressionSyntax maes)
                         {
@@ -283,14 +300,14 @@ namespace AdjustNamespace.Adjusting
                                 else
                                 {
                                     fixerContainer
-                                        .Fixer<NamespaceFixer>(location.Document.FilePath)
+                                        .Fixer<AddUsingFixer>(location.Document.FilePath)
                                         .AddSubject(targetNamespaceInfo.ModifiedName);
                                 }
                             }
                             else
                             {
                                 fixerContainer
-                                    .Fixer<NamespaceFixer>(location.Document.FilePath)
+                                    .Fixer<AddUsingFixer>(location.Document.FilePath)
                                     .AddSubject(targetNamespaceInfo.ModifiedName);
                             }
                         }
@@ -300,7 +317,7 @@ namespace AdjustNamespace.Adjusting
 
                             //add a new using clause
                             fixerContainer
-                                .Fixer<NamespaceFixer>(location.Document.FilePath)
+                                .Fixer<AddUsingFixer>(location.Document.FilePath)
                                 .AddSubject(targetNamespaceInfo.ModifiedName);
                         }
                     }

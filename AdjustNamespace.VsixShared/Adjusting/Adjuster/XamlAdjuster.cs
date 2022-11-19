@@ -1,6 +1,7 @@
 ﻿using AdjustNamespace.Adjusting.Adjuster;
 using AdjustNamespace.Xaml;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AdjustNamespace.Adjusting

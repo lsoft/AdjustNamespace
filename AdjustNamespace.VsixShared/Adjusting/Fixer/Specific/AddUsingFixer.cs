@@ -11,9 +11,9 @@ using System.Threading.Tasks;
 namespace AdjustNamespace.Adjusting.Fixer
 {
     /// <summary>
-    /// Fixer for namespace using statements like <code>using System.Threading.Tasks</code>
+    /// Fixer for adding a using statements like <code>using System.Threading.Tasks</code>
     /// </summary>
-    public class NamespaceFixer : IFixer
+    public class AddUsingFixer : IFixer
     {
         private readonly Workspace _workspace;
         private readonly HashSet<string> _symbolTargetNamespaces = new ();
@@ -23,7 +23,7 @@ namespace AdjustNamespace.Adjusting.Fixer
             get;
         }
 
-        public NamespaceFixer(
+        public AddUsingFixer(
             Workspace workspace,
             string filePath
             )
