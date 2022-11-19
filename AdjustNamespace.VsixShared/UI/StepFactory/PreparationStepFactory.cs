@@ -42,7 +42,7 @@ namespace AdjustNamespace.UI.StepFactory
             var vm  = new PreparationStepViewModel(
                 _vss,
                 _nextStepFactory,
-                (List<string>)argument
+                (HashSet<string>)argument
                 );
 
             v.DataContext = vm;

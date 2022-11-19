@@ -24,7 +24,7 @@ namespace AdjustNamespace.UI.ViewModel
     {
         private readonly VsServices _vss;
         private readonly IStepFactory _nextStepFactory;
-        private readonly List<string> _filePaths;
+        private readonly HashSet<string> _filePaths;
 
         private string _mainMessage;
         private bool _isInProgress = false;
@@ -99,7 +99,7 @@ namespace AdjustNamespace.UI.ViewModel
         public PreparationStepViewModel(
             VsServices vss,
             IStepFactory nextStepFactory,
-            List<string> filePaths
+            HashSet<string> filePaths
             )
         {
             if (nextStepFactory is null)

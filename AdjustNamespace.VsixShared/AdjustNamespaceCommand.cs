@@ -11,6 +11,7 @@ using System.ComponentModel.Design;
 using Task = System.Threading.Tasks.Task;
 using AdjustNamespace.UI.StepFactory;
 using System.Linq;
+using AdjustNamespace.VsixShared.Helper;
 
 namespace AdjustNamespace
 {
@@ -98,7 +99,9 @@ namespace AdjustNamespace
 
             try
             {
-                var filePaths = new List<string>();
+                //HashSet is needed to remove duplicates paths
+                //this is possible if you click Adjust on xaml file (with cs behind)
+                var filePaths = new HashSet<string>();
 
                 var vss = await VsServices.CreateAsync(ServiceProvider);
 

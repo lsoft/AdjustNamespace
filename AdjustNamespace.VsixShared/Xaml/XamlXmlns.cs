@@ -55,7 +55,7 @@ namespace AdjustNamespace.Xaml
 
         internal void SaveTo(ref string xaml, ref int indexToInsert)
         {
-            var s = $@" xmlns:{Alias}=""clr-namespace:{Namespace}{Suffix}";
+            var s = $@" xmlns:{Alias}=""clr-namespace:{Namespace}{Suffix}""";
             xaml = xaml.Insert(indexToInsert, s);
             indexToInsert += s.Length;
         }
