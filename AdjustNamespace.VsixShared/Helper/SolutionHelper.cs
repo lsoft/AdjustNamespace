@@ -10,6 +10,8 @@ namespace AdjustNamespace.Helper
         public static string ProjectItemKindFolder = "{6BB5F8EF-4483-11D3-8BCF-00C04F8EC28C}";
         public static string ProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 
+        public static string DatabaseProjectItemKindFolder = "{6bb5f8ef-4483-11d3-8bcf-00c04f8ec28c}";
+        public static string DatabaseProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 
         public static bool TryGetProjectItem(
             this Solution solution,
@@ -231,7 +233,7 @@ namespace AdjustNamespace.Helper
 
             var result = new List<string>();
 
-            if (projectItem.Kind.NotIn(ProjectItemKindFolder, ProjectItemKindFile))
+            if (projectItem.Kind.NotIn(ProjectItemKindFolder, ProjectItemKindFile, DatabaseProjectItemKindFolder, DatabaseProjectItemKindFile))
             {
                 return result;
             }
@@ -240,7 +242,7 @@ namespace AdjustNamespace.Helper
             {
                 var itemPath = projectItem.FileNames[(short)i];
 
-                if (projectItem.Kind == ProjectItemKindFile)
+                if (projectItem.Kind.In(ProjectItemKindFile, DatabaseProjectItemKindFile))
                 {
                     result.Add(itemPath);
                 }

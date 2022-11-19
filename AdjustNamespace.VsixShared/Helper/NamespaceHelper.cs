@@ -82,7 +82,7 @@ namespace AdjustNamespace.Helper
             }
 
             var suffix = documentFolderPath.Substring(projectFolderPath.Length);
-            targetNamespace = project.DefaultNamespace +
+            targetNamespace = GetProjectDefaultNamespace(project) +
                 suffix
                     .Replace(Path.DirectorySeparatorChar, '.')
                     .Replace(Path.AltDirectorySeparatorChar, '.')
@@ -91,5 +91,22 @@ namespace AdjustNamespace.Helper
             return true;
         }
 
+
+        private static string GetProjectDefaultNamespace(Project project)
+        {
+            if (!string.IsNullOrEmpty(project.DefaultNamespace))
+            {
+                return project.DefaultNamespace!;
+            }
+
+            var dotIndex = project.Name.LastIndexOf(".");
+            if(dotIndex <= 0)
+            {
+                return project.Name;
+            }
+
+            var result = project.Name.Substring(0, dotIndex);
+            return result;
+        }
     }
 }
