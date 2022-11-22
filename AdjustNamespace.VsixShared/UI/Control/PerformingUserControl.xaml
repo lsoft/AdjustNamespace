@@ -38,7 +38,7 @@
             HorizontalAlignment="Right"
             VerticalAlignment="Bottom"
             Command="{Binding CancelCommand}"
-            Content="Cancel (cancellation will not revert applied changed!)"
+            Content="Cancel (cancellation will not revert applied changes!)"
             Foreground="Red"
             />
     </Grid>

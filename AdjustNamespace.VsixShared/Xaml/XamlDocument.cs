@@ -129,7 +129,7 @@ namespace AdjustNamespace.Xaml
 
         private IEnumerable<XamlClass> ReadClasses()
         {
-            var matches = Regex.Matches(_xaml, @"x:Class\s?=\s?""([\w\d._]+)""");
+            var matches = Regex.Matches(_xaml, @$"{XPrefix.Alias}:Class\s?=\s?""([\w\d._]+)""");
             foreach (Match match in matches)
             {
                 var xc = new XamlClass(
