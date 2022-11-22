@@ -1,4 +1,5 @@
 ﻿using AdjustNamespace.Namespace;
+using AdjustNamespace.VsixShared.Settings;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
@@ -59,6 +60,7 @@ namespace AdjustNamespace.Helper
         public static bool TryDetermineTargetNamespace(
             this Project project,
             string documentFilePath,
+            AdjustNamespaceSettings2 settings,
             out string? targetNamespace
             )
         {
@@ -72,6 +74,11 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(documentFilePath));
             }
 
+            if (settings is null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
             var projectFolderPath = new FileInfo(project.FilePath).Directory.FullName;
             var documentFolderPath = new FileInfo(documentFilePath).Directory.FullName;
 
@@ -81,13 +88,21 @@ namespace AdjustNamespace.Helper
                 return false;
             }
 
-            var suffix = documentFolderPath.Substring(projectFolderPath.Length);
-            targetNamespace = GetProjectDefaultNamespace(project) +
-                suffix
-                    .Replace(Path.DirectorySeparatorChar, '.')
-                    .Replace(Path.AltDirectorySeparatorChar, '.')
-                    ;
+            var names = new List<string>();
+            var dir = new DirectoryInfo(documentFolderPath);
+            while (dir.FullName != projectFolderPath && dir.FullName.Length > projectFolderPath.Length)
+            {
+                if (!settings.IsSkippedFolder(dir.FullName))
+                {
+                    names.Add(dir.Name);
+                }
 
+                dir = dir.Parent;
+            }
+
+            names.Reverse();
+            
+            targetNamespace = string.Join(".", names);
             return true;
         }
 

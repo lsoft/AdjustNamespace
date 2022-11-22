@@ -35,6 +35,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Logging.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceTransition.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceTransitionContainer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\AdjustNamespaceSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\AdjustNamespaceSettings2.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\SettingsReader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TypeContainer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionPage.cs" />

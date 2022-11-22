@@ -1,10 +1,12 @@
-﻿using EnvDTE;
+﻿using AdjustNamespace.VsixShared.Settings;
+using EnvDTE;
 using EnvDTE80;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -16,6 +18,7 @@ namespace AdjustNamespace
         public readonly DTE2 Dte;
         public readonly IComponentModel ComponentModel;
         public readonly VisualStudioWorkspace Workspace;
+        public readonly AdjustNamespaceSettings2 Settings;
 
         private VsServices(
             Microsoft.VisualStudio.Shell.IAsyncServiceProvider serviceProvider,
@@ -48,6 +51,12 @@ namespace AdjustNamespace
             Dte = dte;
             ComponentModel = componentModel;
             Workspace = workspace;
+
+            var solutionFolder = new FileInfo(workspace.CurrentSolution.FilePath).Directory.FullName;
+            Settings = new AdjustNamespaceSettings2(
+                solutionFolder,
+                SettingsReader.ReadSettings(solutionFolder) ?? new AdjustNamespaceSettings()
+                );
         }
 
         public static async Task<VsServices> CreateAsync(

@@ -197,7 +197,7 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                if (!roslynProject.TryDetermineTargetNamespace(subjectFilePath, out var targetNamespace))
+                if (!roslynProject.TryDetermineTargetNamespace(subjectFilePath, _vss.Settings, out var targetNamespace))
                 {
                     continue;
                 }

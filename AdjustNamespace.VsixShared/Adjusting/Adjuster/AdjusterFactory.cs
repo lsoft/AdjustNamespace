@@ -73,7 +73,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 return null;
             }
 
-            if (!roslynProject.TryDetermineTargetNamespace(subjectFilePath, out var targetNamespace))
+            if (!roslynProject.TryDetermineTargetNamespace(subjectFilePath, _vss.Settings, out var targetNamespace))
             {
                 return null;
             }
