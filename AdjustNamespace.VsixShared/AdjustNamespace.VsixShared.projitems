@@ -17,6 +17,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\IFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\AddUsingFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\QualifiedNameFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)AdjustSolutionCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\HashSetHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\NameHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceCenter.cs" />

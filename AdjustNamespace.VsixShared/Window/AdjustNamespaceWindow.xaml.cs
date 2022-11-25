@@ -1,4 +1,5 @@
 ﻿using AdjustNamespace.Options;
+using AdjustNamespace.UI.StepFactory;
 using Microsoft.VisualStudio.PlatformUI;
 using System;
 using System.Collections.Generic;
@@ -58,6 +59,38 @@ namespace AdjustNamespace.Window
                 System.Diagnostics.Process.Start("https://marketplace.visualstudio.com/items?itemName=lsoft.AdjustNamespaceVisualStudioExtension&ssr=false#review-details");
 #endif
             }
+        }
+        public static AdjustNamespaceWindow Create(
+            VsServices vss,
+            HashSet<string> filePaths
+            )
+        {
+            var window = new AdjustNamespaceWindow(
+                async anw =>
+                {
+                    var perfsf = new PerformingStepFactory(
+                        vss,
+                        anw,
+                        anw.CenterContentControl
+                        );
+
+                    var selsf = new SelectedStepFactory(
+                        vss,
+                        anw.CenterContentControl,
+                        perfsf
+                        );
+
+                    var prepsf = new PreparationStepFactory(
+                        vss,
+                        anw.CenterContentControl,
+                        selsf
+                        );
+
+                    await prepsf.CreateAsync(filePaths);
+                }
+                );
+
+            return window;
         }
     }
 }

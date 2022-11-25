@@ -36,7 +36,14 @@
          group as the part of a menu contained between two lines. The parent of a group
          must be a menu. -->
     <Groups>
-        <Group guid="guidAdjustNamespacePackageCmdSet" id="MyMenuGroup" priority="0x08e0">
+      <Group guid="guidAdjustNamespacePackageCmdSet" id="ExtensionMenuGroup" priority="0x0601">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_TOOL_MAINMENU" />
+      </Group>
+      <Group guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroup" priority="0x0000">
+        <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenu" />
+      </Group>
+      
+      <Group guid="guidAdjustNamespacePackageCmdSet" id="MyMenuGroup" priority="0x08e0">
             <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_SOLNNODE"/>
         </Group>
         <Group guid="guidAdjustNamespacePackageCmdSet" id="MyMenuGroup" priority="0x07e0">
@@ -49,18 +56,26 @@
             <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE"/>
         </Group>
     </Groups>
-      
-    <!--Buttons section. -->
-    <!--This section defines the elements the user can interact with, like a menu command or a button
-        or combo box in a toolbar. -->
+
+    <Menus>
+      <Menu guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenu" priority="0x0100" type="Menu">
+        <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionMenuGroup" />
+        <Strings>
+          <ButtonText>Adjust Namespace</ButtonText>
+        </Strings>
+      </Menu>
+    </Menus>
+
     <Buttons>
-      <!--To define a menu group you have to specify its ID, the parent menu and its display priority.
-          The command is visible and enabled by default. If you need to change the visibility, status, etc, you can use
-          the CommandFlag node.
-          You can add more than one CommandFlag node e.g.:
-              <CommandFlag>DefaultInvisible</CommandFlag>
-              <CommandFlag>DynamicVisibility</CommandFlag>
-          If you do not want an image next to your command, remove the Icon node /> -->
+
+      <Button guid="guidAdjustNamespacePackageCmdSet" id="AdjustSolutionCommandId" priority="0x0104" type="Button">
+        <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroup" />
+        <Icon guid="guidImages" id="order16" />
+        <Strings>
+          <ButtonText>Adjust namespaces in solution...</ButtonText>
+        </Strings>
+      </Button>
+      
       <Button guid="guidAdjustNamespacePackageCmdSet" id="DoAdjustCommandId" priority="0x0100" type="Button">
         <Parent guid="guidAdjustNamespacePackageCmdSet" id="MyMenuGroup" />
         <Icon guid="guidImages" id="order16" />
@@ -88,7 +103,13 @@
     <!-- This is the guid used to group the menu commands together -->
     <GuidSymbol name="guidAdjustNamespacePackageCmdSet" value="{3f7538ed-5c20-4d49-89fc-c401bb76df25}">
       <IDSymbol name="MyMenuGroup" value="0x1020" />
+
+      <IDSymbol name="ExtensionMenuGroup" value="0x101D" />
+      <IDSymbol name="ExtensionSubMenuGroup" value="0x101E" />
+      <IDSymbol name="ExtensionSubMenu" value="0x101F" />
+
       <IDSymbol name="DoAdjustCommandId" value="0x0100" />
+      <IDSymbol name="AdjustSolutionCommandId" value="0x0101" />
     </GuidSymbol>
 
     <GuidSymbol name="guidImages" value="{6309e701-5f02-4bc7-8376-02ec55028dbf}" >

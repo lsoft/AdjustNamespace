@@ -12,13 +12,14 @@ using Task = System.Threading.Tasks.Task;
 using AdjustNamespace.UI.StepFactory;
 using System.Linq;
 using AdjustNamespace.VsixShared.Helper;
+using Microsoft.CodeAnalysis;
 
 namespace AdjustNamespace
 {
     /// <summary>
     /// Command handler
     /// </summary>
-    internal sealed class AdjustNamespaceCommand
+    internal sealed class AdjustSolutionCommand
     {
         public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
 
@@ -26,7 +27,7 @@ namespace AdjustNamespace
         /// <summary>
         /// Command ID.
         /// </summary>
-        public const int CommandId = 0x0100;
+        public const int CommandId = 0x0101;
 
         /// <summary>
         /// Command menu group (command set GUID).
@@ -44,7 +45,7 @@ namespace AdjustNamespace
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
         /// <param name="commandService">Command service to add command to, not null.</param>
-        private AdjustNamespaceCommand(AsyncPackage package, OleMenuCommandService commandService)
+        private AdjustSolutionCommand(AsyncPackage package, OleMenuCommandService commandService)
         {
             this.package = package ?? throw new ArgumentNullException(nameof(package));
             commandService = commandService ?? throw new ArgumentNullException(nameof(commandService));
@@ -57,7 +58,7 @@ namespace AdjustNamespace
         /// <summary>
         /// Gets the instance of the command.
         /// </summary>
-        public static AdjustNamespaceCommand? Instance
+        public static AdjustSolutionCommand? Instance
         {
             get;
             private set;
@@ -83,7 +84,7 @@ namespace AdjustNamespace
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
 
             var commandService = await package.GetServiceAsync(typeof(IMenuCommandService)) as OleMenuCommandService;
-            Instance = new AdjustNamespaceCommand(package, commandService!);
+            Instance = new AdjustSolutionCommand(package, commandService!);
         }
 
         /// <summary>
@@ -104,33 +105,7 @@ namespace AdjustNamespace
                 var filePaths = new HashSet<string>();
 
                 var vss = await VsServices.CreateAsync(ServiceProvider);
-
-                if (vss.Dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
-                {
-                    var uih = vss.Dte.ToolWindows.SolutionExplorer;
-                    var selectedItems = (Array)uih.SelectedItems;
-
-                    if (null != selectedItems)
-                    {
-                        foreach (UIHierarchyItem selItem in selectedItems)
-                        {
-                            if ((selItem.Object as dynamic).ExtenderCATID == ProjectKind)
-                            {
-                                filePaths.AddRange(vss.Dte.Solution.ProcessSolution());
-                            }
-
-                            if (selItem.Object is EnvDTE.Project project)
-                            {
-                                filePaths.AddRange(project.ProcessProject());
-                            }
-
-                            if (selItem.Object is ProjectItem projectItem)
-                            {
-                                filePaths.AddRange(projectItem.ProcessProjectItem());
-                            }
-                        }
-                    }
-                }
+                filePaths.AddRange(vss.Dte.Solution.ProcessSolution());
 
                 if (filePaths.Count > 0)
                 {
