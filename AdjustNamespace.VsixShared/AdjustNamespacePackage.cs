@@ -49,6 +49,7 @@ namespace AdjustNamespace
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
             await AdjustNamespaceCommand.InitializeAsync(this);
             await AdjustSolutionCommand.InitializeAsync(this);
+            await EditSkippedPathsCommand.InitializeAsync(this);
         }
 
         #endregion

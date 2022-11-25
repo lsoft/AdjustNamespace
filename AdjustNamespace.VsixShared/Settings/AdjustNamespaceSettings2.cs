@@ -8,7 +8,8 @@ namespace AdjustNamespace.VsixShared.Settings
     public class AdjustNamespaceSettings2
     {
         private readonly string _solutionFolder;
-        private readonly AdjustNamespaceSettings _settings;
+        
+        public readonly AdjustNamespaceSettings Settings;
 
         public AdjustNamespaceSettings2(
             string solutionFolder,
@@ -25,7 +26,7 @@ namespace AdjustNamespace.VsixShared.Settings
                 throw new ArgumentNullException(nameof(settings));
             }
             _solutionFolder = solutionFolder;
-            _settings = settings;
+            Settings = settings;
         }
 
         public bool IsSkippedFolder(string fullFolderPath)
@@ -33,7 +34,7 @@ namespace AdjustNamespace.VsixShared.Settings
             fullFolderPath = Path.GetFullPath(fullFolderPath)
                 .Trim(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-            foreach (var sfs in _settings.SkippedFolderSuffixes)
+            foreach (var sfs in Settings.SkippedFolderSuffixes)
             {
                 if (Path.IsPathRooted(sfs))
                 {

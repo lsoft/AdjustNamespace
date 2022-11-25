@@ -18,6 +18,7 @@ namespace AdjustNamespace
         public readonly DTE2 Dte;
         public readonly IComponentModel ComponentModel;
         public readonly VisualStudioWorkspace Workspace;
+        public readonly SettingsReader SettingsReader;
         public readonly AdjustNamespaceSettings2 Settings;
 
         private VsServices(
@@ -53,9 +54,11 @@ namespace AdjustNamespace
             Workspace = workspace;
 
             var solutionFolder = new FileInfo(workspace.CurrentSolution.FilePath).Directory.FullName;
+
+            SettingsReader = new SettingsReader(solutionFolder);
             Settings = new AdjustNamespaceSettings2(
                 solutionFolder,
-                SettingsReader.ReadSettings(solutionFolder) ?? new AdjustNamespaceSettings()
+                SettingsReader.ReadSettings() ?? new AdjustNamespaceSettings()
                 );
         }
 

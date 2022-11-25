@@ -26,7 +26,7 @@ namespace AdjustNamespace
     /// </summary>
     internal sealed partial class PackageIds
     {
-        public const int ContextMenuGroup = 0x1020;
+        public const int MyMenuGroup = 0x1020;
         public const int ExtensionMenuGroup = 0x201D;
         public const int ExtensionSubMenuGroup = 0x201E;
         public const int ExtensionSubMenu = 0x201F;

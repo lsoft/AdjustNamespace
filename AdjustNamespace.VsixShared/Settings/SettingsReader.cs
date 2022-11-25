@@ -6,16 +6,27 @@ using System.Xml.Serialization;
 
 namespace AdjustNamespace.VsixShared.Settings
 {
-    internal class SettingsReader
+    public class SettingsReader
     {
         public const string SettingFileName = "adjust_namespaces_settings.xml";
      
         private static readonly XmlSerializer _serializer = new XmlSerializer(typeof(AdjustNamespaceSettings));
-        public static AdjustNamespaceSettings? ReadSettings(
-            string solutionFolder
+        private readonly string _solutionFolder;
+
+        public SettingsReader(string solutionFolder)
+        {
+            if (solutionFolder is null)
+            {
+                throw new ArgumentNullException(nameof(solutionFolder));
+            }
+
+            _solutionFolder = solutionFolder;
+        }
+
+        public  AdjustNamespaceSettings? ReadSettings(
             )
         {
-            var settingsFilePath = Path.Combine(solutionFolder, SettingFileName);
+            var settingsFilePath = Path.Combine(_solutionFolder, SettingFileName);
             if(!File.Exists(settingsFilePath))
             {
                 return null;
@@ -28,26 +39,28 @@ namespace AdjustNamespace.VsixShared.Settings
             }
         }
 
-        //public static void Write(
-        //    string solutionFolder
-        //    )
-        //{
-        //    var settingsFilePath = Path.Combine(solutionFolder, SettingFileName);
-        //    if (File.Exists(settingsFilePath))
-        //    {
-        //        File.Delete(settingsFilePath);
-        //    }
+        public void Save(
+            AdjustNamespaceSettings settings
+            )
+        {
+            if (settings is null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
 
-        //    using (var fs = new FileStream(settingsFilePath, FileMode.Create))
-        //    {
-        //        var s = new AdjustNamespaceSettings();
-        //        s.SkippedFolderSuffixes.Add(@"C:\projects\AdjustNamespace\Tests\Subject");
-        //        s.SkippedFolderSuffixes.Add(@"AdjustNamespace\Tests\Subject");
-        //        _serializer.Serialize(
-        //            fs,
-        //            s
-        //            );
-        //    }
-        //}
+            var settingsFilePath = Path.Combine(_solutionFolder, SettingFileName);
+            if (File.Exists(settingsFilePath))
+            {
+                File.Delete(settingsFilePath);
+            }
+
+            using (var fs = new FileStream(settingsFilePath, FileMode.Create))
+            {
+                _serializer.Serialize(
+                    fs,
+                    settings
+                    );
+            }
+        }
     }
 }

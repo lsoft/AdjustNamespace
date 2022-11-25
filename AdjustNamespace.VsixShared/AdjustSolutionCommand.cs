@@ -27,7 +27,7 @@ namespace AdjustNamespace
         /// <summary>
         /// Command ID.
         /// </summary>
-        public const int CommandId = 0x0101;
+        public const int CommandId = 0x0301;
 
         /// <summary>
         /// Command menu group (command set GUID).

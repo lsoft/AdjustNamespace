@@ -17,6 +17,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\IFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\AddUsingFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\QualifiedNameFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)EditSkippedPathsCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AdjustSolutionCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\HashSetHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\NameHelper.cs" />
@@ -72,6 +73,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Window\AdjustNamespaceWindow.xaml.cs">
       <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)Window\EditSkippedPathsWindow.xaml.cs">
+      <DependentUpon>EditSkippedPathsWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXamlPerformable.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXamlPositioned.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXmlnsProvider.cs" />
@@ -97,6 +101,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="$(MSBuildThisFileDirectory)Window\AdjustNamespaceWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="$(MSBuildThisFileDirectory)Window\EditSkippedPathsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
