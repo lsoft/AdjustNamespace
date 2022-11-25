@@ -10,6 +10,7 @@ namespace AdjustNamespace.Helper
         public static string ProjectItemKindFolder = "{6BB5F8EF-4483-11D3-8BCF-00C04F8EC28C}";
         public static string ProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 
+        public static string DatabaseProjectKind = "{00d1a9c2-b5f0-4af3-8072-f6c62b433612}";
         public static string DatabaseProjectItemKindFolder = "{6bb5f8ef-4483-11d3-8bcf-00c04f8ec28c}";
         public static string DatabaseProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
 

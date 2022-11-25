@@ -2,10 +2,12 @@
 using AdjustNamespace.VsixShared.Settings;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace AdjustNamespace.Helper
 {
@@ -57,11 +59,10 @@ namespace AdjustNamespace.Helper
             return result.Count > 0;
         }
 
-        public static bool TryDetermineTargetNamespace(
+        public static async Task<string?> TryDetermineTargetNamespaceAsync(
             this Project project,
             string documentFilePath,
-            AdjustNamespaceSettings2 settings,
-            out string? targetNamespace
+            VsServices vss
             )
         {
             if (project is null)
@@ -74,25 +75,19 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(documentFilePath));
             }
 
-            if (settings is null)
-            {
-                throw new ArgumentNullException(nameof(settings));
-            }
-
             var projectFolderPath = new FileInfo(project.FilePath).Directory.FullName;
             var documentFolderPath = new FileInfo(documentFilePath).Directory.FullName;
 
             if (documentFolderPath.Length < projectFolderPath.Length || !documentFolderPath.StartsWith(projectFolderPath))
             {
-                targetNamespace = null;
-                return false;
+                return null;
             }
 
             var names = new List<string>();
             var dir = new DirectoryInfo(documentFolderPath);
             while (dir.FullName != projectFolderPath && dir.FullName.Length > projectFolderPath.Length)
             {
-                if (!settings.IsSkippedFolder(dir.FullName))
+                if (!vss.Settings.IsSkippedFolder(dir.FullName))
                 {
                     names.Add(dir.Name);
                 }
@@ -101,17 +96,43 @@ namespace AdjustNamespace.Helper
             }
 
             names.Reverse();
-            
-            targetNamespace = string.Join(".", names);
-            return true;
+            names.Insert(0, await GetProjectDefaultNamespaceAsync(vss, documentFilePath, project));
+
+            var targetNamespace = string.Join(".", names);
+            return targetNamespace;
         }
 
 
-        private static string GetProjectDefaultNamespace(Project project)
+        private static async Task<string> GetProjectDefaultNamespaceAsync(
+            VsServices vss,
+            string documentFilePath,
+            Project project
+            )
         {
             if (!string.IsNullOrEmpty(project.DefaultNamespace))
             {
                 return project.DefaultNamespace!;
+            }
+
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            if (vss.Dte.Solution.TryGetProjectItem(documentFilePath, out var vsp, out var _))
+            {
+                if (vsp != null)
+                {
+                    if (vsp.Kind == SolutionHelper.DatabaseProjectKind)
+                    {
+                        var prop = vsp.Properties;
+                        if (prop != null)
+                        {
+                            var dn = prop.Item("DefaultNamespace");
+                            if (dn != null)
+                            {
+                                return dn.Value.ToString();
+                            }
+                        }
+                    }
+                }
             }
 
             var dotIndex = project.Name.LastIndexOf(".");

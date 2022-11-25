@@ -53,7 +53,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
             _xamlFilePaths = xamlFilePaths;
         }
 
-        public IAdjuster? Create(
+        public async Task<IAdjuster?> CreateAsync(
             string subjectFilePath
             )
         {
@@ -73,7 +73,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 return null;
             }
 
-            if (!roslynProject.TryDetermineTargetNamespace(subjectFilePath, _vss.Settings, out var targetNamespace))
+            var targetNamespace = await roslynProject.TryDetermineTargetNamespaceAsync(subjectFilePath, _vss);
+            if (string.IsNullOrEmpty(targetNamespace))
             {
                 return null;
             }

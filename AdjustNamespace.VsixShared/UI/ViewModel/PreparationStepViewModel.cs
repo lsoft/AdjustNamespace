@@ -197,7 +197,8 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                if (!roslynProject.TryDetermineTargetNamespace(subjectFilePath, _vss.Settings, out var targetNamespace))
+                var targetNamespace = await roslynProject.TryDetermineTargetNamespaceAsync(subjectFilePath, _vss);
+                if (string.IsNullOrEmpty(targetNamespace))
                 {
                     continue;
                 }

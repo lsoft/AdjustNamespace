@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <AdjustNamespaceSettings xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <SkippedFolderSuffixes>
+    <string>C:\projects\github\AdjustNamespace\Tests\Subject\TestProject\A\B\C\</string>
+    <string>TestProject\A\B</string>
 <!--
 here is a list of skipped folders
 you can add an item with its full path like these:

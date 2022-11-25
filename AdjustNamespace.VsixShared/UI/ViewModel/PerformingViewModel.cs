@@ -126,7 +126,7 @@ namespace AdjustNamespace.UI.ViewModel
                 ProgressMessage = $"{i + 1}/{_subjectFilePaths.Count}: {subjectFilePath}";
                 Debug.WriteLine($"----------------------------> {i} {subjectFilePath}");
 
-                var adjuster = adjusterFactory.Create(subjectFilePath);
+                var adjuster = await adjusterFactory.CreateAsync(subjectFilePath);
                 if (adjuster is not null)
                 {
                     await adjuster.AdjustAsync();
