@@ -1,7 +1,7 @@
 ﻿using AdjustNamespace.Helper;
 using AdjustNamespace.Options;
 using AdjustNamespace.UI.StepFactory;
-using AdjustNamespace.VsixShared.Settings;
+using AdjustNamespace.Settings;
 using Microsoft.VisualStudio.PlatformUI;
 using System;
 using System.Collections.Generic;

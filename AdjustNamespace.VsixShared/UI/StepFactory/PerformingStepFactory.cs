@@ -43,7 +43,7 @@ namespace AdjustNamespace.UI.StepFactory
             var vm = new PerformingViewModel(
                 _vss,
                 () => _window.Close(),
-                (List<string>)argument
+                (PerformingParameters)argument
                 );
 
             v.DataContext = vm;

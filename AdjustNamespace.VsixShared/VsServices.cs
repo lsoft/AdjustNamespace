@@ -1,6 +1,7 @@
-﻿using AdjustNamespace.VsixShared.Settings;
+﻿using AdjustNamespace.Settings;
 using EnvDTE;
 using EnvDTE80;
+using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Shell;
@@ -60,6 +61,15 @@ namespace AdjustNamespace
                 solutionFolder,
                 SettingsReader.ReadSettings() ?? new AdjustNamespaceSettings()
                 );
+        }
+
+        public void OpenFile(
+            string documentFullPath
+            )
+        {
+            ThreadHelper.ThrowIfNotOnUIThread(nameof(OpenFile));
+
+            Dte.ItemOperations.OpenFile(documentFullPath, "{" + VSConstants.LOGVIEWID_TextView + "}");
         }
 
         public static async Task<VsServices> CreateAsync(

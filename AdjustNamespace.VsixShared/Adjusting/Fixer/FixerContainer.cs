@@ -4,6 +4,9 @@ using Microsoft.VisualStudio.LanguageServices;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
+using Microsoft.VisualStudio.Language.CodeCleanUp;
+using System.Diagnostics;
 
 namespace AdjustNamespace.Adjusting.Fixer
 {
@@ -12,29 +15,18 @@ namespace AdjustNamespace.Adjusting.Fixer
     /// </summary>
     public class FixerContainer
     {
-        private readonly Dictionary<string, FixerSet> _dict = new();
-        private readonly VisualStudioWorkspace _workspace;
+        private readonly VsServices _vss;
+        private readonly bool _openFilesToEnableUndo;
 
-        public IReadOnlyDictionary<string, FixerSet> Dict => _dict;
+        private readonly Dictionary<string, FixerSet> _dict = new();
 
         public FixerContainer(
-            VisualStudioWorkspace workspace
+            VsServices vss,
+            bool openFilesToEnableUndo
             )
         {
-            if (workspace is null)
-            {
-                throw new ArgumentNullException(nameof(workspace));
-            }
-
-            _workspace = workspace;
-        }
-
-        public void TryAddFixersFor(string filePath)
-        {
-            if (!_dict.ContainsKey(filePath))
-            {
-                _dict[filePath] = new FixerSet(_workspace, filePath);
-            }
+            _vss = vss;
+            _openFilesToEnableUndo = openFilesToEnableUndo;
         }
 
         public T Fixer<T>(string filePath)
@@ -42,10 +34,30 @@ namespace AdjustNamespace.Adjusting.Fixer
         {
             if (!_dict.TryGetValue(filePath, out var fixerSet))
             {
-                throw new InvalidOperationException($"No fixers found for {filePath}");
+                fixerSet = AddFixersFor(filePath);
             }
 
             return fixerSet.Fixer<T>();
         }
+
+        public async Task FixAllAsync()
+        {
+            foreach (var pair in _dict)
+            {
+                var targetFilePath = pair.Key;
+
+                Debug.WriteLine($"Fix references in {targetFilePath}");
+
+                await pair.Value.FixAllAsync();
+            }
+        }
+
+        private FixerSet AddFixersFor(string filePath)
+        {
+            var fs = new FixerSet(_vss, _openFilesToEnableUndo, filePath);
+            _dict[filePath] = fs;
+            return fs;
+        }
+
     }
 }

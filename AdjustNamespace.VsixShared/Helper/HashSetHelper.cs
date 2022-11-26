@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace AdjustNamespace.VsixShared.Helper
+namespace AdjustNamespace.Helper
 {
     internal static  class HashSetHelper
     {

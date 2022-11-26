@@ -60,7 +60,7 @@ namespace AdjustNamespace.Adjusting
 
                 if (!_namespacesToRemove.Contains(nname))
                 {
-                    //there is a types in this namespace
+                    //there are a types in this namespace
                     continue;
                 }
 

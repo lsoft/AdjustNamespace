@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using SubjectWrong;
+//uncomment this line to see a small defect in AdjustNamespace algorithm: using SubjectWrong;
 using SubjectWrong.Exp1;
 
 namespace SubjectWrong.Exp1

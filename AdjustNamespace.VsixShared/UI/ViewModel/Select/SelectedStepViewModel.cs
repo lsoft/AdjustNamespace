@@ -25,6 +25,11 @@ namespace AdjustNamespace.UI.ViewModel
 {
     public class SelectedStepViewModel : ChainViewModel
     {
+        /// <summary>
+        /// The maximum number of files that can be opened in the editor without causing a delay in VS.
+        /// </summary>
+        public const int MaxFilesAllowedToOpen = 15;
+
         private readonly VsServices _vss;
         private readonly IStepFactory _nextStepFactory;
         private readonly List<FileEx> _filteredFileExs;
@@ -35,6 +40,8 @@ namespace AdjustNamespace.UI.ViewModel
         private ICommand? _closeCommand;
         private ICommand? _nextCommand;
         private ICommand? _invertStatusCommand;
+        private bool _enableOpenFileCheckBox;
+        private bool _openFilesToEnableUndo;
 
         public string MainMessage
         {
@@ -62,6 +69,31 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        #region open files to enable undo checkbox
+
+        public bool EnableOpenFileCheckBox
+        {
+            get => _enableOpenFileCheckBox;
+            set
+            {
+                _enableOpenFileCheckBox = value;
+                OnPropertyChanged(nameof(EnableOpenFileCheckBox));
+            }
+        }
+
+        public string OpenFileCheckBoxText => $"Open affected files to enable Undo (max is {MaxFilesAllowedToOpen} to prevent delays)";
+
+        public bool OpenFilesToEnableUndo
+        {
+            get => _openFilesToEnableUndo;
+            set
+            {
+                _openFilesToEnableUndo = value;
+                OnPropertyChanged(nameof(OpenFilesToEnableUndo));
+            }
+        }
+
+        #endregion
 
         public ICommand CloseCommand
         {
@@ -91,9 +123,16 @@ namespace AdjustNamespace.UI.ViewModel
                 if (_nextCommand == null)
                 {
                     _nextCommand = new AsyncRelayCommand(
-                        async a => await _nextStepFactory.CreateAsync(
-                            ToFilterItems.Where(s => s.FileEx.HasValue && s.IsChecked.GetValueOrDefault(false)).Select(s => s.FileEx!.Value.FilePath).ToList()
-                            ),
+                        async a =>
+                        {
+                            var filePaths = ToFilterItems
+                                .Where(s => s.FileEx.HasValue && s.IsChecked.GetValueOrDefault(false))
+                                .Select(s => s.FileEx!.Value.FilePath)
+                                .ToList();
+                            var pp = new PerformingParameters(filePaths, _openFilesToEnableUndo);
+
+                            await _nextStepFactory.CreateAsync(pp);
+                        },
                         r => ToFilterItems.Any(s => s.IsChecked.GetValueOrDefault(false))
                         );
                 }
@@ -150,7 +189,7 @@ namespace AdjustNamespace.UI.ViewModel
             _filteredFileExs = fileExtensions;
 
             _foreground = Brushes.Green;
-            _mainMessage = "Choose files to process...";
+            _mainMessage = $"Total {fileExtensions.Count} files found. Choose files to process...";
             ToFilterItems = new ObservableCollection<ISelectItemViewModel>();
         }
 
@@ -158,32 +197,15 @@ namespace AdjustNamespace.UI.ViewModel
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            //var dte = await _serviceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as DTE2;
-            //if (dte == null)
-            //{
-            //    return;
-            //}
-
-            //var componentModel = (await _serviceProvider.GetServiceAsync(typeof(SComponentModel)) as IComponentModel)!;
-            //if (componentModel == null)
-            //{
-            //    return;
-            //}
-
-            //var workspace = componentModel.GetService<VisualStudioWorkspace>();
-            //if (workspace == null)
-            //{
-            //    return;
-            //}
-
             //perform grouping by files physical folder!
             var dirPaths = _filteredFileExs.Select(f => f.FolderPath).Distinct().ToList();
             var dirs = new List<SelectFolderViewModel>();
-            foreach(var dirPath in dirPaths)
+            foreach (var dirPath in dirPaths)
             {
                 var dir = new SelectFolderViewModel(
+                    this,
                     dirPath
-                   );
+                    );
 
                 var dirFiles = _filteredFileExs
                     .Where(f => f.FolderPath == dirPath)
@@ -194,7 +216,7 @@ namespace AdjustNamespace.UI.ViewModel
                 dirs.Add(dir);
             }
 
-            foreach(var dir in dirs.OrderBy(d => d.ItemPath))
+            foreach (var dir in dirs.OrderBy(d => d.ItemPath))
             {
                 ToFilterItems.Add(dir);
 
@@ -204,7 +226,27 @@ namespace AdjustNamespace.UI.ViewModel
                 }
             }
 
+            RefreshStatus();
             OnPropertyChanged();
+        }
+
+        public void RefreshStatus()
+        {
+            RefreshOpenFileCheckBox();
+        }
+
+        private void RefreshOpenFileCheckBox()
+        {
+            var cnt = ToFilterItems
+                .Where(i => i.FileEx.HasValue && i.IsChecked.GetValueOrDefault(false))
+                .Count();
+            var allowed = cnt < MaxFilesAllowedToOpen;
+
+            EnableOpenFileCheckBox = allowed;
+            if (!allowed)
+            {
+                OpenFilesToEnableUndo = false;
+            }
         }
     }
 }

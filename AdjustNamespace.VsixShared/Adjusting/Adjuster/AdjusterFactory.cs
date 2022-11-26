@@ -11,14 +11,20 @@ namespace AdjustNamespace.Adjusting.Adjuster
     public class AdjusterFactory
     {
         private readonly VsServices _vss;
+        private readonly bool _openFilesToEnableUndo;
         private readonly NamespaceCenter _namespaceCenter;
         private readonly List<string> _xamlFilePaths;
 
         public static async Task<AdjusterFactory> CreateAsync(
-            VsServices vss
+            VsServices vss,
+            bool openFilesToEnableUndo,
+            NamespaceCenter namespaceCenter
             )
         {
-            var namespaceCenter = await NamespaceCenter.CreateForAsync(vss.Workspace);
+            if (namespaceCenter is null)
+            {
+                throw new ArgumentNullException(nameof(namespaceCenter));
+            }
 
             //get all xaml files in current solution
             var filePaths = vss.Dte.Solution.ProcessSolution();
@@ -26,6 +32,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
             return new AdjusterFactory(
                 vss,
+                openFilesToEnableUndo,
                 namespaceCenter,
                 xamlFilePaths
                 );
@@ -34,6 +41,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
         private AdjusterFactory(
             VsServices vss,
+            bool openFilesToEnableUndo,
             NamespaceCenter namespaceCenter,
             List<string> xamlFilePaths
             )
@@ -49,6 +57,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
             }
 
             _vss = vss;
+            _openFilesToEnableUndo = openFilesToEnableUndo;
             _namespaceCenter = namespaceCenter;
             _xamlFilePaths = xamlFilePaths;
         }
@@ -96,7 +105,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 }
 
                 var csAdjuster = new CsAdjuster(
-                    _vss.Workspace,
+                    _vss,
+                    _openFilesToEnableUndo,
                     _namespaceCenter,
                     subjectFilePath,
                     targetNamespace!,

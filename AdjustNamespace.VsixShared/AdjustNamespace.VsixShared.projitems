@@ -6,21 +6,26 @@
     <SharedGUID>b8f4de5d-eeff-4f14-9c3d-2a6ee41db482</SharedGUID>
   </PropertyGroup>
   <PropertyGroup Label="Configuration">
-    <Import_RootNamespace>AdjustNamespace.VsixShared</Import_RootNamespace>
+    <Import_RootNamespace>AdjustNamespace</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\AdjusterFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\CsAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\Cs\RefProcessor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\IAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Cleanup.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\FixerContainer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\FixerSet.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\IFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\AddUsingFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\NamespaceFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\QualifiedNameFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)EditSkippedPathsCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AdjustSolutionCommand.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\DocumentChangerHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\HashSetHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\NameHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\VisualStudioDocumentHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceCenter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\XamlAdjuster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AdjustNamespaceCommand.cs" />
@@ -111,8 +116,5 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="$(MSBuildThisFileDirectory)LICENSE.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\" />
   </ItemGroup>
 </Project>

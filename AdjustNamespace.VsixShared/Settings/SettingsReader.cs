@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using System.Xml.Serialization;
 
-namespace AdjustNamespace.VsixShared.Settings
+namespace AdjustNamespace.Settings
 {
     public class SettingsReader
     {

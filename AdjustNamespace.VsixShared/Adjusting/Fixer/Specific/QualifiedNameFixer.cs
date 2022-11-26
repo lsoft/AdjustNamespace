@@ -51,30 +51,23 @@ namespace AdjustNamespace.Adjusting.Fixer
 
         public async Task FixAsync()
         {
-            bool r;
-            do
-            {
-                var (document, syntaxRoot) = await _workspace.GetDocumentAndSyntaxRootAsync(FilePath);
-                if (document == null || syntaxRoot == null)
+            await _workspace.ApplyModifiedDocumentAsync(
+                FilePath,
+                (document, syntaxRoot) =>
                 {
-                    //skip this document
-                    return;
+                    var mSyntaxRoot = syntaxRoot.ReplaceNodes(
+                        _arguments.ConvertAll(a => a.SourceSyntax),
+                        (n0, n1) =>
+                        {
+                            var founda = _arguments.First(a => ReferenceEquals(a.SourceSyntax, n0));
+
+                            return founda.ToReplaceSyntax;
+                        });
+
+                    var changedDocument = document.WithSyntaxRoot(mSyntaxRoot);
+                    return changedDocument;
                 }
-
-                syntaxRoot = syntaxRoot.ReplaceNodes(
-                    _arguments.ConvertAll(a => a.SourceSyntax),
-                    (n0, n1) =>
-                    {
-                        var founda = _arguments.First(a => ReferenceEquals(a.SourceSyntax, n0));
-
-                        return founda.ToReplaceSyntax;
-                    });
-
-                var changedDocument = document.WithSyntaxRoot(syntaxRoot);
-                r = _workspace.TryApplyChanges(changedDocument.Project.Solution);
-            }
-            while (!r);
-
+                );
         }
 
         public class QualifiedNameFixerArgument

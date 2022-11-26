@@ -12,6 +12,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
         private List<SelectFileViewModel> _files;
 
         private bool _isSelected;
+        private readonly SelectedStepViewModel _parent;
 
         public IReadOnlyList<SelectFileViewModel> Files => _files;
 
@@ -39,16 +40,12 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
             set
             {
-                //if (value == null)
-                //{
-                //    return;
-                //}
-
                 foreach (var file in _files)
                 {
                     file.SetCheckedStatusFromParent(value.GetValueOrDefault(false));
                 }
 
+                _parent.RefreshStatus();
                 OnPropertyChanged(nameof(IsChecked));
             }
         }
@@ -66,9 +63,15 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
 
         public SelectFolderViewModel(
+            SelectedStepViewModel parent,
             string folderPath
             )
         {
+            if (parent is null)
+            {
+                throw new ArgumentNullException(nameof(parent));
+            }
+
             if (folderPath is null)
             {
                 throw new ArgumentNullException(nameof(folderPath));
@@ -78,6 +81,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
             var level = 0;
             LeftMargin = new Thickness(level * 5, 0, 0, 0);
+            _parent = parent;
             ItemPath = folderPath;
             IsChecked = true;
         }
@@ -96,6 +100,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
         public void RefreshStatus()
         {
+            _parent.RefreshStatus();
             OnPropertyChanged();
         }
     }

@@ -25,7 +25,7 @@ namespace AdjustNamespace.UI.ViewModel
         private readonly VsServices _vss;
         private readonly Action _formCloser;
         private readonly List<string> _subjectFilePaths;
-
+        private readonly bool _openFilesToEnableUndo;
         private RelayCommand? _cancelCommand;
         private System.Threading.Tasks.Task? _task;
 
@@ -66,7 +66,7 @@ namespace AdjustNamespace.UI.ViewModel
         public PerformingViewModel(
             VsServices vss,
             Action formCloser,
-            List<string> subjectFilePaths
+            PerformingParameters parameters
             )
         {
             if (formCloser is null)
@@ -74,14 +74,10 @@ namespace AdjustNamespace.UI.ViewModel
                 throw new ArgumentNullException(nameof(formCloser));
             }
 
-            if (subjectFilePaths is null)
-            {
-                throw new ArgumentNullException(nameof(subjectFilePaths));
-            }
-
             _vss = vss;
             _formCloser = formCloser;
-            _subjectFilePaths = subjectFilePaths;
+            _subjectFilePaths = parameters.SubjectFilePaths;
+            _openFilesToEnableUndo = parameters.OpenFilesToEnableUndo;
             _progressMessage = string.Empty;
         }
 
@@ -111,7 +107,8 @@ namespace AdjustNamespace.UI.ViewModel
 
         private async System.Threading.Tasks.Task PerformAdjustingAsync(CancellationToken cancellationToken)
         {
-            var adjusterFactory = await AdjusterFactory.CreateAsync(_vss);
+            var namespaceCenter = await NamespaceCenter.CreateForAsync(_vss.Workspace);
+            var adjusterFactory = await AdjusterFactory.CreateAsync(_vss, _openFilesToEnableUndo, namespaceCenter);
 
             //process file by file
             for (var i = 0; i < _subjectFilePaths.Count; i++)
@@ -132,7 +129,30 @@ namespace AdjustNamespace.UI.ViewModel
                     await adjuster.AdjustAsync();
                 }
             }
+
+            //cleanup
+            ProgressMessage = "Performing cleanup...";
+            var c = new Cleanup(_vss, namespaceCenter);
+            await c.RemoveEmptyUsingStatementsAsync(cancellationToken);
+        }
+    }
+    
+    public readonly struct PerformingParameters
+    {
+        public readonly List<string> SubjectFilePaths;
+        public readonly bool OpenFilesToEnableUndo;
+
+        public PerformingParameters(
+            List<string> subjectFilePaths,
+            bool openFilesToEnableUndo)
+        {
+            if (subjectFilePaths is null)
+            {
+                throw new ArgumentNullException(nameof(subjectFilePaths));
+            }
+
+            SubjectFilePaths = subjectFilePaths;
+            OpenFilesToEnableUndo = openFilesToEnableUndo;
         }
     }
 }
-

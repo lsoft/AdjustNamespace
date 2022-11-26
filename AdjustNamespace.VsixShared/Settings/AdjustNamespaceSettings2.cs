@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace AdjustNamespace.VsixShared.Settings
+namespace AdjustNamespace.Settings
 {
     public class AdjustNamespaceSettings2
     {

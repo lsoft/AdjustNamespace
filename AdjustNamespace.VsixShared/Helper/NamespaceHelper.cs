@@ -1,5 +1,5 @@
 ﻿using AdjustNamespace.Namespace;
-using AdjustNamespace.VsixShared.Settings;
+using AdjustNamespace.Settings;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.VisualStudio.Shell;

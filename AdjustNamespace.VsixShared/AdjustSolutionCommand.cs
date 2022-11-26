@@ -11,7 +11,7 @@ using System.ComponentModel.Design;
 using Task = System.Threading.Tasks.Task;
 using AdjustNamespace.UI.StepFactory;
 using System.Linq;
-using AdjustNamespace.VsixShared.Helper;
+using AdjustNamespace.Helper;
 using Microsoft.CodeAnalysis;
 
 namespace AdjustNamespace
