@@ -31,6 +31,7 @@ namespace AdjustNamespace.UI.ViewModel
         private bool _blocked = false;
 
         private ICommand? _closeCommand;
+        private ICommand? _repeatCommand;
         private ICommand? _nextCommand;
 
         private List<FileEx>? _filteredFileExs = null;
@@ -71,6 +72,25 @@ namespace AdjustNamespace.UI.ViewModel
                 }
 
                 return _closeCommand;
+            }
+        }
+
+        public ICommand RepeatCommand
+        {
+            get
+            {
+                if (_repeatCommand == null)
+                {
+                    _repeatCommand = new RelayCommand(
+                        a =>
+                        {
+                            StartAsync().FileAndForget(nameof(RepeatCommand));
+                        },
+                        r => !_isInProgress && DetectedMessages.Count > 0
+                        );
+                }
+
+                return _repeatCommand;
             }
         }
 
@@ -122,6 +142,9 @@ namespace AdjustNamespace.UI.ViewModel
         public override async System.Threading.Tasks.Task StartAsync()
         {
             _isInProgress = true;
+
+            DetectedMessages.Clear();
+
             OnPropertyChanged();
 
             await TaskScheduler.Default;

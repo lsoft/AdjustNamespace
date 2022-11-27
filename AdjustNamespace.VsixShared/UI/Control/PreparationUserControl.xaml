@@ -55,9 +55,9 @@
             HorizontalAlignment="Stretch"
             >
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition />
+                <ColumnDefinition />
             </Grid.ColumnDefinitions>
 
             <Button
@@ -69,6 +69,16 @@
                 Command="{Binding CloseCommand}"
                 CommandParameter="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}}"
                 Content="Cancel"
+                />
+
+            <Button
+                Grid.Column="1"
+                Width="80"
+                Margin="2"
+                Padding="10,5,10,5"
+                HorizontalAlignment="Center"
+                Command="{Binding RepeatCommand}"
+                Content="Repeat"
                 />
 
             <Button
