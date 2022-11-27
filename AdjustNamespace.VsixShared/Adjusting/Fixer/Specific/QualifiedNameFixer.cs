@@ -1,5 +1,7 @@
 ﻿using AdjustNamespace.Helper;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,11 +43,6 @@ namespace AdjustNamespace.Adjusting.Fixer
 
         public void AddSubject(QualifiedNameFixerArgument qnsa)
         {
-            if (qnsa is null)
-            {
-                throw new ArgumentNullException(nameof(qnsa));
-            }
-
             _arguments.Add(qnsa);
         }
 
@@ -55,11 +52,15 @@ namespace AdjustNamespace.Adjusting.Fixer
                 FilePath,
                 (document, syntaxRoot) =>
                 {
+                    var nodesToBeReplaced = _arguments.ConvertAll(
+                        a => syntaxRoot.FindNode(a.SubjectNodeSpan).GoDownTo(a.ToReplaceSyntax.GetType())!
+                        );
+
                     var mSyntaxRoot = syntaxRoot.ReplaceNodes(
-                        _arguments.ConvertAll(a => a.SourceSyntax),
+                        nodesToBeReplaced,
                         (n0, n1) =>
                         {
-                            var founda = _arguments.First(a => ReferenceEquals(a.SourceSyntax, n0));
+                            var founda = _arguments.First(a => n0.Span == a.SubjectNodeSpan);
 
                             return founda.ToReplaceSyntax;
                         });
@@ -70,33 +71,22 @@ namespace AdjustNamespace.Adjusting.Fixer
                 );
         }
 
-        public class QualifiedNameFixerArgument
+        public readonly struct QualifiedNameFixerArgument
         {
-            public SyntaxNode SourceSyntax
-            {
-                get;
-            }
-            public SyntaxNode ToReplaceSyntax
-            {
-                get;
-            }
+            public readonly TextSpan SubjectNodeSpan;
+            public readonly SyntaxNode ToReplaceSyntax;
 
             public QualifiedNameFixerArgument(
-                SyntaxNode qualifiedNameSyntax,
+                TextSpan subjectNodeSpan,
                 SyntaxNode toReplaceSyntax
                 )
             {
-                if (qualifiedNameSyntax is null)
-                {
-                    throw new ArgumentNullException(nameof(qualifiedNameSyntax));
-                }
-
                 if (toReplaceSyntax is null)
                 {
                     throw new ArgumentNullException(nameof(toReplaceSyntax));
                 }
 
-                SourceSyntax = qualifiedNameSyntax;
+                SubjectNodeSpan = subjectNodeSpan;
                 ToReplaceSyntax = toReplaceSyntax;
             }
         }

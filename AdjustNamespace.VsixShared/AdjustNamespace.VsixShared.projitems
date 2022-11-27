@@ -25,7 +25,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Helper\DocumentChangerHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\HashSetHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\NameHelper.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Helper\VisualStudioDocumentHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceCenter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\XamlAdjuster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)AdjustNamespaceCommand.cs" />

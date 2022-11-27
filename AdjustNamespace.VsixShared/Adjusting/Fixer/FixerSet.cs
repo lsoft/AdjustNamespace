@@ -67,13 +67,6 @@ namespace AdjustNamespace.Adjusting.Fixer
         {
             if (_openFilesToEnableUndo)
             {
-                //await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-                //VsShellUtilities.OpenDocument(ServiceProvider.GlobalProvider, FilePath, Guid.Empty, out _, out _, out IVsWindowFrame? frame);
-                //IVsTextView? nativeView = VsShellUtilities.GetTextView(frame);
-
-                //await Task.Delay(2000);
-                //var dh = new VisualStudioDocumentHelper(FilePath);
-                //dh.OpenAndNavigate(0, 0, 0, 0);
                 _vss.OpenFile(FilePath);
             }
 

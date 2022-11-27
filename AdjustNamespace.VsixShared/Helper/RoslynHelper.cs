@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -8,16 +9,11 @@ namespace AdjustNamespace.Helper
 {
     public static class RoslynHelper
     {
-        public static QualifiedNameSyntax? Upper(
+        public static QualifiedNameSyntax? ToUpperSymbol(
             this QualifiedNameSyntax qns,
             SemanticModel semanticModel
             )
         {
-            //if (qns.Left.Kind() != SyntaxKind.QualifiedName)
-            //{
-            //    return qns;
-            //}
-
             while (true)
             {
                 var symbol = semanticModel.GetSymbolInfo(qns.Left).Symbol;
@@ -39,22 +35,6 @@ namespace AdjustNamespace.Helper
                 qns = pqns;
             }
 
-
-            //while (true)
-            //{
-            //    if (qns.Left.Kind() != SyntaxKind.QualifiedName)
-            //    {
-            //        return (qns.Parent as QualifiedNameSyntax)!;
-            //    }
-
-            //    var pqns = qns.Left as QualifiedNameSyntax;
-            //    if (pqns == null)
-            //    {
-            //        return qns;
-            //    }
-
-            //    qns = pqns;
-            //}
         }
 
         public static bool IsGlobal(this SyntaxNode node)
@@ -67,14 +47,9 @@ namespace AdjustNamespace.Helper
             return node.ToString().StartsWith("global::");
         }
 
-        public static T? UpTo<T>(this SyntaxNode node)
+        public static T? ToUpperSyntax<T>(this SyntaxNode node)
             where T : SyntaxNode
         {
-            //if (node is T t)
-            //{
-            //    return t;
-            //}
-
             while (node != null)
             {
                 if (!(node.Parent is T))
@@ -83,6 +58,40 @@ namespace AdjustNamespace.Helper
                 }
 
                 node = node.Parent;
+            }
+
+            return default;
+        }
+
+        public static SyntaxNode? GoDownTo(this SyntaxNode node, Type targetType)
+        {
+            if (node.GetType() == targetType)
+            {
+                return node;
+            }
+
+            var toProcess = node.ChildNodes().ToList();
+
+            while (toProcess.Count > 0)
+            {
+                //check any children to match
+                foreach (var child in toProcess)
+                {
+                    if (child.GetType() == targetType)
+                    {
+                        return child;
+                    }
+                }
+
+                //not found in direct children
+                //get children from next level of depth
+                var toProcess2 = new List<SyntaxNode>();
+                foreach (var child in toProcess)
+                {
+                    toProcess2.AddRange(child.ChildNodes());
+                }
+
+                toProcess = toProcess2;
             }
 
             return default;

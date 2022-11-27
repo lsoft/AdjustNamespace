@@ -135,7 +135,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             }
             else if (syntax.Parent is MemberAccessExpressionSyntax maes)
             {
-                var maesr = maes.UpTo<MemberAccessExpressionSyntax>()!;
+                var maesr = maes.ToUpperSyntax<MemberAccessExpressionSyntax>()!;
 
                 ProcessMemberAccessExpression(
                     location,
@@ -161,7 +161,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             QualifiedNameSyntax qns
             )
         {
-            var uqns = qns.Upper(semanticModel);
+            var uqns = qns.ToUpperSymbol(semanticModel);
             if (uqns == null)
             {
                 //we found FullyQualifiedName like `Class1.NestedClass2`
@@ -182,31 +182,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 .WithLeadingTrivia(uqns.GetLeadingTrivia())
                 .WithTrailingTrivia(uqns.GetTrailingTrivia())
                 ;
-            //_vss.OpenFile(location.Document.FilePath);
-
-            //await _workspace.ApplyModifiedDocumentAsync(
-            //    location.Document.FilePath,
-            //    (document, syntaxRoot) =>
-            //    {
-            //        var mSyntaxRoot = syntaxRoot.ReplaceNodes(
-            //            _arguments.ConvertAll(a => a.SourceSyntax),
-            //            (n0, n1) =>
-            //            {
-            //                var founda = _arguments.First(a => ReferenceEquals(a.SourceSyntax, n0));
-
-            //                return founda.ToReplaceSyntax;
-            //            });
-
-            //        var changedDocument = document.WithSyntaxRoot(mSyntaxRoot);
-            //        return changedDocument;
-            //    }
-            //    );
 
             _fixerContainer
                 .Fixer<QualifiedNameFixer>(location.Document.FilePath!)
                 .AddSubject(
                     new QualifiedNameFixer.QualifiedNameFixerArgument(
-                        uqns,
+                        uqns.Span,
                         mqns
                         )
                     );
@@ -259,7 +240,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 .Fixer<QualifiedNameFixer>(location.Document.FilePath!)
                 .AddSubject(
                     new QualifiedNameFixer.QualifiedNameFixerArgument(
-                        maes,
+                        maes.Span,
                         modifiedMaesr
                         )
                     );
