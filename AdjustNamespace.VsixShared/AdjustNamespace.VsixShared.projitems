@@ -80,6 +80,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Window\EditSkippedPathsWindow.xaml.cs">
       <DependentUpon>EditSkippedPathsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\ClosedXamlBodyProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\IXamlBodyProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXamlPerformable.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXamlPositioned.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXmlnsProvider.cs" />
@@ -88,6 +90,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlControl.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlDocument.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlEngine.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\OpenedXamlBodyProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlX.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlXmlns.cs" />
   </ItemGroup>

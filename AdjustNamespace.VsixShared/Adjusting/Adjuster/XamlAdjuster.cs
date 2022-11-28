@@ -11,10 +11,14 @@ namespace AdjustNamespace.Adjusting
     /// </summary>
     public class XamlAdjuster : IAdjuster
     {
+        private readonly VsServices _vss;
         private readonly string _subjectFilePath;
         private readonly string _targetNamespace;
+        private readonly bool _openFilesToEnableUndo;
 
         public XamlAdjuster(
+            VsServices vss,
+            bool openFilesToEnableUndo,
             string subjectFilePath,
             string targetNamespace
             )
@@ -29,13 +33,19 @@ namespace AdjustNamespace.Adjusting
                 throw new ArgumentNullException(nameof(targetNamespace));
             }
 
+            _vss = vss;
+            _openFilesToEnableUndo = openFilesToEnableUndo;
             _subjectFilePath = subjectFilePath;
             _targetNamespace = targetNamespace;
         }
 
         public Task<bool> AdjustAsync()
         {
-            var xamlEngine = new XamlEngine(_subjectFilePath);
+            var xamlEngine = new XamlEngine(
+                _vss,
+                _openFilesToEnableUndo,
+                _subjectFilePath
+                );
 
             if (!xamlEngine.GetRootInfo(out var rootNamespace, out var rootName))
             {

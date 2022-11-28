@@ -1,4 +1,10 @@
-﻿using System;
+﻿using AdjustNamespace.Helper;
+using AdjustNamespace.Xaml.BodyProvider;
+using EnvDTE;
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio.TextManager.Interop;
+using System;
 
 namespace AdjustNamespace.Xaml
 {
@@ -6,19 +12,36 @@ namespace AdjustNamespace.Xaml
     {
         private readonly XamlDocument _document;
 
-        public XamlEngine(string xamlFilePath)
+        public bool ChangesExists => _document.ChangesExists;
+
+        public XamlEngine(
+            VsServices vss,
+            bool openFilesToEnableUndo,
+            string xamlFilePath
+            )
         {
             if (xamlFilePath is null)
             {
                 throw new ArgumentNullException(nameof(xamlFilePath));
             }
 
+            IXamlBodyProvider bodyProvider;
+            if (openFilesToEnableUndo)
+            {
+                var obp = new OpenedXamlBodyProvider(vss, xamlFilePath);
+                obp.Open();
+
+                bodyProvider = obp;
+            }
+            else
+            {
+                bodyProvider = new ClosedXamlBodyProvider(xamlFilePath);
+            }
+
             _document = new XamlDocument(
-                xamlFilePath
+                bodyProvider
                 );
         }
-
-
 
         public void MoveObject(
             string sourceNamespace,
@@ -60,7 +83,7 @@ namespace AdjustNamespace.Xaml
             _document.SaveIfChangesExists();
         }
 
-        internal bool GetRootInfo(out string? rootNamespace, out string? rootName)
+        public bool GetRootInfo(out string? rootNamespace, out string? rootName)
         {
             return _document.GetRootInfo(out rootNamespace, out rootName);
         }

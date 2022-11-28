@@ -1,6 +1,6 @@
-﻿using System;
+﻿using AdjustNamespace.Xaml.BodyProvider;
+using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -8,42 +8,52 @@ namespace AdjustNamespace.Xaml
 {
     public class XamlDocument : IXmlnsProvider
     {
-        private readonly string _xamlFilePath;
+        private readonly IXamlBodyProvider _bodyProvider;
+
         private string _xaml;
 
         private bool _changesExists = false;
 
+        public bool ChangesExists => _changesExists;
+
         public XamlX XPrefix
         {
-            get; private set;
+            get;
+            private set;
         } = null!;
         public List<XamlXmlns> Xmlns
         {
-            get; private set;
+            get;
+            private set;
         } = null!;
         public List<XamlControl> Controls
         {
-            get; private set;
+            get;
+            private set;
         } = null!;
         public List<XamlAttributeReference> RefFroms
         {
-            get; private set;
+            get;
+            private set;
         } = null!;
         public List<XamlClass> Classes
         {
-            get; private set;
+            get;
+            private set;
         } = null!;
 
         public XamlDocument(
-            string xamlFilePath
+            IXamlBodyProvider bodyProvider
             )
         {
-            if (xamlFilePath == null)
-                throw new ArgumentNullException(nameof(xamlFilePath));
+            if (bodyProvider is null)
+            {
+                throw new ArgumentNullException(nameof(bodyProvider));
+            }
 
-            _xamlFilePath = xamlFilePath;
+            _bodyProvider = bodyProvider;
 
-            _xaml = File.ReadAllText(xamlFilePath);
+            _xaml = bodyProvider.ReadText();
 
             Reload();
         }
@@ -243,7 +253,7 @@ namespace AdjustNamespace.Xaml
                 return;
             }
             
-            File.WriteAllText(_xamlFilePath, _xaml);
+            _bodyProvider.UpdateText(_xaml);
         }
 
         internal bool GetRootInfo(out string? rootNamespace, out string? rootName)

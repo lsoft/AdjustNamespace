@@ -8,7 +8,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
 {
     public class SelectFileViewModel : BaseViewModel, ISelectItemViewModel
     {
-        private readonly SelectFolderViewModel _parentViewModel;
+        private SelectFolderViewModel? _parentViewModel;
 
         private bool _isChecked; //file cannot be in the middle state
         private bool _isSelected;
@@ -32,7 +32,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
             {
                 _isChecked = value.GetValueOrDefault(false);
                 OnPropertyChanged(nameof(IsChecked));
-                _parentViewModel.RefreshStatus();
+                _parentViewModel?.RefreshStatus();
             }
         }
 
@@ -71,6 +71,11 @@ namespace AdjustNamespace.UI.ViewModel.Select
             ItemPath = fileEx.FileName;
             _parentViewModel = parentViewModel;
             IsChecked = true;
+        }
+
+        public void Clear()
+        {
+            _parentViewModel = null;
         }
     }
 }

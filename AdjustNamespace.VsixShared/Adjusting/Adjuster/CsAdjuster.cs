@@ -89,14 +89,16 @@ namespace AdjustNamespace.Adjusting
 
             var fixerContainer = new FixerContainer(_vss, _openFilesToEnableUndo);
 
+            var processedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+
             //fix refs (adding a new using namespace clauses or edit fully qualified names)
-            var processedTypes = await FixReferencesAsync(
+            await FixReferencesAsync(
+                processedTypes,
                 subjectSyntaxRoot,
                 subjectSemanticModel,
                 ntc,
                 fixerContainer
                 );
-
 
             //fix namespaces of the current file
             fixerContainer.Fixer<NamespaceFixer>(subjectDocument.FilePath!)
@@ -115,14 +117,14 @@ namespace AdjustNamespace.Adjusting
             return true;
         }
 
-        private async Task<HashSet<INamedTypeSymbol>> FixReferencesAsync(
+        private async Task FixReferencesAsync(
+            HashSet<INamedTypeSymbol> processedTypes,
             SyntaxNode syntaxRoot,
             SemanticModel semanticModel,
             NamespaceTransitionContainer ntc,
             FixerContainer fixerContainer
             )
         {
-            var processedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
 
             var foundSyntaxes = (
                 from snode in syntaxRoot.DescendantNodes()
@@ -161,8 +163,6 @@ namespace AdjustNamespace.Adjusting
                 processedTypes.Add(symbolInfo);
                 _namespaceCenter.TypeRemoved(symbolInfo);
             }
-
-            return processedTypes;
         }
 
         private void FixReferenceInXamlFiles(
@@ -182,7 +182,11 @@ namespace AdjustNamespace.Adjusting
                     continue;
                 }
 
-                var xamlEngine = new XamlEngine(xamlFilePath);
+                var xamlEngine = new XamlEngine(
+                    _vss,
+                    _openFilesToEnableUndo,
+                    xamlFilePath
+                    );
 
                 foreach (var processedType in processedTypes)
                 {

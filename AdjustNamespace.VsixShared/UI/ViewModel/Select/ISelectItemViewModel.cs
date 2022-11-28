@@ -27,5 +27,10 @@ namespace AdjustNamespace.UI.ViewModel.Select
         {
             get;
         }
+
+        /// <summary>
+        /// Clear the references to the parent.
+        /// </summary>
+        void Clear();
     }
 }

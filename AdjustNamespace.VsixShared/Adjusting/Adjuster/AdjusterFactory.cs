@@ -92,7 +92,12 @@ namespace AdjustNamespace.Adjusting.Adjuster
             {
                 //it's a xaml
 
-                var xamlAdjuster = new XamlAdjuster(subjectFilePath, targetNamespace!);
+                var xamlAdjuster = new XamlAdjuster(
+                    _vss,
+                    _openFilesToEnableUndo,
+                    subjectFilePath,
+                    targetNamespace!
+                    );
                 return xamlAdjuster;
             }
             else

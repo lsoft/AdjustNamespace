@@ -12,7 +12,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
         private List<SelectFileViewModel> _files;
 
         private bool _isSelected;
-        private readonly SelectedStepViewModel _parent;
+        private SelectedStepViewModel? _parent;
 
         public IReadOnlyList<SelectFileViewModel> Files => _files;
 
@@ -45,7 +45,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
                     file.SetCheckedStatusFromParent(value.GetValueOrDefault(false));
                 }
 
-                _parent.RefreshStatus();
+                _parent?.RefreshStatus();
                 OnPropertyChanged(nameof(IsChecked));
             }
         }
@@ -100,8 +100,13 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
         public void RefreshStatus()
         {
-            _parent.RefreshStatus();
+            _parent?.RefreshStatus();
             OnPropertyChanged();
+        }
+
+        public void Clear()
+        {
+            _parent = null;
         }
     }
 }

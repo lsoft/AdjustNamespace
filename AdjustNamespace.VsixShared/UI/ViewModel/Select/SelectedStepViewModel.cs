@@ -106,6 +106,7 @@ namespace AdjustNamespace.UI.ViewModel
                         {
                             if (a is DialogWindow w)
                             {
+                                Cleanup();
                                 w.Close();
                             }
                         }
@@ -130,6 +131,8 @@ namespace AdjustNamespace.UI.ViewModel
                                 .Select(s => s.FileEx!.Value.FilePath)
                                 .ToList();
                             var pp = new PerformingParameters(filePaths, _openFilesToEnableUndo);
+
+                            Cleanup();
 
                             await _nextStepFactory.CreateAsync(pp);
                         },
@@ -247,6 +250,15 @@ namespace AdjustNamespace.UI.ViewModel
             {
                 OpenFilesToEnableUndo = false;
             }
+        }
+
+        /// <summary>
+        /// Clear the circular references to avoid possible difficulties for GC to grab that objects.
+        /// </summary>
+        private void Cleanup()
+        {
+            ToFilterItems.ForEach(i => i.Clear());
+            ToFilterItems.Clear();
         }
     }
 }
