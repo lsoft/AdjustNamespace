@@ -187,12 +187,6 @@ namespace AdjustNamespace.UI.ViewModel
 
                 MainMessage = $"Processing {subjectFilePath}";
 
-                var roslynProject = _vss.Workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProject.FullPath);
-                if (roslynProject == null)
-                {
-                    continue;
-                }
-
                 if (subjectFilePath.EndsWith(".xaml"))
                 {
                     //we want to process XAML documents! no need for additional checks
@@ -220,7 +214,7 @@ namespace AdjustNamespace.UI.ViewModel
                     continue;
                 }
 
-                var targetNamespace = await roslynProject.TryDetermineTargetNamespaceAsync(subjectFilePath, _vss);
+                var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(subjectProject, subjectFilePath, _vss);
                 if (string.IsNullOrEmpty(targetNamespace))
                 {
                     continue;

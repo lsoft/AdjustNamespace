@@ -61,7 +61,7 @@ namespace AdjustNamespace.Helper
         }
 
         public static async Task<string?> TryDetermineTargetNamespaceAsync(
-            this Microsoft.CodeAnalysis.Project project,
+            this SolutionItem project,
             string documentFilePath,
             VsServices vss
             )
@@ -76,7 +76,7 @@ namespace AdjustNamespace.Helper
                 throw new ArgumentNullException(nameof(documentFilePath));
             }
 
-            var projectFolderPath = new FileInfo(project.FilePath).Directory.FullName;
+            var projectFolderPath = new FileInfo(project.FullPath).Directory.FullName;
             var documentFolderPath = new FileInfo(documentFilePath).Directory.FullName;
 
             if (documentFolderPath.Length < projectFolderPath.Length || !documentFolderPath.StartsWith(projectFolderPath))
@@ -107,14 +107,9 @@ namespace AdjustNamespace.Helper
         private static async Task<string> GetProjectDefaultNamespaceAsync(
             VsServices vss,
             string documentFilePath,
-            Microsoft.CodeAnalysis.Project project
+            SolutionItem project
             )
         {
-            if (!string.IsNullOrEmpty(project.DefaultNamespace))
-            {
-                return project.DefaultNamespace!;
-            }
-
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             var pi = vss.Dte.Solution.FindProjectItem(documentFilePath);
@@ -123,7 +118,7 @@ namespace AdjustNamespace.Helper
                 var cp = pi.ContainingProject;
                 if(cp != null)
                 {
-                    if (cp.Kind == SolutionHelper.DatabaseProjectKind)
+                    if (cp.Kind.In(SolutionHelper.CSharpProjectKind, SolutionHelper.DatabaseProjectKind))
                     {
                         var prop = cp.Properties;
                         if (prop != null)
@@ -137,6 +132,12 @@ namespace AdjustNamespace.Helper
                     }
                 }
             }
+
+            //get roslynProject by SolutionItem project
+            //if (!string.IsNullOrEmpty(roslynProject.DefaultNamespace))
+            //{
+            //    return project.DefaultNamespace!;
+            //}
 
             //var (r, p, _) = await SolutionHelper.TryGetProjectItemAsync(documentFilePath);
             //if (r)

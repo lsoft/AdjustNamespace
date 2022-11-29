@@ -14,14 +14,8 @@ namespace AdjustNamespace.Helper
 {
     public static class SolutionHelper
     {
-        //public const string SolutionKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
-
-        //public const string ProjectItemKindFolder = "{6BB5F8EF-4483-11D3-8BCF-00C04F8EC28C}";
-        //public const string ProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
-
         public const string DatabaseProjectKind = "{00d1a9c2-b5f0-4af3-8072-f6c62b433612}";
-        //public const string DatabaseProjectItemKindFolder = "{6bb5f8ef-4483-11d3-8bcf-00c04f8ec28c}";
-        //public const string DatabaseProjectItemKindFile = "{6BB5F8EE-4483-11D3-8BCF-00C04F8EC28C}";
+        public const string CSharpProjectKind = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
 
 
         public static bool IsProjectOfType(this SolutionItem project, string projectType)

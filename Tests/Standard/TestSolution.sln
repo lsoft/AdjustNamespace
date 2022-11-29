@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NewFolder2", "NewFolder2", 
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NewFolder3", "NewFolder3", "{426939EF-91E0-40F4-B093-11682B5B6469}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "TestSharedProject", "TestSharedProject\TestSharedProject.shproj", "{CD802BC9-8F39-412C-9929-4536B0EAD347}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -34,12 +36,17 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{C58A4EE1-4B9A-458C-8251-373D3BCC0D6E} = {5D243CC9-770E-4A16-9F6F-4FB13C463803}
+		{C58A4EE1-4B9A-458C-8251-373D3BCC0D6E} = {877DB1BD-DBBB-4997-9B26-EBA7518D5FE1}
 		{E3D2AA90-FB0D-410A-B9FE-7EFD5AB9FA94} = {426939EF-91E0-40F4-B093-11682B5B6469}
 		{877DB1BD-DBBB-4997-9B26-EBA7518D5FE1} = {5D243CC9-770E-4A16-9F6F-4FB13C463803}
 		{426939EF-91E0-40F4-B093-11682B5B6469} = {877DB1BD-DBBB-4997-9B26-EBA7518D5FE1}
+		{CD802BC9-8F39-412C-9929-4536B0EAD347} = {5D243CC9-770E-4A16-9F6F-4FB13C463803}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AE24893F-C804-40AF-BE98-551D4E1E79D9}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		TestSharedProject\TestSharedProject.projitems*{c58a4ee1-4b9a-458c-8251-373d3bcc0d6e}*SharedItemsImports = 5
+		TestSharedProject\TestSharedProject.projitems*{cd802bc9-8f39-412c-9929-4536b0ead347}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

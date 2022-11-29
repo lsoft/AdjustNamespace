@@ -77,13 +77,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 return null;
             }
 
-            var roslynProject = _vss.Workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProject!.FullPath);
-            if (roslynProject == null)
-            {
-                return null;
-            }
-
-            var targetNamespace = await roslynProject.TryDetermineTargetNamespaceAsync(subjectFilePath, _vss);
+            var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(subjectProject!, subjectFilePath, _vss);
             if (string.IsNullOrEmpty(targetNamespace))
             {
                 return null;
