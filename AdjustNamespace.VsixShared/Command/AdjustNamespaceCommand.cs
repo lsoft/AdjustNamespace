@@ -1,22 +1,26 @@
-﻿using AdjustNamespace.Window;
+﻿using AdjustNamespace.Helper;
+using AdjustNamespace.Window;
+using EnvDTE;
 using Microsoft.VisualStudio.Shell;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.Design;
+using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio;
+using System.Runtime.InteropServices;
+using System.Linq;
 
-namespace AdjustNamespace
+namespace AdjustNamespace.Command
 {
     /// <summary>
     /// Command handler
     /// </summary>
-    internal sealed class EditSkippedPathsCommand
+    internal sealed class AdjustNamespaceCommand
     {
-        public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
-
-
         /// <summary>
         /// Command ID.
         /// </summary>
-        public const int CommandId = 0x0302;
+        public const int CommandId = 0x0300;
 
         /// <summary>
         /// Command menu group (command set GUID).
@@ -34,7 +38,7 @@ namespace AdjustNamespace
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
         /// <param name="commandService">Command service to add command to, not null.</param>
-        private EditSkippedPathsCommand(AsyncPackage package, OleMenuCommandService commandService)
+        private AdjustNamespaceCommand(AsyncPackage package, OleMenuCommandService commandService)
         {
             this.package = package ?? throw new ArgumentNullException(nameof(package));
             commandService = commandService ?? throw new ArgumentNullException(nameof(commandService));
@@ -47,7 +51,7 @@ namespace AdjustNamespace
         /// <summary>
         /// Gets the instance of the command.
         /// </summary>
-        public static EditSkippedPathsCommand? Instance
+        public static AdjustNamespaceCommand? Instance
         {
             get;
             private set;
@@ -73,7 +77,7 @@ namespace AdjustNamespace
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
 
             var commandService = await package.GetServiceAsync(typeof(IMenuCommandService)) as OleMenuCommandService;
-            Instance = new EditSkippedPathsCommand(package, commandService!);
+            Instance = new AdjustNamespaceCommand(package, commandService!);
         }
 
         /// <summary>
@@ -89,12 +93,34 @@ namespace AdjustNamespace
 
             try
             {
+                //HashSet is needed to remove duplicates paths
+                //this is possible if you click Adjust on xaml file (with cs behind)
+                var filePaths = new HashSet<string>();
+
                 var vss = await VsServices.CreateAsync(ServiceProvider);
 
-                var w = new EditSkippedPathsWindow(
-                    vss
-                    );
-                w.ShowDialog();
+                if (vss.Dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
+                {
+                    var sew = await VS.Windows.GetSolutionExplorerWindowAsync();
+                    if (sew != null)
+                    {
+                        var selection = await sew.GetSelectionAsync();
+
+                        foreach (var item in selection)
+                        {
+                            var files = item.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, null);
+                            filePaths.AddRange(
+                                files.ConvertAll(i => i.FullPath!).FindAll(i => !string.IsNullOrEmpty(i))
+                                );
+                        }
+                    }
+                }
+
+                if (filePaths.Count > 0)
+                {
+                    var window = AdjustNamespaceWindow.Create(vss, filePaths);
+                    window.ShowModal();
+                }
             }
             catch (Exception excp)
             {

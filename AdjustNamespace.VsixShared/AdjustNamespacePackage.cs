@@ -2,6 +2,7 @@
 global using Microsoft.VisualStudio.Shell;
 global using System;
 global using Task = System.Threading.Tasks.Task;
+using AdjustNamespace.Command;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -19,6 +20,7 @@ namespace AdjustNamespace
             
             await AdjustNamespaceCommand.InitializeAsync(this);
             await AdjustSolutionCommand.InitializeAsync(this);
+            await AdjustSelectedCommand.InitializeAsync(this);
             await EditSkippedPathsCommand.InitializeAsync(this);
 
             await this.RegisterCommandsAsync();

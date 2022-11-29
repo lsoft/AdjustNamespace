@@ -5,12 +5,12 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 
-namespace AdjustNamespace
+namespace AdjustNamespace.Command
 {
     /// <summary>
     /// Command handler
     /// </summary>
-    internal sealed class AdjustSolutionCommand
+    internal sealed class AdjustSelectedCommand
     {
         public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
 
@@ -18,7 +18,7 @@ namespace AdjustNamespace
         /// <summary>
         /// Command ID.
         /// </summary>
-        public const int CommandId = 0x0301;
+        public const int CommandId = 0x0302;
 
         /// <summary>
         /// Command menu group (command set GUID).
@@ -36,7 +36,7 @@ namespace AdjustNamespace
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
         /// <param name="commandService">Command service to add command to, not null.</param>
-        private AdjustSolutionCommand(AsyncPackage package, OleMenuCommandService commandService)
+        private AdjustSelectedCommand(AsyncPackage package, OleMenuCommandService commandService)
         {
             this.package = package ?? throw new ArgumentNullException(nameof(package));
             commandService = commandService ?? throw new ArgumentNullException(nameof(commandService));
@@ -49,7 +49,7 @@ namespace AdjustNamespace
         /// <summary>
         /// Gets the instance of the command.
         /// </summary>
-        public static AdjustSolutionCommand? Instance
+        public static AdjustSelectedCommand? Instance
         {
             get;
             private set;
@@ -75,7 +75,7 @@ namespace AdjustNamespace
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
 
             var commandService = await package.GetServiceAsync(typeof(IMenuCommandService)) as OleMenuCommandService;
-            Instance = new AdjustSolutionCommand(package, commandService!);
+            Instance = new AdjustSelectedCommand(package, commandService!);
         }
 
         /// <summary>
@@ -95,9 +95,21 @@ namespace AdjustNamespace
 
                 //HashSet is needed to remove duplicates paths
                 //this is possible if you click Adjust on xaml file (with cs behind)
-                var filePaths = new HashSet<string>(
-                    await SolutionHelper.GetAllFilesFromAsync()
-                    );
+                var filePaths = new HashSet<string>();
+
+                var sew = await VS.Windows.GetSolutionExplorerWindowAsync();
+                if (sew != null)
+                {
+                    var selection = await sew.GetSelectionAsync();
+
+                    foreach (var item in selection)
+                    {
+                        var files = item.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, null);
+                        filePaths.AddRange(
+                            files.ConvertAll(i => i.FullPath!).FindAll(i => !string.IsNullOrEmpty(i))
+                            );
+                    }
+                }
 
                 if (filePaths.Count > 0)
                 {

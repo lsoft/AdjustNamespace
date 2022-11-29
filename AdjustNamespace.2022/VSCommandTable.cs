@@ -33,7 +33,8 @@ namespace AdjustNamespace
         public const int ExtensionSubMenuGroupService = 0x2020;
         public const int DoAdjustCommandId = 0x0300;
         public const int AdjustSolutionCommandId = 0x0301;
-        public const int EditSkippedPathsCommandId = 0x0302;
+        public const int AdjustSelectedCommandId = 0x0302;
+        public const int EditSkippedPathsCommandId = 0x0322;
         public const int order16 = 0x0001;
     }
 }

@@ -10,10 +10,10 @@
       <Group guid="guidAdjustNamespacePackageCmdSet" id="ExtensionMenuGroup" priority="0x0601">
         <Parent guid="guidSHLMainMenu" id="IDM_VS_TOOL_MAINMENU" />
       </Group>
-      <Group guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroup" priority="0x0100">
+      <Group guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroup" priority="0x0010">
         <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenu" />
       </Group>
-      <Group guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroupService" priority="0x0010">
+      <Group guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroupService" priority="0x0100">
         <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenu" />
       </Group>
 
@@ -53,16 +53,24 @@
         </Strings>
       </Button>
 
-      <Button guid="guidAdjustNamespacePackageCmdSet" id="AdjustSolutionCommandId" priority="0x0104" type="Button">
-        <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroupService" />
+      <Button guid="guidAdjustNamespacePackageCmdSet" id="AdjustSolutionCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroup" />
         <Icon guid="guidImages" id="order16" />
         <Strings>
           <ButtonText>Adjust namespaces in solution...</ButtonText>
         </Strings>
       </Button>
 
-      <Button guid="guidAdjustNamespacePackageCmdSet" id="EditSkippedPathsCommandId" priority="0x0105" type="Button">
+      <Button guid="guidAdjustNamespacePackageCmdSet" id="AdjustSelectedCommandId" priority="0x0110" type="Button">
         <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroup" />
+        <Icon guid="guidImages" id="order16" />
+        <Strings>
+          <ButtonText>Adjust namespaces in selected...</ButtonText>
+        </Strings>
+      </Button>
+
+      <Button guid="guidAdjustNamespacePackageCmdSet" id="EditSkippedPathsCommandId" priority="0x0200" type="Button">
+        <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroupService" />
         <Strings>
           <ButtonText>Edit skipped paths...</ButtonText>
         </Strings>
@@ -89,7 +97,8 @@
 
       <IDSymbol name="DoAdjustCommandId" value="0x0300" />
       <IDSymbol name="AdjustSolutionCommandId" value="0x0301" />
-      <IDSymbol name="EditSkippedPathsCommandId" value="0x0302" />
+      <IDSymbol name="AdjustSelectedCommandId" value="0x0302" />
+      <IDSymbol name="EditSkippedPathsCommandId" value="0x0322" />
     </GuidSymbol>
 
     <GuidSymbol name="guidImages" value="{6309e701-5f02-4bc7-8376-02ec55028dbf}" >
