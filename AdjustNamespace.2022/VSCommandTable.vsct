@@ -18,17 +18,20 @@
       </Group>
 
       <Group guid="guidAdjustNamespacePackageCmdSet" id="ContextMenuGroup" priority="0x08e0">
-            <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_SOLNNODE"/>
-        </Group>
-        <Group guid="guidAdjustNamespacePackageCmdSet" id="ContextMenuGroup" priority="0x07e0">
-            <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_PROJNODE"/>
-        </Group>
-        <Group guid="guidAdjustNamespacePackageCmdSet" id="ContextMenuGroup" priority="0x05e0">
-            <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_FOLDERNODE"/>
-        </Group>
-        <Group guid="guidAdjustNamespacePackageCmdSet" id="ContextMenuGroup" priority="0x06e0">
-            <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE"/>
-        </Group>
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_SOLNNODE"/>
+      </Group>
+      <Group guid="guidAdjustNamespacePackageCmdSet" id="ContextMenuGroup" priority="0x07e0">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_PROJNODE"/>
+      </Group>
+      <Group guid="guidAdjustNamespacePackageCmdSet" id="ContextMenuGroup" priority="0x05e0">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_FOLDERNODE"/>
+      </Group>
+      <Group guid="guidAdjustNamespacePackageCmdSet" id="ContextMenuGroup" priority="0x06e0">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_ITEMNODE"/>
+      </Group>
+      <Group guid="guidAdjustNamespacePackageCmdSet" id="ContextMenuGroup" priority="0x06e0">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_SOLNFOLDER"/>
+      </Group>
     </Groups>
 
     <Menus>
@@ -49,7 +52,7 @@
           <ButtonText>Adjust namespaces...</ButtonText>
         </Strings>
       </Button>
-      
+
       <Button guid="guidAdjustNamespacePackageCmdSet" id="AdjustSolutionCommandId" priority="0x0104" type="Button">
         <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroupService" />
         <Icon guid="guidImages" id="order16" />
@@ -89,7 +92,7 @@
       <IDSymbol name="EditSkippedPathsCommandId" value="0x0302" />
     </GuidSymbol>
 
-      <GuidSymbol name="guidImages" value="{6309e701-5f02-4bc7-8376-02ec55028dbf}" >
+    <GuidSymbol name="guidImages" value="{6309e701-5f02-4bc7-8376-02ec55028dbf}" >
       <IDSymbol name="order16" value="1" />
     </GuidSymbol>
 

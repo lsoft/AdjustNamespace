@@ -63,7 +63,7 @@ namespace AdjustNamespace.Helper
 
         public static IReadOnlyList<string> EnumerateAllDocumentFilePaths(
             this Workspace workspace,
-            Func<Project, bool> projectPredicate,
+            Func<Microsoft.CodeAnalysis.Project, bool> projectPredicate,
             Func<Document, bool> documentPredicate
             )
         {

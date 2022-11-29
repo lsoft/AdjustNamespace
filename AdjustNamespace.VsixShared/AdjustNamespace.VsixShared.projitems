@@ -41,14 +41,11 @@
     <Compile Include="$(MSBuildThisFileDirectory)Logging.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceTransition.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceTransitionContainer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Options\General.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Settings\AdjustNamespaceSettings.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Settings\AdjustNamespaceSettings2.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Settings\SettingsReader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TypeContainer.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionModel.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Options\BaseOptionPage.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Options\DialogPageProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Options\GeneralOptions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Predicate.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)RelayCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Control\PerformingUserControl.xaml.cs">
@@ -115,8 +112,5 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="$(MSBuildThisFileDirectory)LICENSE.txt" />
   </ItemGroup>
 </Project>

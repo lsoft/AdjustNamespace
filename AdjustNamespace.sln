@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33027.239
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdjustNamespace.2019", "AdjustNamespace.2019\AdjustNamespace.2019.csproj", "{E36D5F78-82AF-4BFE-9147-3D70F51CE1FA}"
-EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "AdjustNamespace.VsixShared", "AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.shproj", "{B8F4DE5D-EEFF-4F14-9C3D-2A6EE41DB482}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdjustNamespace.2022", "AdjustNamespace.2022\AdjustNamespace.2022.csproj", "{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}"
@@ -12,17 +10,25 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|arm64 = Debug|arm64
+		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
+		Release|arm64 = Release|arm64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FA}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|arm64.ActiveCfg = Debug|Any CPU
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|arm64.Build.0 = Debug|Any CPU
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|x86.ActiveCfg = Debug|x86
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|x86.Build.0 = Debug|x86
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|arm64.ActiveCfg = Release|Any CPU
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|arm64.Build.0 = Release|Any CPU
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|x86.ActiveCfg = Release|x86
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -32,7 +38,6 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems*{b8f4de5d-eeff-4f14-9c3d-2a6ee41db482}*SharedItemsImports = 13
-		AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems*{e36d5f78-82af-4bfe-9147-3d70f51ce1fa}*SharedItemsImports = 4
 		AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems*{e36d5f78-82af-4bfe-9147-3d70f51ce1fb}*SharedItemsImports = 4
 	EndGlobalSection
 EndGlobal

@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Task = System.Threading.Tasks.Task;
 
 namespace AdjustNamespace.Adjusting.Fixer
 {
@@ -53,11 +52,11 @@ namespace AdjustNamespace.Adjusting.Fixer
             return (T)result;
         }
 
-        internal async Task FixAllAsync()
+        internal async System.Threading.Tasks.Task FixAllAsync()
         {
             if (_openFilesToEnableUndo)
             {
-                _vss.OpenFile(FilePath);
+                await _vss.OpenFileAsync(FilePath);
             }
 
             foreach (var fixer in _fixers)

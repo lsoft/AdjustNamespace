@@ -1,9 +1,7 @@
 ﻿using AdjustNamespace.UI.Control;
-using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
 using System.Windows.Controls;
-using Task = System.Threading.Tasks.Task;
 using AdjustNamespace.UI.ViewModel;
 
 namespace AdjustNamespace.UI.StepFactory
@@ -35,7 +33,7 @@ namespace AdjustNamespace.UI.StepFactory
             _nextStepFactory = nextStepFactory;
         }
 
-        public async Task CreateAsync(object argument)
+        public async System.Threading.Tasks.Task CreateAsync(object argument)
         {
             var v = new SelectedUserControl();
 

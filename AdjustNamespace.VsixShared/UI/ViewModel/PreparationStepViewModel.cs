@@ -187,7 +187,7 @@ namespace AdjustNamespace.UI.ViewModel
 
                 MainMessage = $"Processing {subjectFilePath}";
 
-                var roslynProject = _vss.Workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem!.ContainingProject.FullName);
+                var roslynProject = _vss.Workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProject.FullPath);
                 if (roslynProject == null)
                 {
                     continue;
@@ -283,7 +283,8 @@ namespace AdjustNamespace.UI.ViewModel
             var fileExtensions = new List<FileExtension>(_filePaths.Count);
             foreach (var filePath in _filePaths)
             {
-                if (!_vss.Dte.Solution.TryGetProjectItem(filePath, out var subjectProject, out var subjectProjectItem))
+                var(r, subjectProject, subjectProjectItem) = await SolutionHelper.TryGetProjectItemAsync(filePath);
+                if (!r)
                 {
                     continue;
                 }
@@ -310,18 +311,25 @@ namespace AdjustNamespace.UI.ViewModel
         private readonly struct FileExtension
         {
             public readonly string FilePath;
-            public readonly EnvDTE.Project Project;
+            public readonly SolutionItem Project;
             public readonly string ProjectPath;
-            public readonly ProjectItem ProjectItem;
+            public readonly SolutionItem ProjectItem;
 
             public FileExtension(
                 string filePath,
-                EnvDTE.Project project,
-                ProjectItem projectItem
+                SolutionItem project,
+                SolutionItem projectItem
                 )
             {
-                Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
+                if (project is null)
+                {
+                    throw new ArgumentNullException(nameof(project));
+                }
 
+                if (projectItem is null)
+                {
+                    throw new ArgumentNullException(nameof(projectItem));
+                }
                 if (filePath is null)
                 {
                     throw new ArgumentNullException(nameof(filePath));
@@ -329,7 +337,7 @@ namespace AdjustNamespace.UI.ViewModel
 
                 FilePath = filePath;
                 Project = project;
-                ProjectPath = project.FullName;
+                ProjectPath = project.FullPath!;
                 ProjectItem = projectItem;
             }
 

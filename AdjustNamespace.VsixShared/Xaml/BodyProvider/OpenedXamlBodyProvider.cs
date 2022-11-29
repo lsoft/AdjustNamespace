@@ -1,22 +1,25 @@
 ﻿using AdjustNamespace.Helper;
+using Community.VisualStudio.Toolkit;
 using EnvDTE;
+using Microsoft.VisualStudio.Threading;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading;
 
 namespace AdjustNamespace.Xaml.BodyProvider
 {
     public sealed class OpenedXamlBodyProvider : IXamlBodyProvider
     {
         private readonly VsServices _vss;
-        
+        private DocumentView? _dw;
+
         public string XamlFilePath
         {
             get;
         }
 
-        private EnvDTE.Window? _w;
 
         public OpenedXamlBodyProvider(
             VsServices vss,
@@ -31,52 +34,46 @@ namespace AdjustNamespace.Xaml.BodyProvider
             XamlFilePath = xamlFilePath;
         }
 
-        public void Open()
+        public async Task OpenAsync()
         {
-            Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            if (!_vss.Dte.Solution.TryGetProjectItem(XamlFilePath, out var subjectProject, out var subjectProjectItem))
-            {
-                throw new InvalidOperationException($"File {XamlFilePath} not found!");
-            }
+            //var (r, subjectProject, subjectProjectItem) = await SolutionHelper.TryGetProjectItemAsync(XamlFilePath);
 
-            var w = subjectProjectItem!.Open();
-            w.Visible = true;
-            //no need for this: w.Activate();
+            //if (!r)
+            //{
+            //    throw new InvalidOperationException($"File {XamlFilePath} not found!");
+            //}
 
-            _w = w;
+            _dw = await VS.Documents.OpenViaProjectAsync(XamlFilePath);
         }
 
         public string ReadText()
         {
             Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
 
-            if (_w == null)
+            if (_dw == null)
             {
                 throw new InvalidOperationException("Please open document before retrieving its text");
             }
 
-            var textDocument = (TextDocument)_w.Document.Object("TextDocument");
-            var textSelection = textDocument.Selection;
-            textSelection.SelectAll();
-            var t = textSelection.Text;
-
-            return t;
+            var result = _dw!.TextView!.TextSnapshot.GetText();
+            return result;
         }
 
         public void UpdateText(string text)
         {
             Microsoft.VisualStudio.Shell.ThreadHelper.ThrowIfNotOnUIThread();
 
-            if (_w == null)
+            if (_dw == null)
             {
                 throw new InvalidOperationException("Please open document before saving its text");
             }
 
-            var textDocument = (TextDocument)_w.Document.Object("TextDocument");
-            var textSelection = textDocument.Selection;
-            textSelection.SelectAll();
-            textSelection.Insert(text);
+            var edit = _dw!.TextView!.TextBuffer.CreateEdit();
+            edit.Delete(0, edit.Snapshot.GetText().Length);
+            edit.Insert(0, text);
+            edit.Apply();
         }
     }
 }

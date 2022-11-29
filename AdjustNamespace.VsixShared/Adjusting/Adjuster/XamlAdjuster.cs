@@ -39,9 +39,9 @@ namespace AdjustNamespace.Adjusting
             _targetNamespace = targetNamespace;
         }
 
-        public Task<bool> AdjustAsync()
+        public async Task<bool> AdjustAsync()
         {
-            var xamlEngine = new XamlEngine(
+            var xamlEngine = await XamlEngine.CreateAsync(
                 _vss,
                 _openFilesToEnableUndo,
                 _subjectFilePath
@@ -49,12 +49,12 @@ namespace AdjustNamespace.Adjusting
 
             if (!xamlEngine.GetRootInfo(out var rootNamespace, out var rootName))
             {
-                return Task.FromResult(false);
+                return false;
             }
 
             if (rootNamespace == _targetNamespace)
             {
-                return Task.FromResult(false);
+                return false;
             }
 
             xamlEngine.MoveObject(
@@ -65,7 +65,7 @@ namespace AdjustNamespace.Adjusting
 
             xamlEngine.SaveIfChangesExists();
 
-            return Task.FromResult(true);
+            return true;
         }
     }
 }

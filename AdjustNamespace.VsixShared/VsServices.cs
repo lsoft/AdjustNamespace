@@ -1,14 +1,9 @@
 ﻿using AdjustNamespace.Settings;
 using EnvDTE;
 using EnvDTE80;
-using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
-using Microsoft.VisualStudio.Shell;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace AdjustNamespace
@@ -63,13 +58,11 @@ namespace AdjustNamespace
                 );
         }
 
-        public void OpenFile(
+        public async Task OpenFileAsync(
             string documentFullPath
             )
         {
-            ThreadHelper.ThrowIfNotOnUIThread(nameof(OpenFile));
-
-            Dte.ItemOperations.OpenFile(documentFullPath, "{" + VSConstants.LOGVIEWID_TextView + "}");
+            _ = await VS.Documents.OpenAsync(documentFullPath);
         }
 
         public static async Task<VsServices> CreateAsync(

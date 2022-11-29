@@ -1,8 +1,20 @@
-﻿using System.ComponentModel;
+﻿using Community.VisualStudio.Toolkit;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 
 namespace AdjustNamespace.Options
 {
-    internal class GeneralOptions : BaseOptionModel<GeneralOptions>
+    internal partial class OptionsProvider
+    {
+        // Register the options with this attribute on your package class:
+        // [ProvideOptionPage(typeof(OptionsProvider.GeneralOptions), "AdjustNamespace2022", "General", 0, 0, true, SupportsProfiles = true)]
+        [ComVisible(true)]
+        public class GeneralOptions : BaseOptionPage<General>
+        {
+        }
+    }
+
+    public class General : BaseOptionModel<General>
     {
         [Category("General")]
         [DisplayName("FilesAdjusted")]

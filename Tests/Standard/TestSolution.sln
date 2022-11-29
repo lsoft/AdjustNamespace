@@ -7,6 +7,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestProject", "TestProject\
 EndProject
 Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "DatabaseProject", "DatabaseProject\DatabaseProject.sqlproj", "{E3D2AA90-FB0D-410A-B9FE-7EFD5AB9FA94}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NewFolder1", "NewFolder1", "{5D243CC9-770E-4A16-9F6F-4FB13C463803}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NewFolder2", "NewFolder2", "{877DB1BD-DBBB-4997-9B26-EBA7518D5FE1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NewFolder3", "NewFolder3", "{426939EF-91E0-40F4-B093-11682B5B6469}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,6 +32,12 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{C58A4EE1-4B9A-458C-8251-373D3BCC0D6E} = {5D243CC9-770E-4A16-9F6F-4FB13C463803}
+		{E3D2AA90-FB0D-410A-B9FE-7EFD5AB9FA94} = {426939EF-91E0-40F4-B093-11682B5B6469}
+		{877DB1BD-DBBB-4997-9B26-EBA7518D5FE1} = {5D243CC9-770E-4A16-9F6F-4FB13C463803}
+		{426939EF-91E0-40F4-B093-11682B5B6469} = {877DB1BD-DBBB-4997-9B26-EBA7518D5FE1}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AE24893F-C804-40AF-BE98-551D4E1E79D9}

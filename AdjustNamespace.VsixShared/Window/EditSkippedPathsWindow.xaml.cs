@@ -1,16 +1,8 @@
 ﻿using AdjustNamespace.Helper;
-using AdjustNamespace.Options;
-using AdjustNamespace.UI.StepFactory;
-using AdjustNamespace.Settings;
 using Microsoft.VisualStudio.PlatformUI;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Runtime;
 using System.Windows;
 using System.Windows.Forms;
-using static AdjustNamespace.Options.DialogPageProvider;
-using Task = System.Threading.Tasks.Task;
 
 namespace AdjustNamespace.Window
 {

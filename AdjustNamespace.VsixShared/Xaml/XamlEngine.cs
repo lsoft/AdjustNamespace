@@ -14,22 +14,31 @@ namespace AdjustNamespace.Xaml
 
         public bool ChangesExists => _document.ChangesExists;
 
-        public XamlEngine(
+        private XamlEngine(
+            IXamlBodyProvider bodyProvider
+            )
+        {
+            if (bodyProvider is null)
+            {
+                throw new ArgumentNullException(nameof(bodyProvider));
+            }
+
+            _document = new XamlDocument(
+                bodyProvider
+                );
+        }
+
+        public static async System.Threading.Tasks.Task<XamlEngine> CreateAsync(
             VsServices vss,
             bool openFilesToEnableUndo,
             string xamlFilePath
             )
         {
-            if (xamlFilePath is null)
-            {
-                throw new ArgumentNullException(nameof(xamlFilePath));
-            }
-
             IXamlBodyProvider bodyProvider;
             if (openFilesToEnableUndo)
             {
                 var obp = new OpenedXamlBodyProvider(vss, xamlFilePath);
-                obp.Open();
+                await obp.OpenAsync();
 
                 bodyProvider = obp;
             }
@@ -38,9 +47,7 @@ namespace AdjustNamespace.Xaml
                 bodyProvider = new ClosedXamlBodyProvider(xamlFilePath);
             }
 
-            _document = new XamlDocument(
-                bodyProvider
-                );
+            return new XamlEngine(bodyProvider);
         }
 
         public void MoveObject(

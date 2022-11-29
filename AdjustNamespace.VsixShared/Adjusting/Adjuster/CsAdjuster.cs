@@ -109,7 +109,7 @@ namespace AdjustNamespace.Adjusting
             await fixerContainer.FixAllAsync();
 
             //TODO: switch to IFixer infrastructure, and put above fixerContainer.FixAllAsync() clause
-            FixReferenceInXamlFiles(
+            await FixReferenceInXamlFilesAsync(
                 ntc,
                 processedTypes
                 );
@@ -165,7 +165,7 @@ namespace AdjustNamespace.Adjusting
             }
         }
 
-        private void FixReferenceInXamlFiles(
+        private async System.Threading.Tasks.Task FixReferenceInXamlFilesAsync(
             NamespaceTransitionContainer ntc,
             HashSet<INamedTypeSymbol> processedTypes
             )
@@ -182,24 +182,53 @@ namespace AdjustNamespace.Adjusting
                     continue;
                 }
 
-                var xamlEngine = new XamlEngine(
+                var testXamlEngine = await XamlEngine.CreateAsync(
                     _vss,
-                    _openFilesToEnableUndo,
+                    false,
                     xamlFilePath
                     );
 
-                foreach (var processedType in processedTypes)
+                PerformChanges(
+                    testXamlEngine,
+                    ntc,
+                    processedTypes
+                    );
+
+                //open XAML files only if changes exists
+                if (testXamlEngine.ChangesExists)
                 {
-                    var targetNamespaceInfo = ntc.TransitionDict[processedType.ContainingNamespace.ToDisplayString()];
-
-                    xamlEngine.MoveObject(
-                        processedType.ContainingNamespace.ToDisplayString(),
-                        processedType.Name,
-                        targetNamespaceInfo.ModifiedName
+                    var realXamlEngine = await XamlEngine.CreateAsync(
+                        _vss,
+                        _openFilesToEnableUndo,
+                        xamlFilePath
                         );
-                }
 
-                xamlEngine.SaveIfChangesExists();
+                    PerformChanges(
+                        realXamlEngine,
+                        ntc,
+                        processedTypes
+                        );
+
+                    realXamlEngine.SaveIfChangesExists();
+                }
+            }
+        }
+
+        private void PerformChanges(
+            XamlEngine xamlEngine,
+            NamespaceTransitionContainer ntc,
+            HashSet<INamedTypeSymbol> processedTypes
+            )
+        {
+            foreach (var processedType in processedTypes)
+            {
+                var targetNamespaceInfo = ntc.TransitionDict[processedType.ContainingNamespace.ToDisplayString()];
+
+                xamlEngine.MoveObject(
+                    processedType.ContainingNamespace.ToDisplayString(),
+                    processedType.Name,
+                    targetNamespaceInfo.ModifiedName
+                    );
             }
         }
     }

@@ -99,7 +99,7 @@ namespace AdjustNamespace.UI.ViewModel
 
             await System.Threading.Tasks.Task.Delay(750);
 
-            GeneralOptions.Instance.FilesAdjusted += _subjectFilePaths.Count;
+            General.Instance.FilesAdjusted += _subjectFilePaths.Count;
 
             _cts.Dispose();
             _formCloser();

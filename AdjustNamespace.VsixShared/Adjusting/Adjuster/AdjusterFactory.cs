@@ -27,7 +27,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
             }
 
             //get all xaml files in current solution
-            var filePaths = vss.Dte.Solution.ProcessSolution();
+            var filePaths = await SolutionHelper.GetAllFilesFromAsync();
             var xamlFilePaths = filePaths.FindAll(fp => fp.EndsWith(".xaml"));
 
             return new AdjusterFactory(
@@ -71,12 +71,13 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 throw new ArgumentNullException(nameof(subjectFilePath));
             }
 
-            if (!_vss.Dte.Solution.TryGetProjectItem(subjectFilePath, out var subjectProject, out var subjectProjectItem))
+            var (result, subjectProject, subjectProjectItem) = await SolutionHelper.TryGetProjectItemAsync(subjectFilePath);
+            if (!result)
             {
                 return null;
             }
 
-            var roslynProject = _vss.Workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProjectItem!.ContainingProject.FullName);
+            var roslynProject = _vss.Workspace.CurrentSolution.Projects.FirstOrDefault(p => p.FilePath == subjectProject!.FullPath);
             if (roslynProject == null)
             {
                 return null;

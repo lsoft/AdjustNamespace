@@ -1,17 +1,14 @@
 ﻿using AdjustNamespace.Helper;
 using AdjustNamespace.Window;
 using EnvDTE;
-using EnvDTE80;
-using Microsoft.VisualStudio.ComponentModelHost;
-using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
-using Task = System.Threading.Tasks.Task;
-using AdjustNamespace.UI.StepFactory;
+using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio;
+using System.Runtime.InteropServices;
 using System.Linq;
-using AdjustNamespace.Helper;
 
 namespace AdjustNamespace
 {
@@ -20,9 +17,6 @@ namespace AdjustNamespace
     /// </summary>
     internal sealed class AdjustNamespaceCommand
     {
-        public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
-
-
         /// <summary>
         /// Command ID.
         /// </summary>
@@ -78,7 +72,7 @@ namespace AdjustNamespace
         /// Initializes the singleton instance of the command.
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
-        public static async Task InitializeAsync(AsyncPackage package)
+        public static async System.Threading.Tasks.Task InitializeAsync(AsyncPackage package)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
 
@@ -107,27 +101,17 @@ namespace AdjustNamespace
 
                 if (vss.Dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
                 {
-                    var uih = vss.Dte.ToolWindows.SolutionExplorer;
-                    var selectedItems = (Array)uih.SelectedItems;
-
-                    if (null != selectedItems)
+                    var sew = await VS.Windows.GetSolutionExplorerWindowAsync();
+                    if (sew != null)
                     {
-                        foreach (UIHierarchyItem selItem in selectedItems)
+                        var selection = await sew.GetSelectionAsync();
+
+                        foreach (var item in selection)
                         {
-                            if ((selItem.Object as dynamic).ExtenderCATID == ProjectKind)
-                            {
-                                filePaths.AddRange(vss.Dte.Solution.ProcessSolution());
-                            }
-
-                            if (selItem.Object is EnvDTE.Project project)
-                            {
-                                filePaths.AddRange(project.ProcessProject());
-                            }
-
-                            if (selItem.Object is ProjectItem projectItem)
-                            {
-                                filePaths.AddRange(projectItem.ProcessProjectItem());
-                            }
+                            var files = item.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, null);
+                            filePaths.AddRange(
+                                files.ConvertAll(i => i.FullPath!).FindAll(i => !string.IsNullOrEmpty(i))
+                                );
                         }
                     }
                 }

@@ -1,5 +1,6 @@
 ﻿using AdjustNamespace.Namespace;
 using AdjustNamespace.Settings;
+using Community.VisualStudio.Toolkit;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.VisualStudio.Shell;
@@ -60,7 +61,7 @@ namespace AdjustNamespace.Helper
         }
 
         public static async Task<string?> TryDetermineTargetNamespaceAsync(
-            this Project project,
+            this Microsoft.CodeAnalysis.Project project,
             string documentFilePath,
             VsServices vss
             )
@@ -106,7 +107,7 @@ namespace AdjustNamespace.Helper
         private static async Task<string> GetProjectDefaultNamespaceAsync(
             VsServices vss,
             string documentFilePath,
-            Project project
+            Microsoft.CodeAnalysis.Project project
             )
         {
             if (!string.IsNullOrEmpty(project.DefaultNamespace))
@@ -116,13 +117,15 @@ namespace AdjustNamespace.Helper
 
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            if (vss.Dte.Solution.TryGetProjectItem(documentFilePath, out var vsp, out var _))
+            var pi = vss.Dte.Solution.FindProjectItem(documentFilePath);
+            if (pi != null)
             {
-                if (vsp != null)
+                var cp = pi.ContainingProject;
+                if(cp != null)
                 {
-                    if (vsp.Kind == SolutionHelper.DatabaseProjectKind)
+                    if (cp.Kind == SolutionHelper.DatabaseProjectKind)
                     {
-                        var prop = vsp.Properties;
+                        var prop = cp.Properties;
                         if (prop != null)
                         {
                             var dn = prop.Item("DefaultNamespace");
@@ -134,6 +137,29 @@ namespace AdjustNamespace.Helper
                     }
                 }
             }
+
+            //var (r, p, _) = await SolutionHelper.TryGetProjectItemAsync(documentFilePath);
+            //if (r)
+            //{
+            //    if (p != null)
+            //    {
+            //        if (p.IsProjectOfType(SolutionHelper.DatabaseProjectKind))
+            //        {
+            //            var dn = p.GetDefaultNamespace();
+            //            return dn;
+
+            //            //var prop = vsp.Properties;
+            //            //if (prop != null)
+            //            //{
+            //            //    var dn = prop.Item("DefaultNamespace");
+            //            //    if (dn != null)
+            //            //    {
+            //            //        return dn.Value.ToString();
+            //            //    }
+            //            //}
+            //        }
+            //    }
+            //}
 
             var dotIndex = project.Name.LastIndexOf(".");
             if(dotIndex <= 0)

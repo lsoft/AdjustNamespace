@@ -1,18 +1,7 @@
-﻿using AdjustNamespace.Helper;
-using AdjustNamespace.Window;
-using EnvDTE;
-using EnvDTE80;
-using Microsoft.VisualStudio.ComponentModelHost;
-using Microsoft.VisualStudio.LanguageServices;
+﻿using AdjustNamespace.Window;
 using Microsoft.VisualStudio.Shell;
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.Design;
-using Task = System.Threading.Tasks.Task;
-using AdjustNamespace.UI.StepFactory;
-using System.Linq;
-using AdjustNamespace.Helper;
-using Microsoft.CodeAnalysis;
 
 namespace AdjustNamespace
 {
@@ -79,7 +68,7 @@ namespace AdjustNamespace
         /// Initializes the singleton instance of the command.
         /// </summary>
         /// <param name="package">Owner package, not null.</param>
-        public static async Task InitializeAsync(AsyncPackage package)
+        public static async System.Threading.Tasks.Task InitializeAsync(AsyncPackage package)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync(package.DisposalToken);
 
