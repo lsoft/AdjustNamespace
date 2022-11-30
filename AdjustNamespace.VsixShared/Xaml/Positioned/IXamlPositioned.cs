@@ -1,4 +1,4 @@
-﻿namespace AdjustNamespace.Xaml
+﻿namespace AdjustNamespace.Xaml.Positioned
 {
     public interface IXamlPositioned
     {
@@ -6,6 +6,7 @@
         {
             get;
         }
+
         int Length
         {
             get;

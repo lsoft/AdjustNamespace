@@ -1,4 +1,4 @@
-﻿namespace AdjustNamespace.Xaml
+﻿namespace AdjustNamespace.Xaml.Positioned
 {
     public class XamlX : IXamlPositioned
     {

@@ -186,44 +186,48 @@ namespace AdjustNamespace.Adjusting
 
                 var testDocument = await xamlEngine.CreateDocumentAsync(false, xamlFilePath);
 
-                PerformChanges(
+                var modifiedTestDocument = PerformChanges(
                     testDocument,
                     ntc,
                     processedTypes
                     );
 
                 //open XAML files only if changes exists
-                if (testDocument.ChangesExists)
+                if (modifiedTestDocument.IsChangesExists(testDocument))
                 {
                     var realDocument = await xamlEngine.CreateDocumentAsync(_openFilesToEnableUndo, xamlFilePath);
 
-                    PerformChanges(
+                    var modifiedRealDocument = PerformChanges(
                         realDocument,
                         ntc,
                         processedTypes
                         );
 
-                    realDocument.SaveIfChangesExists();
+                    modifiedRealDocument.SaveIfChangesExistsAgainst(realDocument);
                 }
             }
         }
 
-        private void PerformChanges(
+        private XamlDocument PerformChanges(
             XamlDocument document,
             NamespaceTransitionContainer ntc,
             HashSet<INamedTypeSymbol> processedTypes
             )
         {
+            var result = document;
+
             foreach (var processedType in processedTypes)
             {
                 var targetNamespaceInfo = ntc.TransitionDict[processedType.ContainingNamespace.ToDisplayString()];
 
-                document.MoveObject(
+                result = result.MoveObject(
                     processedType.ContainingNamespace.ToDisplayString(),
                     processedType.Name,
                     targetNamespaceInfo.ModifiedName
                     );
             }
+
+            return result;
         }
     }
 }

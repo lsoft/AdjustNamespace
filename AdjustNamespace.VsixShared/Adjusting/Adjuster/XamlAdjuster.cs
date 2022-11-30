@@ -60,13 +60,13 @@ namespace AdjustNamespace.Adjusting
                 return false;
             }
 
-            xamlDocument.MoveObject(
+            var modifiedXamlDocument = xamlDocument.MoveObject(
                 rootNamespace!,
                 rootName!,
                 _targetNamespace
                 );
 
-            xamlDocument.SaveIfChangesExists();
+            modifiedXamlDocument.SaveIfChangesExistsAgainst(xamlDocument);
 
             return true;
         }

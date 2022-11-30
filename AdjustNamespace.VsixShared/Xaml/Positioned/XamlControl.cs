@@ -1,11 +1,9 @@
 ﻿using System;
 
-namespace AdjustNamespace.Xaml
+namespace AdjustNamespace.Xaml.Positioned
 {
-    public class XamlAttributeReference : IXamlPerformable
+    public class XamlControl : IXamlPerformable
     {
-        private readonly IXmlnsProvider _xmlnsProvider;
-
         public int Index
         {
             get;
@@ -14,7 +12,7 @@ namespace AdjustNamespace.Xaml
         {
             get;
         }
-        public string Prefix
+        public string TagPrefix
         {
             get;
         }
@@ -27,28 +25,23 @@ namespace AdjustNamespace.Xaml
             get;
         }
 
-        public XamlAttributeReference(
-            IXmlnsProvider xmlnsProvider,
+        public XamlControl(
             int index,
             int length,
-            string prefix,
+            string tagPrefix,
             string alias,
             string className
             )
         {
-            if (xmlnsProvider == null)
-                throw new ArgumentNullException(nameof(xmlnsProvider));
-
-            _xmlnsProvider = xmlnsProvider;
-
             Index = index;
             Length = length;
+            TagPrefix = tagPrefix;
             Alias = alias;
             ClassName = className;
-            Prefix = prefix;
         }
 
         public bool Perform(
+            XamlStructure structure,
             string sourceNamespace,
             string objectClassName,
             string targetNamespace,
@@ -75,7 +68,7 @@ namespace AdjustNamespace.Xaml
                 return false;
             }
 
-            var sourceXmlns = _xmlnsProvider.GetByAlias(Alias);
+            var sourceXmlns = structure.GetByAlias(Alias);
             if (sourceXmlns.Namespace != sourceNamespace)
             {
                 return false;
@@ -84,7 +77,7 @@ namespace AdjustNamespace.Xaml
             //match!
 
             //get or create new xmlns
-            var targetXmlns = _xmlnsProvider.TryGetByNamespace(targetNamespace);
+            var targetXmlns = structure.TryGetByNamespace(targetNamespace);
             if (targetXmlns == null)
             {
                 targetXmlns = new XamlXmlns(
@@ -94,10 +87,8 @@ namespace AdjustNamespace.Xaml
                 newXmlns = targetXmlns;
             }
 
-            var xPrefix = _xmlnsProvider.GetXPrefix();
-
             xaml = xaml.Substring(0, Index)
-                + $"{{{xPrefix.Alias}:{Prefix} {targetXmlns.Alias}:{ClassName}"
+                + $"<{TagPrefix}{targetXmlns.Alias}:{ClassName}"
                 + xaml.Substring(Index + Length)
                 ;
             return true;

@@ -1,11 +1,9 @@
 ﻿using System;
 
-namespace AdjustNamespace.Xaml
+namespace AdjustNamespace.Xaml.Positioned
 {
     public class XamlClass : IXamlPerformable
     {
-        private readonly IXmlnsProvider _xmlnsProvider;
-
         public int Index
         {
             get;
@@ -24,17 +22,11 @@ namespace AdjustNamespace.Xaml
         }
 
         public XamlClass(
-            IXmlnsProvider xmlnsProvider,
             int index,
             int length,
             string fullClassName
             )
         {
-            if (xmlnsProvider == null)
-                throw new ArgumentNullException(nameof(xmlnsProvider));
-
-            _xmlnsProvider = xmlnsProvider;
-
             Index = index;
             Length = length;
 
@@ -52,6 +44,7 @@ namespace AdjustNamespace.Xaml
         }
 
         public bool Perform(
+            XamlStructure structure,
             string sourceNamespace,
             string objectClassName,
             string targetNamespace,
@@ -73,7 +66,7 @@ namespace AdjustNamespace.Xaml
 
             //match!
 
-            var xPrefix = _xmlnsProvider.GetXPrefix();
+            var xPrefix = structure.GetXPrefix();
 
             xaml = xaml.Substring(0, Index)
                 + $@"{xPrefix.Alias}:Class=""{targetNamespace}.{ClassName}"""

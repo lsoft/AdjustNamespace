@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 
-namespace AdjustNamespace.Xaml
+namespace AdjustNamespace.Xaml.Positioned
 {
     public class XamlXmlns : IXamlPositioned
     {

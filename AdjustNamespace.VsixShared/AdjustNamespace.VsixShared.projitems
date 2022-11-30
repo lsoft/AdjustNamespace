@@ -80,17 +80,17 @@
     </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\ClosedXamlBodyProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\IXamlBodyProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXamlPerformable.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXamlPositioned.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Xaml\IXmlnsProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlAttributeReference.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlClass.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlControl.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\IXamlPerformable.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\IXamlPositioned.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlAttributeReference.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlClass.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlControl.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlDocument.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlEngine.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\OpenedXamlBodyProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlX.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlXmlns.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlStructure.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlX.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlXmlns.cs" />
   </ItemGroup>
   <ItemGroup>
     <Page Include="$(MSBuildThisFileDirectory)UI\Control\PerformingUserControl.xaml">
@@ -113,5 +113,8 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)Xaml\Positioned\" />
   </ItemGroup>
 </Project>
