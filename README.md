@@ -18,10 +18,4 @@ You can also exclude some folders from participating in namespace chain. AdjustN
 
 ## Remarks
 
-I do not test it against:
-
-0. WinForms applications
-0. Web applications (aspx, for example)
-0. Any other projects except plain C#, XAML and sqlproj.
-
-I encourage you to do that testing and report bugs (with minimal repro) to https://github.com/lsoft/AdjustNamespace/issues.
+I test it against plain C# code, WPF Xaml, and C# code from `sqlproj`. I encourage you test against your codebase and report bugs (with minimal repro) to https://github.com/lsoft/AdjustNamespace/issues.
