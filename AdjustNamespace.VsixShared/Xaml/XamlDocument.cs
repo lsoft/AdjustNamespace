@@ -12,9 +12,11 @@ namespace AdjustNamespace.Xaml
 
         private string _xaml;
 
-        private bool _changesExists = false;
-
-        public bool ChangesExists => _changesExists;
+        public bool ChangesExists
+        {
+            get;
+            private set;
+        }
 
         public XamlX XPrefix
         {
@@ -56,6 +58,110 @@ namespace AdjustNamespace.Xaml
             _xaml = bodyProvider.ReadText();
 
             Reload();
+        }
+
+        public XamlXmlns GetByAlias(string alias) => Xmlns.First(x => x.Alias == alias);
+
+        public XamlXmlns? TryGetByNamespace(string @namespace) => Xmlns.FirstOrDefault(x => x.Namespace == @namespace);
+
+        public XamlX GetXPrefix() => XPrefix;
+
+        public void MoveObject(
+            string sourceNamespace,
+            string objectClassName,
+            string targetNamespace
+            )
+        {
+            if (sourceNamespace is null)
+            {
+                throw new ArgumentNullException(nameof(sourceNamespace));
+            }
+
+            if (objectClassName is null)
+            {
+                throw new ArgumentNullException(nameof(objectClassName));
+            }
+
+            if (targetNamespace is null)
+            {
+                throw new ArgumentNullException(nameof(targetNamespace));
+            }
+
+            var combined = new List<IXamlPerformable>();
+            combined.AddRange(Controls);
+            combined.AddRange(RefFroms);
+            combined.AddRange(Classes);
+
+            //in backward order!
+            foreach (var performable in combined.OrderByDescending(c => c.Index))
+            {
+                if (performable.Perform(
+                    sourceNamespace,
+                    objectClassName,
+                    targetNamespace,
+                    ref _xaml,
+                    out var newXmlns
+                    ))
+                {
+                    ChangesExists = true;
+
+                    if (newXmlns != null)
+                    {
+                        Xmlns.Add(newXmlns);
+                    }
+                }
+            }
+
+            var reloadedXmlns = ReadXmlns().ToList();
+            if (reloadedXmlns.Count > 0)
+            {
+                var indexToInsert = reloadedXmlns.Max(x => x.Index + x.Length);
+
+                foreach (var xmlns in Xmlns.Where(x => !x.Saved))
+                {
+                    xmlns.SaveTo(ref _xaml, ref indexToInsert);
+                }
+            }
+
+
+            //cleanup
+            Reload();
+            Cleanup();
+            Reload();
+        }
+
+        public void SaveIfChangesExists()
+        {
+            if (!ChangesExists)
+            {
+                return;
+            }
+            
+            _bodyProvider.UpdateText(_xaml);
+        }
+
+        public bool GetRootInfo(out string? rootNamespace, out string? rootName)
+        {
+            if (Classes.Count == 0)
+            {
+                rootNamespace = null;
+                rootName = null;
+                return false;
+            }
+
+            rootNamespace = Classes[0].Namespace;
+            rootName = Classes[0].ClassName;
+            return true;
+        }
+
+
+        private void Reload()
+        {
+            XPrefix = ReadXPrefix();
+            Xmlns = ReadXmlns().ToList();
+            Controls = ReadControls().ToList();
+            RefFroms = ReadRefFromAttributes().ToList();
+            Classes = ReadClasses().ToList();
         }
 
         private IEnumerable<XamlAttributeReference> ReadRefFromAttributes()
@@ -153,27 +259,13 @@ namespace AdjustNamespace.Xaml
             }
         }
 
-        public XamlXmlns GetByAlias(string alias) => Xmlns.First(x => x.Alias == alias);
-
-        public XamlXmlns? TryGetByNamespace(string @namespace) => Xmlns.FirstOrDefault(x => x.Namespace == @namespace);
-
-        public XamlX GetXPrefix() => XPrefix;
-
-        public void Reload()
-        {
-            XPrefix = ReadXPrefix();
-            Xmlns = ReadXmlns().ToList();
-            Controls = ReadControls().ToList();
-            RefFroms = ReadRefFromAttributes().ToList();
-            Classes = ReadClasses().ToList();
-        }
-
-        public void Cleanup()
+        private void Cleanup()
         {
             var aliases = new HashSet<string>();
             Controls.ForEach(c => aliases.Add(c.Alias));
             RefFroms.ForEach(c => aliases.Add(c.Alias));
 
+            //in backward order!
             foreach (var xmlns in Xmlns.OrderByDescending(x => x.Index))
             {
                 if (aliases.Contains(xmlns.Alias))
@@ -185,89 +277,5 @@ namespace AdjustNamespace.Xaml
             }
         }
 
-        public void MoveObject(
-            string sourceNamespace,
-            string objectClassName,
-            string targetNamespace
-            )
-        {
-            if (sourceNamespace is null)
-            {
-                throw new ArgumentNullException(nameof(sourceNamespace));
-            }
-
-            if (objectClassName is null)
-            {
-                throw new ArgumentNullException(nameof(objectClassName));
-            }
-
-            if (targetNamespace is null)
-            {
-                throw new ArgumentNullException(nameof(targetNamespace));
-            }
-
-            var combined = new List<IXamlPerformable>();
-            combined.AddRange(Controls);
-            combined.AddRange(RefFroms);
-            combined.AddRange(Classes);
-
-            //in backward order!
-            foreach (var positioned in combined.OrderByDescending(c => c.Index))
-            {
-                var performable = positioned as IXamlPerformable;
-
-                if (performable.Perform(
-                    sourceNamespace,
-                    objectClassName,
-                    targetNamespace,
-                    ref _xaml,
-                    out var newXmlns
-                    ))
-                {
-                    _changesExists = true;
-
-                    if (newXmlns != null)
-                    {
-                        Xmlns.Add(newXmlns);
-                    }
-                }
-            }
-
-            var reloadedXmlns = ReadXmlns().ToList();
-            if (reloadedXmlns.Count > 0)
-            {
-                var indexToInsert = reloadedXmlns.Max(x => x.Index + x.Length);
-
-                foreach (var xmlns in Xmlns.Where(x => !x.Saved))
-                {
-                    xmlns.SaveTo(ref _xaml, ref indexToInsert);
-                }
-            }
-
-        }
-
-        internal void SaveIfChangesExists()
-        {
-            if (!_changesExists)
-            {
-                return;
-            }
-            
-            _bodyProvider.UpdateText(_xaml);
-        }
-
-        internal bool GetRootInfo(out string? rootNamespace, out string? rootName)
-        {
-            if (Classes.Count == 0)
-            {
-                rootNamespace = null;
-                rootName = null;
-                return false;
-            }
-
-            rootNamespace = Classes[0].Namespace;
-            rootName = Classes[0].ClassName;
-            return true;
-        }
     }
 }

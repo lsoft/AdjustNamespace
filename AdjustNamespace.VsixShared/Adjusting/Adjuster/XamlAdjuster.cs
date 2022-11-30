@@ -41,13 +41,16 @@ namespace AdjustNamespace.Adjusting
 
         public async Task<bool> AdjustAsync()
         {
-            var xamlEngine = await XamlEngine.CreateAsync(
-                _vss,
+            var xamlEngine = new XamlEngine(
+                _vss
+                );
+
+            var xamlDocument = await xamlEngine.CreateDocumentAsync(
                 _openFilesToEnableUndo,
                 _subjectFilePath
                 );
 
-            if (!xamlEngine.GetRootInfo(out var rootNamespace, out var rootName))
+            if (!xamlDocument.GetRootInfo(out var rootNamespace, out var rootName))
             {
                 return false;
             }
@@ -57,13 +60,13 @@ namespace AdjustNamespace.Adjusting
                 return false;
             }
 
-            xamlEngine.MoveObject(
+            xamlDocument.MoveObject(
                 rootNamespace!,
                 rootName!,
                 _targetNamespace
                 );
 
-            xamlEngine.SaveIfChangesExists();
+            xamlDocument.SaveIfChangesExists();
 
             return true;
         }

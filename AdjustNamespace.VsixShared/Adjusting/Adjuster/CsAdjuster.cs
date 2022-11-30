@@ -182,40 +182,34 @@ namespace AdjustNamespace.Adjusting
                     continue;
                 }
 
-                var testXamlEngine = await XamlEngine.CreateAsync(
-                    _vss,
-                    false,
-                    xamlFilePath
-                    );
+                var xamlEngine = new XamlEngine(_vss);
+
+                var testDocument = await xamlEngine.CreateDocumentAsync(false, xamlFilePath);
 
                 PerformChanges(
-                    testXamlEngine,
+                    testDocument,
                     ntc,
                     processedTypes
                     );
 
                 //open XAML files only if changes exists
-                if (testXamlEngine.ChangesExists)
+                if (testDocument.ChangesExists)
                 {
-                    var realXamlEngine = await XamlEngine.CreateAsync(
-                        _vss,
-                        _openFilesToEnableUndo,
-                        xamlFilePath
-                        );
+                    var realDocument = await xamlEngine.CreateDocumentAsync(_openFilesToEnableUndo, xamlFilePath);
 
                     PerformChanges(
-                        realXamlEngine,
+                        realDocument,
                         ntc,
                         processedTypes
                         );
 
-                    realXamlEngine.SaveIfChangesExists();
+                    realDocument.SaveIfChangesExists();
                 }
             }
         }
 
         private void PerformChanges(
-            XamlEngine xamlEngine,
+            XamlDocument document,
             NamespaceTransitionContainer ntc,
             HashSet<INamedTypeSymbol> processedTypes
             )
@@ -224,7 +218,7 @@ namespace AdjustNamespace.Adjusting
             {
                 var targetNamespaceInfo = ntc.TransitionDict[processedType.ContainingNamespace.ToDisplayString()];
 
-                xamlEngine.MoveObject(
+                document.MoveObject(
                     processedType.ContainingNamespace.ToDisplayString(),
                     processedType.Name,
                     targetNamespaceInfo.ModifiedName
