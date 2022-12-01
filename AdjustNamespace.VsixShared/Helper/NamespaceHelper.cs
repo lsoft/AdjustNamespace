@@ -139,27 +139,10 @@ namespace AdjustNamespace.Helper
             //    return project.DefaultNamespace!;
             //}
 
-            //var (r, p, _) = await SolutionHelper.TryGetProjectItemAsync(documentFilePath);
-            //if (r)
+            //if (project.IsProjectOfType(SolutionHelper.DatabaseProjectKind))
             //{
-            //    if (p != null)
-            //    {
-            //        if (p.IsProjectOfType(SolutionHelper.DatabaseProjectKind))
-            //        {
-            //            var dn = p.GetDefaultNamespace();
-            //            return dn;
-
-            //            //var prop = vsp.Properties;
-            //            //if (prop != null)
-            //            //{
-            //            //    var dn = prop.Item("DefaultNamespace");
-            //            //    if (dn != null)
-            //            //    {
-            //            //        return dn.Value.ToString();
-            //            //    }
-            //            //}
-            //        }
-            //    }
+            //    var dn = await ((Community.VisualStudio.Toolkit.Project)project).GetAttributeAsync("RootNamespace");
+            //    return dn!;
             //}
 
             var dotIndex = project.Name.LastIndexOf(".");

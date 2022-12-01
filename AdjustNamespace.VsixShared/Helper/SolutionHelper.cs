@@ -37,27 +37,6 @@ namespace AdjustNamespace.Helper
             return r;
         }
 
-        public static string GetDefaultNamespace(
-            this SolutionItem project
-            )
-        {
-            ThreadHelper.ThrowIfNotOnUIThread();
-
-            project.GetItemInfo(
-                out Microsoft.VisualStudio.Shell.Interop.IVsHierarchy h,
-                out uint itemId,
-                out IVsHierarchyItem hi
-                );
-            var r = h.GetProperty(itemId, (int)__VSHPROPID.VSHPROPID_DefaultNamespace, out var propbody);
-            if (!ErrorHandler.Succeeded(r))
-            {
-                throw new InvalidOperationException("Cannot get property!");
-            }
-
-            return propbody.ToString();
-        }
-
-
 
         public static List<SolutionItem> ProcessDownRecursivelyFor(
             this SolutionItem item,
