@@ -16,7 +16,7 @@ namespace AdjustNamespace.Command
         /// <summary>
         /// Command ID.
         /// </summary>
-        public const int CommandId = 0x0322;
+        public const int CommandId = PackageIds.EditSkippedPathsCommandId;
 
         /// <summary>
         /// Command menu group (command set GUID).

@@ -35,7 +35,7 @@
             Grid.Row="1"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
-            Foreground="Red"
+            Foreground="DarkOrange"
             Text="CAUTION! You are using a preview version. Please, save and commit all your changes before adjusting namespaces."
             TextWrapping="Wrap"
             />

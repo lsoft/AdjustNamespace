@@ -107,8 +107,8 @@ namespace AdjustNamespace.Adjusting
 
             var typeContainer = await TypeContainer.CreateForAsync(workspace);
 
-            var types = new Dictionary<string, HashSet<string>>(typeContainer.Dict.Count);
-            foreach (var nte in typeContainer.Dict.Values)
+            var types = new Dictionary<string, HashSet<string>>(typeContainer.DictByFullName.Count);
+            foreach (var nte in typeContainer.DictByFullName.Values)
             {
                 var key = nte.ContainingNamespaceName;
                 if (!types.ContainsKey(key))

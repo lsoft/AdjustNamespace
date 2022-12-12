@@ -20,7 +20,7 @@ namespace AdjustNamespace.Command
         /// <summary>
         /// Command ID.
         /// </summary>
-        public const int CommandId = 0x0300;
+        public const int CommandId = PackageIds.DoAdjustCommandId;
 
         /// <summary>
         /// Command menu group (command set GUID).

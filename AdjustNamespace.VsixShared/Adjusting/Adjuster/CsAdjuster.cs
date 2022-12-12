@@ -148,6 +148,11 @@ namespace AdjustNamespace.Adjusting
                 }
 
                 var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
+                if (symbolNamespace == _targetNamespace)
+                {
+                    continue;
+                }
+
                 var targetNamespaceInfo = ntc.TransitionDict[symbolNamespace];
 
                 if (symbolNamespace == targetNamespaceInfo.ModifiedName)

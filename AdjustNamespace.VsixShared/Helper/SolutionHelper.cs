@@ -9,6 +9,7 @@ using Microsoft.VisualStudio.Shell.Interop;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.LanguageServices;
+using System.Linq;
 
 namespace AdjustNamespace.Helper
 {
@@ -77,26 +78,101 @@ namespace AdjustNamespace.Helper
         }
 
 
-        public static async Task<(bool result, SolutionItem? rProject, SolutionItem? rProjectItem)> TryGetProjectItemAsync(
+        public static async Task<ProjectItemInformation?> TryGetProjectItemAsync(
             string filePath
             )
         {
             var solution = await VS.Solutions.GetCurrentSolutionAsync();
-
             if (solution != null)
             {
                 var projects = solution.ProcessDownRecursivelyFor(SolutionItemType.Project, null);
-                foreach (var project in projects)
+                var result = TryGetProjectItem(projects, filePath);
+                return result;
+            }
+
+            return null;
+        }
+
+        public static ProjectItemInformation? TryGetProjectItem(
+            List<SolutionItem> projects,
+            string filePath
+            )
+        {
+            foreach (var project in projects)
+            {
+                var files = project.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, filePath);
+                if (files.Count > 0)
                 {
-                    var files = project.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, filePath);
-                    if (files.Count > 0)
-                    {
-                        return (true, project, files[0]);
-                    }
+                    return new ProjectItemInformation(project, files[0]);
                 }
             }
 
-            return (false, null, null);
+            return null;
+        }
+
+        public static async Task<Dictionary<string, ProjectItemInformation>> GetAllProjectItemsAsync(
+            List<SolutionItem>? projects
+            )
+        {
+            var result = new Dictionary<string, ProjectItemInformation>();
+
+            var solution = await VS.Solutions.GetCurrentSolutionAsync();
+            if (solution == null)
+            {
+                return result;
+            }
+
+            if(projects == null)
+            {
+                projects = solution.ProcessDownRecursivelyFor(SolutionItemType.Project, null);
+            }
+
+            foreach (var project in projects!)
+            {
+                var files = project.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, null);
+                foreach(var file in files)
+                {
+                    if(string.IsNullOrEmpty(file.FullPath))
+                    {
+                        continue;
+                    }
+
+                    if(result.ContainsKey(file.FullPath!))
+                    {
+                        continue;
+                    }
+
+                    result[file.FullPath!] = new ProjectItemInformation(project, file);
+                }
+            }
+
+            return result;
+        }
+
+    }
+
+    public readonly struct ProjectItemInformation
+    {
+        public readonly SolutionItem Project;
+        public readonly SolutionItem ProjectItem;
+
+        public ProjectItemInformation(
+            SolutionItem project,
+            SolutionItem projectItem
+            )
+        {
+            if (project is null)
+            {
+                throw new ArgumentNullException(nameof(project));
+            }
+
+            if (projectItem is null)
+            {
+                throw new ArgumentNullException(nameof(projectItem));
+            }
+
+            Project = project;
+            ProjectItem = projectItem;
         }
     }
 }

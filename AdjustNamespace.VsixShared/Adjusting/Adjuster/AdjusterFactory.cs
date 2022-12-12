@@ -71,13 +71,13 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 throw new ArgumentNullException(nameof(subjectFilePath));
             }
 
-            var (result, subjectProject, subjectProjectItem) = await SolutionHelper.TryGetProjectItemAsync(subjectFilePath);
-            if (!result)
+            var pii = await SolutionHelper.TryGetProjectItemAsync(subjectFilePath);
+            if (!pii.HasValue)
             {
                 return null;
             }
 
-            var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(subjectProject!, subjectFilePath, _vss);
+            var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(pii.Value.Project, subjectFilePath, _vss);
             if (string.IsNullOrEmpty(targetNamespace))
             {
                 return null;

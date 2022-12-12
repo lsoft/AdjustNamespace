@@ -18,7 +18,7 @@ namespace AdjustNamespace.Command
         /// <summary>
         /// Command ID.
         /// </summary>
-        public const int CommandId = 0x0301;
+        public const int CommandId = PackageIds.AdjustSolutionCommandId;
 
         /// <summary>
         /// Command menu group (command set GUID).

@@ -46,16 +46,7 @@ namespace AdjustNamespace.UI.StepFactory
             v.DataContext = vm;
             _targetControl.Content = v;
 
-            try
-            {
-                await vm!.StartAsync();
-            }
-            catch (Exception excp)
-            {
-                _targetControl.Content = excp.Message + Environment.NewLine + excp.StackTrace;
-                _targetControl.Foreground = System.Windows.Media.Brushes.Red;
-                Logging.LogVS(excp);
-            }
+            await vm!.StartAsync();
         }
 
     }
