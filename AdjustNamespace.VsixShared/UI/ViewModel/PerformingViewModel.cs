@@ -3,6 +3,7 @@ using AdjustNamespace.Adjusting.Adjuster;
 using AdjustNamespace.Helper;
 using AdjustNamespace.Options;
 using EnvDTE80;
+using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.PlatformUI;
@@ -111,17 +112,26 @@ namespace AdjustNamespace.UI.ViewModel
             var adjusterFactory = await AdjusterFactory.CreateAsync(_vss, _openFilesToEnableUndo, namespaceCenter);
 
             //process file by file
-            for (var i = 0; i < _subjectFilePaths.Count; i++)
+            cancellationToken = await AdjustAsync(adjusterFactory, cancellationToken);
+
+            //cleanup
+            await CleanupAsync(namespaceCenter, cancellationToken);
+        }
+
+        private async Task<CancellationToken> AdjustAsync(AdjusterFactory adjusterFactory, CancellationToken cancellationToken)
+        {
+            var total = _subjectFilePaths.Count;
+            for (var i = 0; i < total; i++)
             {
-                if(cancellationToken.IsCancellationRequested)
+                if (cancellationToken.IsCancellationRequested)
                 {
                     break;
                 }
 
                 var subjectFilePath = _subjectFilePaths[i];
 
-                ProgressMessage = $"{i + 1}/{_subjectFilePaths.Count}: {subjectFilePath}";
-                Debug.WriteLine($"----------------------------> {i} {subjectFilePath}");
+                ProgressMessage = $"{i + 1}/{total}: {subjectFilePath}";
+                Debug.WriteLine($"----------------------------> {i} Adjust {subjectFilePath}");
 
                 var adjuster = await adjusterFactory.CreateAsync(subjectFilePath);
                 if (adjuster is not null)
@@ -130,10 +140,27 @@ namespace AdjustNamespace.UI.ViewModel
                 }
             }
 
-            //cleanup
-            ProgressMessage = "Performing cleanup...";
+            return cancellationToken;
+        }
+
+        private async Task CleanupAsync(NamespaceCenter namespaceCenter, CancellationToken cancellationToken)
+        {
+            var cleanupDocuments = _vss.Workspace.EnumerateAllDocumentFilePaths(Predicate.IsProjectInScope, Predicate.IsDocumentInScope).ToList();
+            var total = cleanupDocuments.Count;
             var c = new Cleanup(_vss, namespaceCenter);
-            await c.RemoveEmptyUsingStatementsAsync(cancellationToken);
+            for (int i = 0; i < total; i++)
+            {
+                string documentFilePath = cleanupDocuments[i];
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                ProgressMessage = $"{i + 1}/{total} Performing cleanup {documentFilePath}";
+                Debug.WriteLine($"----------------------------> {i} Cleanup {documentFilePath}");
+
+                await c.RemoveEmptyUsingStatementsForAsync(documentFilePath);
+            }
         }
     }
     

@@ -153,6 +153,11 @@ namespace AdjustNamespace.Adjusting
                     continue;
                 }
 
+                if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
+                {
+                    continue;
+                }
+
                 var targetNamespaceInfo = ntc.TransitionDict[symbolNamespace];
 
                 if (symbolNamespace == targetNamespaceInfo.ModifiedName)

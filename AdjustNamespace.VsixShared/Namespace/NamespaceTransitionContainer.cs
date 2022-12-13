@@ -73,6 +73,7 @@ namespace AdjustNamespace.Namespace
                 where tdnode != null
                 let ni = TryGetNamespaceTransitionInfo(tdnode, root)
                 where ni.HasValue
+                where !NamespaceHelper.IsSpecialNamespace(ni.Value.OriginalName)
                 select ni.Value
                 ).ToList();
 
@@ -83,6 +84,7 @@ namespace AdjustNamespace.Namespace
                 where fsndnode != null
                 let ni = TryGetNamespaceTransitionInfo(fsndnode, root)
                 where ni.HasValue
+                where !NamespaceHelper.IsSpecialNamespace(ni.Value.OriginalName)
                 select ni.Value
                 ).ToList();
 
