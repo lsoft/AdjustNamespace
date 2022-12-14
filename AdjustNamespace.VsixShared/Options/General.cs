@@ -6,8 +6,6 @@ namespace AdjustNamespace.Options
 {
     internal partial class OptionsProvider
     {
-        // Register the options with this attribute on your package class:
-        // [ProvideOptionPage(typeof(OptionsProvider.GeneralOptions), "AdjustNamespace2022", "General", 0, 0, true, SupportsProfiles = true)]
         [ComVisible(true)]
         public class GeneralOptions : BaseOptionPage<General>
         {
@@ -25,7 +23,7 @@ namespace AdjustNamespace.Options
 
         [Category("General")]
         [DisplayName("StarsGiven")]
-        [Description("Stars are given already, no need to make noise.")]
+        [Description("Stars are given already, no need to make a noise.")]
         [DefaultValue(false)]
         [Browsable(false)]
         public bool StarsGiven { get; set; } = false;

@@ -12,6 +12,7 @@ namespace AdjustNamespace
     [InstalledProductRegistration(Vsix.Name, Vsix.Description, Vsix.Version)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
     [Guid(PackageGuids.guidAdjustNamespacePackageString)]
+    [ProvideOptionPage(typeof(Options.OptionsProvider.GeneralOptions), "Adjust Namespaces", "General", 0, 0, true, SupportsProfiles = true)]
     public sealed class AdjustNamespacePackage : ToolkitPackage
     {
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
