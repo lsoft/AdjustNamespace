@@ -28,48 +28,40 @@ namespace AdjustNamespace.Adjusting
             _namespaceCenter = namespaceCenter;
         }
 
-        public async Task RemoveEmptyUsingStatementsAsync(
-            CancellationToken cancellationToken
+        public async Task RemoveEmptyUsingStatementsForAsync(
+            string documentFilePath
             )
         {
             var workspace = _vss.Workspace;
 
-            foreach (var documentFilePath in workspace.EnumerateAllDocumentFilePaths(Predicate.IsProjectInScope, Predicate.IsDocumentInScope))
+            bool r = true;
+            do
             {
-                if (cancellationToken.IsCancellationRequested)
+                var (document, syntaxRoot) = await workspace.GetDocumentAndSyntaxRootAsync(documentFilePath);
+                if (document == null || syntaxRoot == null)
                 {
-                    break;
+                    //something went wrong
+                    //skip this document
+                    return;
                 }
 
-                bool r = true;
-                do
+                var namespaces = syntaxRoot.GetAllDescendants<UsingDirectiveSyntax>();
+
+                var toRemove = _namespaceCenter.GetRemovedNamespaces(namespaces);
+                if (toRemove.Count == 0)
                 {
-                    var (document, syntaxRoot) = await workspace.GetDocumentAndSyntaxRootAsync(documentFilePath);
-                    if (document == null || syntaxRoot == null)
-                    {
-                        //something went wrong
-                        //skip this document
-                        return;
-                    }
-
-                    var namespaces = syntaxRoot.GetAllDescendants<UsingDirectiveSyntax>();
-
-                    var toRemove = _namespaceCenter.GetRemovedNamespaces(namespaces);
-                    if (toRemove.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    syntaxRoot = syntaxRoot.RemoveNodes(toRemove, SyntaxRemoveOptions.KeepNoTrivia);
-                    if (syntaxRoot != null)
-                    {
-                        var changedDocument = document.WithSyntaxRoot(syntaxRoot);
-
-                        r = workspace.TryApplyChanges(changedDocument.Project.Solution);
-                    }
+                    continue;
                 }
-                while (!r);
+
+                syntaxRoot = syntaxRoot.RemoveNodes(toRemove, SyntaxRemoveOptions.KeepNoTrivia);
+                if (syntaxRoot != null)
+                {
+                    var changedDocument = document.WithSyntaxRoot(syntaxRoot);
+
+                    r = workspace.TryApplyChanges(changedDocument.Project.Solution);
+                }
             }
+            while (!r);
         }
 
     }

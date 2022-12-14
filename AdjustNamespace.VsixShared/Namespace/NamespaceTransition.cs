@@ -42,6 +42,5 @@ namespace AdjustNamespace.Namespace
             ModifiedName = modifiedName;
             IsRoot = isRoot;
         }
-
     }
 }

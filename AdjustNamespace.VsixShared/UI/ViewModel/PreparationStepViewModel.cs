@@ -227,15 +227,15 @@ namespace AdjustNamespace.UI.ViewModel
                 _vss.Workspace
                 );
 
-            var index = 0;
             var total = fileExtensions.Count;
-            foreach (var fileExtension in fileExtensions)
+            for (int i = 0; i < total; i++)
             {
+                FileExtension fileExtension = fileExtensions[i];
                 var subjectFilePath = fileExtension.FilePath;
                 var subjectProject = fileExtension.Project;
                 var subjectProjectItem = fileExtension.ProjectItem;
 
-                MainMessage = $"{index++}/{total} Processing {subjectFilePath}";
+                MainMessage = $"{i+1}/{total} Processing {subjectFilePath}";
 
                 if (subjectFilePath.EndsWith(".xaml"))
                 {
@@ -291,6 +291,11 @@ namespace AdjustNamespace.UI.ViewModel
                         continue;
                     }
 
+                    if(NamespaceHelper.IsSpecialNamespace(symbolNamespace))
+                    {
+                        continue;
+                    }
+
                     var targetNamespaceInfo = ntc.TransitionDict[symbolNamespace];
                     if (typesInSolutionPerNamespace.CheckForTypeExists(targetNamespaceInfo.ModifiedName, symbolInfo.Name))
                     {
@@ -321,7 +326,7 @@ namespace AdjustNamespace.UI.ViewModel
 
         private async Task CheckForSolutionCompilationAsync()
         {
-            var index = 0;
+            var index = 1;
             var total = _vss.Workspace.CurrentSolution.Projects.Count();
             foreach (var project in _vss.Workspace.CurrentSolution.Projects)
             {

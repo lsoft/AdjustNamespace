@@ -14,6 +14,28 @@ namespace AdjustNamespace.Helper
 {
     public static class NamespaceHelper
     {
+        public static bool IsSpecialNamespace(
+            string namespaceName
+            )
+        {
+            //workaround: we will not remove a System* and Microsoft* namespaces
+            //such namespaces may exists in the codebase because of
+            //delivering special attributes in the obsolete codebase
+            //(like nullable attributes, CallerMemberNameAttribute etc)
+            //we do not want to remove System, System.*, Microsoft.* from
+            //the codebase in this case
+            if (namespaceName.StartsWith("System"))
+            {
+                return true;
+            }
+            if (namespaceName.StartsWith("Microsoft"))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         public static bool TryFindNamespaceNodesFor(
             this SyntaxNode syntaxRoot,
             string namespaceName,

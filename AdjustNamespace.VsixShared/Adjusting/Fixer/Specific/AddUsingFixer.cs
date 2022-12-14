@@ -73,35 +73,47 @@ namespace AdjustNamespace.Adjusting.Fixer
                         .OfType<UsingDirectiveSyntax>()
                         .ToList();
 
-                    if (usingSyntaxes.Count == 0)
+                    if (usingSyntaxes.Count > 0)
                     {
-                        //no using namespaces exists
-                        //no need to insert new in this file
-                        continue;
-                    }
-
-                    if (usingSyntaxes.Any(s => s.Name.ToString() == symbolTargetNamespace))
-                    {
-                        //that using already exists
-                        continue;
-                    }
-
-                    var lastUsing = usingSyntaxes.Last();
-
-                    Debug.WriteLine($"Fix references in {FilePath}: '{lastUsing.Name}' -> '{symbolTargetNamespace}' ");
-
-                    syntaxRoot = syntaxRoot.InsertNodesAfter(
-                        lastUsing,
-                        new[]
+                        if (usingSyntaxes.Any(s => s.Name.ToString() == symbolTargetNamespace))
                         {
+                            //that using already exists
+                            continue;
+                        }
+                    }
+
+                    Debug.WriteLine($"Fix references in {FilePath}: Add '{symbolTargetNamespace}' ");
+
+                    if (usingSyntaxes.Count > 0)
+                    {
+                        var lastUsing = usingSyntaxes.Last();
+
+                        syntaxRoot = syntaxRoot.InsertNodesAfter(
+                            lastUsing,
+                            new[]
+                            {
+                                SyntaxFactory.UsingDirective(
+                                    SyntaxFactory.ParseName(
+                                        " " + symbolTargetNamespace
+                                        )
+                                    ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                                    .WithLeadingTrivia(lastUsing.GetLeadingTrivia())
+                            });
+                    }
+                    else
+                    {
+                        var cus = (CompilationUnitSyntax)syntaxRoot;
+                        var modifiedcus = cus.AddUsings(
                             SyntaxFactory.UsingDirective(
                                 SyntaxFactory.ParseName(
                                     " " + symbolTargetNamespace
                                     )
-                                ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                                .WithLeadingTrivia(lastUsing.GetLeadingTrivia())
-                        });
+                                ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed, SyntaxFactory.CarriageReturnLineFeed)
+                                .WithLeadingTrivia(cus.GetLeadingTrivia())
+                             );
 
+                        syntaxRoot = modifiedcus;
+                    }
                 }
 
                 var changedDocument = document.WithSyntaxRoot(syntaxRoot);
