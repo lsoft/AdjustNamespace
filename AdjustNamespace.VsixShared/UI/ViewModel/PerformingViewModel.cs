@@ -3,10 +3,13 @@ using AdjustNamespace.Adjusting.Adjuster;
 using AdjustNamespace.Helper;
 using AdjustNamespace.Options;
 using EnvDTE80;
+using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
+using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.TextManager.Interop;
 using Microsoft.VisualStudio.Threading;
 using System;
 using System.Collections.Generic;
@@ -85,8 +88,20 @@ namespace AdjustNamespace.UI.ViewModel
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
+            //var undoManager = (await _vss.ServiceProvider.GetServiceAsync(typeof(SVsLinkedUndoTransactionManager))) as IVsLinkedUndoTransactionManager;
+            //ErrorHandler.ThrowOnFailure(
+            //    undoManager!.OpenLinkedUndo((uint)LinkedTransactionFlagsEnum.Global, "Adjusting Namespaces")
+            //    );
+
+            //int transactionCount = 0;
+            //ErrorHandler.ThrowOnFailure(
+            //    undoManager.CountOpenTransactions(ref transactionCount)
+            //    );
+
             _task = PerformAdjustingAsync(_cts.Token);
             await _task;
+
+            //ErrorHandler.ThrowOnFailure(undoManager.CloseLinkedUndo());
 
             if (_cts.IsCancellationRequested)
             {
@@ -156,3 +171,13 @@ namespace AdjustNamespace.UI.ViewModel
         }
     }
 }
+
+//[Flags]
+//public enum LinkedTransactionFlagsEnum : uint
+//{
+//    Default = 0, //Specifies the transaction to be non-strict.
+
+//    Strict = 1, //Specifies the transaction to be strict.
+
+//    Global = 2
+//}
