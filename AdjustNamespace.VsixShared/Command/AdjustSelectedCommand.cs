@@ -104,7 +104,7 @@ namespace AdjustNamespace.Command
 
                     foreach (var item in selection)
                     {
-                        var files = item.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, null);
+                        var files = await item.ProcessDownRecursivelyForAsync(SolutionItemType.PhysicalFile, null);
                         filePaths.AddRange(
                             files.ConvertAll(i => i.FullPath!).FindAll(i => !string.IsNullOrEmpty(i))
                             );

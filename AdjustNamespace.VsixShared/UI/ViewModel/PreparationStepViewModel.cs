@@ -19,6 +19,7 @@ using EnvDTE;
 using AdjustNamespace.Namespace;
 using Community.VisualStudio.Toolkit;
 using System.Runtime.Serialization;
+using System.Diagnostics;
 
 namespace AdjustNamespace.UI.ViewModel
 {
@@ -326,6 +327,8 @@ namespace AdjustNamespace.UI.ViewModel
 
         private async Task CheckForSolutionCompilationAsync()
         {
+            var errorFound = false;
+
             var index = 1;
             var total = _vss.Workspace.CurrentSolution.Projects.Count();
             foreach (var project in _vss.Workspace.CurrentSolution.Projects)
@@ -337,11 +340,16 @@ namespace AdjustNamespace.UI.ViewModel
                     var compilation = await project.GetCompilationAsync();
                     if (compilation != null)
                     {
-                        if (compilation.GetDiagnostics().Any(j => j.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error))
+                        var errors = compilation.GetDiagnostics().FindAll(j => j.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+                        if (errors.Count > 0)
                         {
                             await AddMessageAsync(
-                                $"Compilation of {project.Name} fails. Adjust namespace can produce an incorrect results."
+                                $"Compilation of {project.Name} fails:"
                                 );
+                            await AddMessageAsync(
+                                new string(' ', 8) + string.Join(Environment.NewLine, errors.Select(e => e.GetMessage()))
+                                );
+                            errorFound = true;
                         }
                     }
                 }
@@ -349,6 +357,13 @@ namespace AdjustNamespace.UI.ViewModel
                 {
                     throw new CompilationException(project.Name, ex);
                 }
+            }
+
+            if (errorFound)
+            {
+                await AddMessageAsync(
+                    $"Adjust namespace can produce an incorrect results."
+                    );
             }
         }
 
@@ -420,6 +435,7 @@ namespace AdjustNamespace.UI.ViewModel
         /// <summary>
         /// Extension for file from workspace.
         /// </summary>
+        [DebuggerDisplay("{FilePath}")]
         private readonly struct FileExtension
         {
             public readonly string FilePath;

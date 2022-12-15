@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.LanguageServices;
 using System.Linq;
+using System.IO;
 
 namespace AdjustNamespace.Helper
 {
@@ -39,7 +40,7 @@ namespace AdjustNamespace.Helper
         }
 
 
-        public static List<SolutionItem> ProcessDownRecursivelyFor(
+        public static async Task<List<SolutionItem>> ProcessDownRecursivelyForAsync(
             this SolutionItem item,
             SolutionItemType type,
             string? fullPath
@@ -52,12 +53,44 @@ namespace AdjustNamespace.Helper
                 result.Add(item);
             }
 
+            var skippedFolders = new HashSet<string>(2, StringComparer.CurrentCultureIgnoreCase);
+            if(item is Community.VisualStudio.Toolkit.Project p)
+            {
+                var projectFolder = new FileInfo(p.FullPath).Directory.FullName;
+
+                var objFolder = await p.GetAttributeAsync("BaseIntermediateOutputPath");
+                if (!string.IsNullOrEmpty(objFolder))
+                {
+                    var objFolderFullPath = Path.Combine(projectFolder, objFolder);
+                    skippedFolders.Add(objFolderFullPath);
+                }
+                var binFolder = await p.GetAttributeAsync("BaseOutputPath");
+                if (!string.IsNullOrEmpty(binFolder))
+                {
+                    var binFolderFullPath = Path.Combine(projectFolder, binFolder);
+                    skippedFolders.Add(binFolderFullPath);
+                }
+            }
+
             foreach (var child in item.Children)
             {
-                if (child != null)
+                if (child == null)
                 {
-                    result.AddRange(child.ProcessDownRecursivelyFor(type, fullPath));
+                    continue;
                 }
+                if (child is Community.VisualStudio.Toolkit.PhysicalFolder pf)
+                {
+                    if (!string.IsNullOrEmpty(pf.Name))
+                    {
+                        //var di = new DirectoryInfo(pf.Name);
+                        if (skippedFolders.Contains(pf.Name))
+                        {
+                            continue;
+                        }
+                    }
+                }
+
+                result.AddRange(await child.ProcessDownRecursivelyForAsync(type, fullPath));
             }
 
             return result;
@@ -73,7 +106,7 @@ namespace AdjustNamespace.Helper
                 return new List<string>();
             }
 
-            var files = solution.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, null);
+            var files = await solution.ProcessDownRecursivelyForAsync(SolutionItemType.PhysicalFile, null);
             return files.ConvertAll(i => i.FullPath!).FindAll(i => !string.IsNullOrEmpty(i));
         }
 
@@ -85,22 +118,22 @@ namespace AdjustNamespace.Helper
             var solution = await VS.Solutions.GetCurrentSolutionAsync();
             if (solution != null)
             {
-                var projects = solution.ProcessDownRecursivelyFor(SolutionItemType.Project, null);
-                var result = TryGetProjectItem(projects, filePath);
+                var projects = await solution.ProcessDownRecursivelyForAsync(SolutionItemType.Project, null);
+                var result = await TryGetProjectItemAsync(projects, filePath);
                 return result;
             }
 
             return null;
         }
 
-        public static ProjectItemInformation? TryGetProjectItem(
+        public static async Task<ProjectItemInformation?> TryGetProjectItemAsync(
             List<SolutionItem> projects,
             string filePath
             )
         {
             foreach (var project in projects)
             {
-                var files = project.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, filePath);
+                var files = await project.ProcessDownRecursivelyForAsync(SolutionItemType.PhysicalFile, filePath);
                 if (files.Count > 0)
                 {
                     return new ProjectItemInformation(project, files[0]);
@@ -124,12 +157,12 @@ namespace AdjustNamespace.Helper
 
             if(projects == null)
             {
-                projects = solution.ProcessDownRecursivelyFor(SolutionItemType.Project, null);
+                projects = await solution.ProcessDownRecursivelyForAsync(SolutionItemType.Project, null);
             }
 
             foreach (var project in projects!)
             {
-                var files = project.ProcessDownRecursivelyFor(SolutionItemType.PhysicalFile, null);
+                var files = await project.ProcessDownRecursivelyForAsync(SolutionItemType.PhysicalFile, null);
                 foreach(var file in files)
                 {
                     if(string.IsNullOrEmpty(file.FullPath))
