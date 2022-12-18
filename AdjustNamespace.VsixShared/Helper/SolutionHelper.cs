@@ -11,6 +11,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.LanguageServices;
 using System.Linq;
 using System.IO;
+using Microsoft.Internal.VisualStudio.PlatformUI;
 
 namespace AdjustNamespace.Helper
 {
@@ -48,28 +49,20 @@ namespace AdjustNamespace.Helper
         {
             var result = new List<SolutionItem>();
 
+            //https://github.com/VsixCommunity/Community.VisualStudio.Toolkit/issues/401
+            item.GetItemInfo(out IVsHierarchy hierarchy, out uint itemID, out _);
+            if (HierarchyUtilities.TryGetHierarchyProperty(hierarchy, itemID, (int)__VSHPROPID.VSHPROPID_IsNonMemberItem, out bool isNonMemberItem))
+            {
+                if (isNonMemberItem)
+                {
+                    // The item is not usually visible. Skip it.
+                    return result;
+                }
+            }
+
             if (item.Type == type && (string.IsNullOrEmpty(fullPath) || fullPath == item.FullPath))
             {
                 result.Add(item);
-            }
-
-            var skippedFolders = new HashSet<string>(2, StringComparer.CurrentCultureIgnoreCase);
-            if(item is Community.VisualStudio.Toolkit.Project p)
-            {
-                var projectFolder = new FileInfo(p.FullPath).Directory.FullName;
-
-                var objFolder = await p.GetAttributeAsync("BaseIntermediateOutputPath");
-                if (!string.IsNullOrEmpty(objFolder))
-                {
-                    var objFolderFullPath = Path.Combine(projectFolder, objFolder);
-                    skippedFolders.Add(objFolderFullPath);
-                }
-                var binFolder = await p.GetAttributeAsync("BaseOutputPath");
-                if (!string.IsNullOrEmpty(binFolder))
-                {
-                    var binFolderFullPath = Path.Combine(projectFolder, binFolder);
-                    skippedFolders.Add(binFolderFullPath);
-                }
             }
 
             foreach (var child in item.Children)
@@ -77,17 +70,6 @@ namespace AdjustNamespace.Helper
                 if (child == null)
                 {
                     continue;
-                }
-                if (child is Community.VisualStudio.Toolkit.PhysicalFolder pf)
-                {
-                    if (!string.IsNullOrEmpty(pf.Name))
-                    {
-                        //var di = new DirectoryInfo(pf.Name);
-                        if (skippedFolders.Contains(pf.Name))
-                        {
-                            continue;
-                        }
-                    }
                 }
 
                 result.AddRange(await child.ProcessDownRecursivelyForAsync(type, fullPath));
