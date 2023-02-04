@@ -183,6 +183,12 @@ namespace AdjustNamespace.Xaml
         private static XamlX ReadXPrefix(string xaml)
         {
             var matches = Regex.Matches(xaml, @"xmlns\s?:\s?([\w\d]+)\s?=\s?\""http:\/\/schemas\.microsoft\.com\/winfx\/2006\/xaml\""");
+            if (matches.Count == 0)
+            {
+                //for maui
+                matches = Regex.Matches(xaml, @"xmlns\s?:\s?([\w\d]+)\s?=\s?\""http:\/\/schemas\.microsoft\.com\/winfx\/2009\/xaml\""");
+            }
+
             var match = matches[0];
 
             return new XamlX(

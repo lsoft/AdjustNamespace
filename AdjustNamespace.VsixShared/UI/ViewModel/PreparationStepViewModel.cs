@@ -240,7 +240,8 @@ namespace AdjustNamespace.UI.ViewModel
 
                 if (subjectFilePath.EndsWith(".xaml"))
                 {
-                    //we want to process XAML documents! no need for additional checks
+                    //we want to process XAML documents!
+                    //TODO: need for additional checks
                     _filteredFileExs.Add(
                         new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
                         );
