@@ -20,6 +20,8 @@ using AdjustNamespace.Namespace;
 using Community.VisualStudio.Toolkit;
 using System.Runtime.Serialization;
 using System.Diagnostics;
+using AdjustNamespace.Xaml;
+using AdjustNamespace.Adjusting;
 
 namespace AdjustNamespace.UI.ViewModel
 {
@@ -137,6 +139,7 @@ namespace AdjustNamespace.UI.ViewModel
             _vss = vss;
             _nextStepFactory = nextStepFactory;
             _filePaths = filePaths;
+
             _mainMessage = "Scanning solution...";
 
             DetectedMessages = new ObservableCollection<string>();
@@ -240,80 +243,99 @@ namespace AdjustNamespace.UI.ViewModel
 
                 if (subjectFilePath.EndsWith(".xaml"))
                 {
-                    //we want to process XAML documents!
-                    //TODO: need for additional checks
+                    //TODO: unify create XamlAdjuster across the VSIX codebase
+                    var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
+                        subjectProject,
+                        subjectFilePath,
+                        _vss
+                        );
+                    if (!string.IsNullOrEmpty(targetNamespace))
+                    {
+                        var xamlAdjuster = new XamlAdjuster(
+                            _vss,
+                            false,
+                            subjectFilePath,
+                            targetNamespace!
+                            );
+                        if (await xamlAdjuster.IsChangesExistsAsync())
+                        {
+                            _filteredFileExs.Add(
+                                new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
+                                );
+                        }
+                    }
+
+                    continue;
+                }
+                else
+                {
+                    var subjectDocument = _vss.Workspace.GetDocument(subjectFilePath);
+                    if (!subjectDocument.IsDocumentInScope())
+                    {
+                        continue;
+                    }
+
+                    var subjectSemanticModel = await subjectDocument!.GetSemanticModelAsync();
+                    if (subjectSemanticModel == null)
+                    {
+                        continue;
+                    }
+
+                    var subjectSyntaxRoot = await subjectDocument.GetSyntaxRootAsync();
+                    if (subjectSyntaxRoot == null)
+                    {
+                        continue;
+                    }
+
+                    var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(subjectProject, subjectFilePath, _vss);
+                    if (string.IsNullOrEmpty(targetNamespace))
+                    {
+                        continue;
+                    }
+
+                    var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(subjectSyntaxRoot, targetNamespace!);
+                    if (ntc.IsEmpty)
+                    {
+                        continue;
+                    }
+
+                    //check for same types already exists in the destination namespace
+                    foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                    {
+                        var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
+                        if (symbolInfo == null)
+                        {
+                            continue;
+                        }
+
+                        var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
+                        if (symbolNamespace == targetNamespace)
+                        {
+                            continue;
+                        }
+
+                        if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
+                        {
+                            continue;
+                        }
+
+                        var targetNamespaceInfo = ntc.TransitionDict[symbolNamespace];
+                        if (typesInSolutionPerNamespace.CheckForTypeExists(targetNamespaceInfo.ModifiedName, symbolInfo.Name))
+                        {
+                            await AddMessageAsync(
+                                $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'"
+                                );
+
+                            _blocked = true;
+                            _filteredFileExs.Clear();
+                            return;
+                        }
+                    }
+
                     _filteredFileExs.Add(
                         new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
                         );
-                    continue;
                 }
-
-                var subjectDocument = _vss.Workspace.GetDocument(subjectFilePath);
-                if (!subjectDocument.IsDocumentInScope())
-                {
-                    continue;
-                }
-
-                var subjectSemanticModel = await subjectDocument!.GetSemanticModelAsync();
-                if (subjectSemanticModel == null)
-                {
-                    continue;
-                }
-
-                var subjectSyntaxRoot = await subjectDocument.GetSyntaxRootAsync();
-                if (subjectSyntaxRoot == null)
-                {
-                    continue;
-                }
-
-                var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(subjectProject, subjectFilePath, _vss);
-                if (string.IsNullOrEmpty(targetNamespace))
-                {
-                    continue;
-                }
-
-                var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(subjectSyntaxRoot, targetNamespace!);
-                if (ntc.IsEmpty)
-                {
-                    continue;
-                }
-
-                //check for same types already exists in the destination namespace
-                foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
-                {
-                    var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
-                    if (symbolInfo == null)
-                    {
-                        continue;
-                    }
-
-                    var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
-                    if(symbolNamespace == targetNamespace)
-                    {
-                        continue;
-                    }
-
-                    if(NamespaceHelper.IsSpecialNamespace(symbolNamespace))
-                    {
-                        continue;
-                    }
-
-                    var targetNamespaceInfo = ntc.TransitionDict[symbolNamespace];
-                    if (typesInSolutionPerNamespace.CheckForTypeExists(targetNamespaceInfo.ModifiedName, symbolInfo.Name))
-                    {
-                        await AddMessageAsync(
-                            $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'"
-                            );
-
-                        _blocked = true;
-                        _filteredFileExs.Clear();
-                        return;
-                    }
-                }
-
-                _filteredFileExs.Add(
-                    new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
-                    );
             }
 
             #endregion

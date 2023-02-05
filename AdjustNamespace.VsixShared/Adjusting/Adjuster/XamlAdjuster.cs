@@ -41,6 +41,27 @@ namespace AdjustNamespace.Adjusting
 
         public async Task<bool> AdjustAsync()
         {
+            var (xamlDocument, modifiedDocument) = await TryModifyDocumentAsync();
+            if (!modifiedDocument.HasValue)
+            {
+                return false;
+            }
+
+            modifiedDocument.Value.SaveIfChangesExistsAgainst(xamlDocument);
+
+            return true;
+        }
+
+        public async Task<bool> IsChangesExistsAsync(
+            )
+        {
+            var (xamlDocument, modifiedDocument) = await TryModifyDocumentAsync();
+            return modifiedDocument.HasValue && modifiedDocument.Value.IsChangesExists(xamlDocument);
+        }
+
+        private async Task<(XamlDocument, XamlDocument?)> TryModifyDocumentAsync(
+            )
+        {
             var xamlEngine = new XamlEngine(
                 _vss
                 );
@@ -52,12 +73,12 @@ namespace AdjustNamespace.Adjusting
 
             if (!xamlDocument.GetRootInfo(out var rootNamespace, out var rootName))
             {
-                return false;
+                return (xamlDocument, null);
             }
 
             if (rootNamespace == _targetNamespace)
             {
-                return false;
+                return (xamlDocument, null);
             }
 
             var modifiedXamlDocument = xamlDocument.MoveObject(
@@ -66,9 +87,7 @@ namespace AdjustNamespace.Adjusting
                 _targetNamespace
                 );
 
-            modifiedXamlDocument.SaveIfChangesExistsAgainst(xamlDocument);
-
-            return true;
+            return (xamlDocument, modifiedXamlDocument);
         }
     }
 }
