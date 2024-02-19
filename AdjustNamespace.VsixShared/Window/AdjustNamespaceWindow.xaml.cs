@@ -3,6 +3,7 @@ using AdjustNamespace.UI.StepFactory;
 using Microsoft.VisualStudio.PlatformUI;
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Windows;
 
 namespace AdjustNamespace.Window
@@ -31,18 +32,25 @@ namespace AdjustNamespace.Window
 
         private async void DialogWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            var showAwardCheckBox = false;
-            if (!General.Instance.StarsGiven)
+            try
             {
-                if (General.Instance.FilesAdjusted >= 20)
+                var showAwardCheckBox = false;
+                if (!General.Instance.StarsGiven)
                 {
-                    showAwardCheckBox = true;
+                    if (General.Instance.FilesAdjusted >= 20)
+                    {
+                        showAwardCheckBox = true;
+                    }
                 }
+
+                this.AwardCheckBox.Visibility = showAwardCheckBox ? Visibility.Visible : Visibility.Collapsed;
+
+                await _factory(this);
             }
-
-            this.AwardCheckBox.Visibility = showAwardCheckBox ? Visibility.Visible : Visibility.Collapsed;
-
-            await _factory(this);
+            catch (Exception ex)
+            {
+                Logging.LogVS(ex);
+            }
         }
 
         private void DialogWindow_Closed(object sender, EventArgs e)
@@ -51,11 +59,7 @@ namespace AdjustNamespace.Window
             {
                 General.Instance.StarsGiven = true;
 
-#if VS2022
                 System.Diagnostics.Process.Start("https://marketplace.visualstudio.com/items?itemName=lsoft.AdjustNamespaceVisualStudioExtension2022&ssr=false#review-details");
-#else
-                System.Diagnostics.Process.Start("https://marketplace.visualstudio.com/items?itemName=lsoft.AdjustNamespaceVisualStudioExtension&ssr=false#review-details");
-#endif
             }
         }
         public static AdjustNamespaceWindow Create(

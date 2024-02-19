@@ -20,6 +20,7 @@ using System.Windows;
 using System.Threading;
 using Newtonsoft.Json.Linq;
 using AdjustNamespace.UI.ViewModel.Select;
+using static AdjustNamespace.UI.StepFactory.SelectedStepFactory;
 
 namespace AdjustNamespace.UI.ViewModel
 {
@@ -32,6 +33,7 @@ namespace AdjustNamespace.UI.ViewModel
 
         private readonly VsServices _vss;
         private readonly IStepFactory _nextStepFactory;
+        private readonly NamespaceReplaceRegex _replaceRegex;
         private readonly List<FileEx> _filteredFileExs;
 
         private Brush _foreground;
@@ -130,7 +132,11 @@ namespace AdjustNamespace.UI.ViewModel
                                 .Where(s => s.FileEx.HasValue && s.IsChecked.GetValueOrDefault(false))
                                 .Select(s => s.FileEx!.Value.FilePath)
                                 .ToList();
-                            var pp = new PerformingParameters(filePaths, _openFilesToEnableUndo);
+                            var pp = new PerformingParameters(
+                                filePaths,
+                                _replaceRegex,
+                                _openFilesToEnableUndo
+                                );
 
                             Cleanup();
 
@@ -175,7 +181,7 @@ namespace AdjustNamespace.UI.ViewModel
         public SelectedStepViewModel(
             VsServices vss,
             IStepFactory nextStepFactory,
-            List<FileEx> fileExtensions
+            SelectedStepParameters parameters
             )
         {
             if (nextStepFactory is null)
@@ -183,16 +189,13 @@ namespace AdjustNamespace.UI.ViewModel
                 throw new ArgumentNullException(nameof(nextStepFactory));
             }
 
-            if (fileExtensions is null)
-            {
-                throw new ArgumentNullException(nameof(fileExtensions));
-            }
             _vss = vss;
             _nextStepFactory = nextStepFactory;
-            _filteredFileExs = fileExtensions;
+            _replaceRegex = parameters.ReplaceRegex;
+            _filteredFileExs = parameters.FileExs;
 
             _foreground = Brushes.Green;
-            _mainMessage = $"Total {fileExtensions.Count} files found. Choose files to process...";
+            _mainMessage = $"Total {_filteredFileExs.Count} files found. Choose files to process...";
             ToFilterItems = new ObservableCollection<ISelectItemViewModel>();
         }
 

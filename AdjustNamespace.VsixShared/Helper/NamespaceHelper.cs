@@ -39,11 +39,7 @@ namespace AdjustNamespace.Helper
         public static bool TryFindNamespaceNodesFor(
             this SyntaxNode syntaxRoot,
             string namespaceName,
-#if VS2022
             out List<BaseNamespaceDeclarationSyntax> result
-#else
-            out List<NamespaceDeclarationSyntax> result
-#endif
             )
         {
             if (syntaxRoot is null)
@@ -62,11 +58,7 @@ namespace AdjustNamespace.Helper
 
             var allFoundNamespaceSyntaxes = syntaxRoot
                 .DescendantNodes()
-#if VS2022
                 .OfType<BaseNamespaceDeclarationSyntax>()
-#else
-                .OfType<NamespaceDeclarationSyntax>()
-#endif
                 .ToList();
 
 
@@ -84,13 +76,19 @@ namespace AdjustNamespace.Helper
 
         public static async Task<string?> TryDetermineTargetNamespaceAsync(
             this SolutionItem project,
-            string documentFilePath,
-            VsServices vss
+            VsServices vss,
+            NamespaceReplaceRegex replaceRegex,
+            string documentFilePath
             )
         {
             if (project is null)
             {
                 throw new ArgumentNullException(nameof(project));
+            }
+
+            if (replaceRegex is null)
+            {
+                throw new ArgumentNullException(nameof(replaceRegex));
             }
 
             if (documentFilePath is null)
@@ -122,6 +120,9 @@ namespace AdjustNamespace.Helper
             names.Insert(0, await GetProjectDefaultNamespaceAsync(vss, documentFilePath, project));
 
             var targetNamespace = string.Join(".", names);
+
+            targetNamespace = replaceRegex.Modify(targetNamespace);
+
             return targetNamespace;
         }
 

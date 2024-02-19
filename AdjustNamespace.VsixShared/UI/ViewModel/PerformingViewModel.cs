@@ -2,17 +2,6 @@
 using AdjustNamespace.Adjusting.Adjuster;
 using AdjustNamespace.Helper;
 using AdjustNamespace.Options;
-using EnvDTE80;
-using Microsoft.CodeAnalysis;
-using Microsoft.VisualStudio;
-using Microsoft.VisualStudio.ComponentModelHost;
-using Microsoft.VisualStudio.LanguageServices;
-using Microsoft.VisualStudio.OLE.Interop;
-using Microsoft.VisualStudio.PlatformUI;
-using Microsoft.VisualStudio.Shell;
-using Microsoft.VisualStudio.TextManager.Interop;
-using Microsoft.VisualStudio.Threading;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -29,7 +18,9 @@ namespace AdjustNamespace.UI.ViewModel
         private readonly VsServices _vss;
         private readonly Action _formCloser;
         private readonly List<string> _subjectFilePaths;
+        private readonly NamespaceReplaceRegex _replaceRegex;
         private readonly bool _openFilesToEnableUndo;
+
         private RelayCommand? _cancelCommand;
         private System.Threading.Tasks.Task? _task;
 
@@ -81,6 +72,7 @@ namespace AdjustNamespace.UI.ViewModel
             _vss = vss;
             _formCloser = formCloser;
             _subjectFilePaths = parameters.SubjectFilePaths;
+            _replaceRegex = parameters.ReplaceRegex;
             _openFilesToEnableUndo = parameters.OpenFilesToEnableUndo;
             _progressMessage = string.Empty;
         }
@@ -124,8 +116,13 @@ namespace AdjustNamespace.UI.ViewModel
         private async System.Threading.Tasks.Task PerformAdjustingAsync(CancellationToken cancellationToken)
         {
             var namespaceCenter = await NamespaceCenter.CreateForAsync(_vss.Workspace);
-            var adjusterFactory = await AdjusterFactory.CreateAsync(_vss, _openFilesToEnableUndo, namespaceCenter);
-
+            var adjusterFactory = await AdjusterFactory.CreateAsync(
+                _vss,
+                _replaceRegex,
+                _openFilesToEnableUndo,
+                namespaceCenter
+                );
+            
             //process file by file
             cancellationToken = await AdjustAsync(adjusterFactory, cancellationToken);
 
@@ -169,42 +166,14 @@ namespace AdjustNamespace.UI.ViewModel
                 if (cancellationToken.IsCancellationRequested)
                 {
                     break;
-        }
+                }
 
                 ProgressMessage = $"{i + 1}/{total} Performing cleanup {documentFilePath}";
                 Debug.WriteLine($"----------------------------> {i} Cleanup {documentFilePath}");
 
                 await c.RemoveEmptyUsingStatementsForAsync(documentFilePath);
-    }
+            }
         }
     }
     
-    public readonly struct PerformingParameters
-    {
-        public readonly List<string> SubjectFilePaths;
-        public readonly bool OpenFilesToEnableUndo;
-
-        public PerformingParameters(
-            List<string> subjectFilePaths,
-            bool openFilesToEnableUndo)
-        {
-            if (subjectFilePaths is null)
-            {
-                throw new ArgumentNullException(nameof(subjectFilePaths));
-            }
-
-            SubjectFilePaths = subjectFilePaths;
-            OpenFilesToEnableUndo = openFilesToEnableUndo;
-        }
-    }
 }
-
-//[Flags]
-//public enum LinkedTransactionFlagsEnum : uint
-//{
-//    Default = 0, //Specifies the transaction to be non-strict.
-
-//    Strict = 1, //Specifies the transaction to be strict.
-
-//    Global = 2
-//}

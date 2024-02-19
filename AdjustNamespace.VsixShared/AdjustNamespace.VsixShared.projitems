@@ -64,7 +64,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\PerformingStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\PreparationStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\SelectedStepFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\SelectedStepParameters.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Theme.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ui\viewmodel\PerformingParameters.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PerformingViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PreparationStepViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\ISelectItemViewModel.cs" />

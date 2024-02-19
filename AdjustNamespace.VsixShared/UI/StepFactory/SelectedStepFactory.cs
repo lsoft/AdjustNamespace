@@ -35,12 +35,14 @@ namespace AdjustNamespace.UI.StepFactory
 
         public async System.Threading.Tasks.Task CreateAsync(object argument)
         {
+            var a = (SelectedStepParameters)argument;
+
             var v = new SelectedUserControl();
 
-            var vm  = new SelectedStepViewModel(
+            var vm = new SelectedStepViewModel(
                 _vss,
                 _nextStepFactory,
-                (List<FileEx>)argument
+                a
                 );
 
             v.DataContext = vm;
@@ -57,6 +59,5 @@ namespace AdjustNamespace.UI.StepFactory
                 Logging.LogVS(excp);
             }
         }
-
     }
 }

@@ -1,9 +1,5 @@
 ﻿using AdjustNamespace.Helper;
-using Microsoft.CodeAnalysis;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace AdjustNamespace.Adjusting.Adjuster
@@ -11,16 +7,23 @@ namespace AdjustNamespace.Adjusting.Adjuster
     public class AdjusterFactory
     {
         private readonly VsServices _vss;
+        private readonly NamespaceReplaceRegex _replaceRegex;
         private readonly bool _openFilesToEnableUndo;
         private readonly NamespaceCenter _namespaceCenter;
         private readonly List<string> _xamlFilePaths;
 
         public static async Task<AdjusterFactory> CreateAsync(
             VsServices vss,
+            NamespaceReplaceRegex replaceRegex,
             bool openFilesToEnableUndo,
             NamespaceCenter namespaceCenter
             )
         {
+            if (replaceRegex is null)
+            {
+                throw new ArgumentNullException(nameof(replaceRegex));
+            }
+
             if (namespaceCenter is null)
             {
                 throw new ArgumentNullException(nameof(namespaceCenter));
@@ -32,6 +35,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
             return new AdjusterFactory(
                 vss,
+                replaceRegex,
                 openFilesToEnableUndo,
                 namespaceCenter,
                 xamlFilePaths
@@ -41,11 +45,17 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
         private AdjusterFactory(
             VsServices vss,
+            NamespaceReplaceRegex replaceRegex,
             bool openFilesToEnableUndo,
             NamespaceCenter namespaceCenter,
             List<string> xamlFilePaths
             )
         {
+            if (replaceRegex is null)
+            {
+                throw new ArgumentNullException(nameof(replaceRegex));
+            }
+
             if (namespaceCenter is null)
             {
                 throw new ArgumentNullException(nameof(namespaceCenter));
@@ -57,6 +67,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
             }
 
             _vss = vss;
+            _replaceRegex = replaceRegex;
             _openFilesToEnableUndo = openFilesToEnableUndo;
             _namespaceCenter = namespaceCenter;
             _xamlFilePaths = xamlFilePaths;
@@ -77,7 +88,12 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 return null;
             }
 
-            var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(pii.Value.Project, subjectFilePath, _vss);
+            var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
+                pii.Value.Project,
+                _vss,
+                _replaceRegex,
+                subjectFilePath
+                );
             if (string.IsNullOrEmpty(targetNamespace))
             {
                 return null;

@@ -57,6 +57,17 @@ namespace AdjustNamespace.UI.ViewModel
             private set;
         }
 
+        public string ReplaceRegex
+        {
+            get;
+            set;
+        } = string.Empty;
+
+        public string ReplacedString
+        {
+            get;
+            set;
+        } = string.Empty;
 
         public ICommand CloseCommand
         {
@@ -110,7 +121,16 @@ namespace AdjustNamespace.UI.ViewModel
                         {
                             if (_filteredFileExs != null)
                             {
-                                await _nextStepFactory.CreateAsync(_filteredFileExs);
+                                var replaceRegex = new NamespaceReplaceRegex(ReplaceRegex, ReplacedString);
+
+                                var parameters = new SelectedStepParameters(
+                                    _filteredFileExs,
+                                    replaceRegex
+                                    );
+
+                                await _nextStepFactory.CreateAsync(
+                                    parameters
+                                    );
                             }
                         },
                         r => !_blocked && !_isInProgress
@@ -136,6 +156,7 @@ namespace AdjustNamespace.UI.ViewModel
             {
                 throw new ArgumentNullException(nameof(filePaths));
             }
+
             _vss = vss;
             _nextStepFactory = nextStepFactory;
             _filePaths = filePaths;
@@ -231,6 +252,8 @@ namespace AdjustNamespace.UI.ViewModel
                 _vss.Workspace
                 );
 
+            var replaceRegex = new NamespaceReplaceRegex(ReplaceRegex, ReplacedString);
+
             var total = fileExtensions.Count;
             for (int i = 0; i < total; i++)
             {
@@ -246,8 +269,9 @@ namespace AdjustNamespace.UI.ViewModel
                     //TODO: unify create XamlAdjuster across the VSIX codebase
                     var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
                         subjectProject,
-                        subjectFilePath,
-                        _vss
+                        _vss,
+                        replaceRegex,
+                        subjectFilePath
                         );
                     if (!string.IsNullOrEmpty(targetNamespace))
                     {
@@ -287,7 +311,12 @@ namespace AdjustNamespace.UI.ViewModel
                         continue;
                     }
 
-                    var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(subjectProject, subjectFilePath, _vss);
+                    var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
+                        subjectProject, 
+                        _vss,
+                        replaceRegex,
+                        subjectFilePath
+                        );
                     if (string.IsNullOrEmpty(targetNamespace))
                     {
                         continue;
