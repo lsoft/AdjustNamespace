@@ -1,4 +1,4 @@
-﻿using AdjustNamespace.Xaml.BodyProvider;
+using AdjustNamespace.Xaml.BodyProvider;
 using AdjustNamespace.Xaml.Positioned;
 using System;
 using System.Collections.Generic;
@@ -187,6 +187,12 @@ namespace AdjustNamespace.Xaml
             {
                 //for maui
                 matches = Regex.Matches(xaml, @"xmlns\s?:\s?([\w\d]+)\s?=\s?\""http:\/\/schemas\.microsoft\.com\/winfx\/2009\/xaml\""");
+            }
+
+            if (matches.Count == 0)
+            {
+                // there is no x definition (i.e. ResourceDictionary etc)
+                return new XamlX(0, 0, "NO_X_ALIAS");
             }
 
             var match = matches[0];
