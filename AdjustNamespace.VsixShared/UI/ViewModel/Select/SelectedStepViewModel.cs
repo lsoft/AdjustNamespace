@@ -1,12 +1,5 @@
 ﻿using AdjustNamespace.Helper;
-using EnvDTE80;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.VisualStudio.ComponentModelHost;
-using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.PlatformUI;
-using Microsoft.VisualStudio.Shell;
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -14,13 +7,10 @@ using System.Windows.Input;
 using System.Windows.Media;
 using AdjustNamespace.UI.StepFactory;
 using Microsoft.CodeAnalysis;
+using AdjustNamespace.UI.ViewModel.Select;
+using AdjustNamespace.Adjusting;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
-using System.Windows;
-using System.Threading;
-using Newtonsoft.Json.Linq;
-using AdjustNamespace.UI.ViewModel.Select;
-using static AdjustNamespace.UI.StepFactory.SelectedStepFactory;
 
 namespace AdjustNamespace.UI.ViewModel
 {
@@ -32,18 +22,27 @@ namespace AdjustNamespace.UI.ViewModel
         public const int MaxFilesAllowedToOpen = 15;
 
         private readonly VsServices _vss;
+        private readonly IStepFactory _previousStepFactory;
         private readonly IStepFactory _nextStepFactory;
-        private readonly NamespaceReplaceRegex _replaceRegex;
-        private readonly List<FileEx> _filteredFileExs;
+        private readonly HashSet<string> _filePaths;
+
+        //private readonly List<FileEx> _filteredFileExs;
+
+        private bool _statusOk = false;
 
         private Brush _foreground;
-        private string _mainMessage;
+        private string _mainMessage = string.Empty;
 
         private ICommand? _closeCommand;
         private ICommand? _nextCommand;
         private ICommand? _invertStatusCommand;
+        private ICommand? _previousCommand;
+        private ICommand? _rescanCommand;
+        
         private bool _enableOpenFileCheckBox;
         private bool _openFilesToEnableUndo;
+        private string _replaceRegex = string.Empty;
+        private string _replacedString = string.Empty;
 
         public string MainMessage
         {
@@ -97,6 +96,37 @@ namespace AdjustNamespace.UI.ViewModel
 
         #endregion
 
+        public string ReplaceRegex
+        {
+            get => _replaceRegex;
+            set
+            {
+                _replaceRegex = value;
+
+                Reset();
+
+                OnPropertyChanged();
+            }
+        }
+
+        public string ReplacedString
+        {
+            get => _replacedString;
+            set
+            {
+                _replacedString = value;
+
+                Reset();
+
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<KnownRegex> KnownRegexes
+        {
+            get;
+        }
+
         public ICommand CloseCommand
         {
             get
@@ -119,6 +149,45 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        public ICommand PreviousCommand
+        {
+            get
+            {
+                if (_previousCommand == null)
+                {
+                    _previousCommand = new AsyncRelayCommand(
+                        async a =>
+                        {
+                            await _previousStepFactory.CreateAsync(
+                                _filePaths
+                                );
+                        }
+                        );
+                }
+
+                return _previousCommand;
+            }
+        }
+
+        public ICommand RescanCommand
+        {
+            get
+            {
+                if (_rescanCommand == null)
+                {
+                    _rescanCommand = new AsyncRelayCommand(
+                        async a =>
+                        {
+                            await RescanAsync();
+                        },
+                        r => !_statusOk
+                        );
+                }
+
+                return _rescanCommand;
+            }
+        }
+
         public ICommand NextCommand
         {
             get
@@ -134,7 +203,7 @@ namespace AdjustNamespace.UI.ViewModel
                                 .ToList();
                             var pp = new PerformingParameters(
                                 filePaths,
-                                _replaceRegex,
+                                CreateNamespaceReplaceRegex(),
                                 _openFilesToEnableUndo
                                 );
 
@@ -142,14 +211,13 @@ namespace AdjustNamespace.UI.ViewModel
 
                             await _nextStepFactory.CreateAsync(pp);
                         },
-                        r => ToFilterItems.Any(s => s.IsChecked.GetValueOrDefault(false))
+                        r => _statusOk && ToFilterItems.Any(s => s.IsChecked.GetValueOrDefault(false))
                         );
                 }
 
                 return _nextCommand;
             }
         }
-
 
         public ICommand InvertStatusCommand
         {
@@ -169,7 +237,8 @@ namespace AdjustNamespace.UI.ViewModel
 
                             var newValue = !selected[0].IsChecked.GetValueOrDefault(false);
                             selected.ForEach(s => s.IsChecked = newValue);
-                        }
+                        },
+                        a => _statusOk
                         );
                 }
 
@@ -180,31 +249,136 @@ namespace AdjustNamespace.UI.ViewModel
 
         public SelectedStepViewModel(
             VsServices vss,
+            IStepFactory previousStepFactory,
             IStepFactory nextStepFactory,
             SelectedStepParameters parameters
             )
         {
+            if (previousStepFactory is null)
+            {
+                throw new ArgumentNullException(nameof(previousStepFactory));
+            }
+
             if (nextStepFactory is null)
             {
                 throw new ArgumentNullException(nameof(nextStepFactory));
             }
 
             _vss = vss;
+            _previousStepFactory = previousStepFactory;
             _nextStepFactory = nextStepFactory;
-            _replaceRegex = parameters.ReplaceRegex;
-            _filteredFileExs = parameters.FileExs;
+            _filePaths = parameters.FilePaths;
 
             _foreground = Brushes.Green;
-            _mainMessage = $"Total {_filteredFileExs.Count} files found. Choose files to process...";
             ToFilterItems = new ObservableCollection<ISelectItemViewModel>();
+
+            KnownRegexes = new ObservableCollection<KnownRegex>(
+                [
+                    new KnownRegex(
+                        "Any.Name.Space -> NewNamespace",
+                        ".+",
+                        string.Empty,
+                        a =>
+                        {
+                            ReplaceRegex = a.ReplaceRegex;
+                            ReplacedString = a.ReplacedString;
+                        }
+                        ),
+                    new KnownRegex(
+                        "First.Part.Of.The.Name -> NewNamespace.Part.Of.The.Name",
+                        "^[^.]+",
+                        string.Empty,
+                        a =>
+                        {
+                            ReplaceRegex = a.ReplaceRegex;
+                            ReplacedString = a.ReplacedString;
+                        }
+                        ),
+                    new KnownRegex(
+                        "Last.Part.Of.The.Name -> Last.Part.Of.The.NewNamespace",
+                        "[^.]+$",
+                        string.Empty,
+                        a =>
+                        {
+                            ReplaceRegex = a.ReplaceRegex;
+                            ReplacedString = a.ReplacedString;
+                        }
+                        ),
+
+
+                ]);
         }
 
         public override async System.Threading.Tasks.Task StartAsync()
         {
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            await RescanAsync();
+        }
 
+        private void Reset()
+        {
+            MainMessage = "Target namespace regex changed. Press Rescan button.";
+
+            _statusOk = false;
+
+            ToFilterItems.Clear();
+        }
+
+        private async Task RescanAsync()
+        {
+            try
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                MainMessage = $"Scanning for a type name conflicts...";
+
+                var replaceRegex = CreateNamespaceReplaceRegex();
+
+                var sfc = new SubjectFileCollector(
+                    _vss,
+                    _filePaths,
+                    replaceRegex
+                    );
+                var sr = await sfc.AnalyzeAndCollectAsync(
+                    (progress, total, filePaths) =>
+                    {
+                        MainMessage = $"{progress}/{total} Processing {filePaths}";
+                    }
+                    );
+
+                BuildTree(sr.CollectedFiles);
+
+                MainMessage = $"Total {sr.CollectedFiles.Count} files found. Choose files to process...";
+
+                _statusOk = true;
+            }
+            catch (FileProcessException excp)
+            {
+                MainMessage =
+                    $"Processing {excp.FilePath} fails."
+                    + Environment.NewLine
+                    + $"Adjust namespace can produce an incorrect results."
+                    + Environment.NewLine
+                    + excp.Message
+                    + Environment.NewLine
+                    + excp.StackTrace
+                    ;
+
+                Logging.LogVS(excp);
+            }
+        }
+
+        private NamespaceReplaceRegex CreateNamespaceReplaceRegex()
+        {
+            return new NamespaceReplaceRegex(ReplaceRegex, ReplacedString);
+        }
+
+
+        private void BuildTree(
+            List<FileEx> filteredFileExs
+            )
+        {
             //perform grouping by files physical folder!
-            var dirPaths = _filteredFileExs.Select(f => f.FolderPath).Distinct().ToList();
+            var dirPaths = filteredFileExs.Select(f => f.FolderPath).Distinct().ToList();
             var dirs = new List<SelectFolderViewModel>();
             foreach (var dirPath in dirPaths)
             {
@@ -213,7 +387,7 @@ namespace AdjustNamespace.UI.ViewModel
                     dirPath
                     );
 
-                var dirFiles = _filteredFileExs
+                var dirFiles = filteredFileExs
                     .Where(f => f.FolderPath == dirPath)
                     .Select(f => new SelectFileViewModel(f, dir))
                     .ToList();

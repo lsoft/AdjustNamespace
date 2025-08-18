@@ -21,6 +21,8 @@
             <RowDefinition />
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
         </Grid.RowDefinitions>
 
         <TextBlock
@@ -97,8 +99,96 @@
             />
 
         <Grid
-            Name="ButtonGrid"
+            Name="RegexGrid"
             Grid.Row="4"
+            Margin="0,10,0,0"
+            HorizontalAlignment="Stretch"
+            >
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="auto" />
+                <ColumnDefinition />
+                <ColumnDefinition Width="auto" />
+                <ColumnDefinition />
+                <ColumnDefinition Width="auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock
+                Grid.Column="0"
+                Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                Margin="5,0,10,0"
+                VerticalAlignment="Center"
+                Text="Modify produced namespace with regex"
+                />
+
+            <TextBox
+                Grid.Column="1"
+                Text="{Binding Path=ReplaceRegex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                />
+
+            <TextBlock
+                Grid.Column="2"
+                Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                Margin="10,0,10,0"
+                VerticalAlignment="Center"
+                Text="with the following"
+                />
+
+            <TextBox
+                Grid.Column="3"
+                Text="{Binding Path=ReplacedString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                />
+
+            <TextBlock
+                Grid.Column="4"
+                Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
+                Margin="10,0,10,0"
+                VerticalAlignment="Center"
+                Text="(fill both to enable)"
+                />
+        </Grid>
+
+        <ListView
+            Grid.Row="5"
+            HorizontalAlignment="Stretch"
+            ItemsSource="{Binding KnownRegexes}"
+            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+            >
+            <ListView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Stretch"
+                        />
+                </ItemsPanelTemplate>
+            </ListView.ItemsPanel>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="{x:Type ListViewItem}">
+                                <ContentPresenter />
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Button
+                        Margin="20,0,20,0"
+                        Style="{DynamicResource TextLikeButtonResource}"
+                        Content="{Binding RegexName}"
+                        Command="{Binding ApplyRegexCommand}"
+                        />
+                </DataTemplate>
+            </ListView.ItemTemplate>
+            
+        </ListView>
+
+
+        <Grid
+            Name="ButtonGrid"
+            Grid.Row="6"
             Margin="0,10,0,0"
             HorizontalAlignment="Stretch"
             >
@@ -119,26 +209,73 @@
                 Content="Cancel"
                 />
 
-            <Button
-                Name="NextButton"
+
+            <StackPanel
                 Grid.Column="3"
-                Width="80"
-                Margin="2"
-                Padding="10,5,10,5"
-                HorizontalAlignment="Right"
-                Command="{Binding NextCommand}"
+                Orientation="Horizontal"
                 >
-                <Button.Content>
-                    <StackPanel Orientation="Horizontal">
-                        <imaging:CrispImage
-                            Width="10"
-                            Height="10"
-                            Moniker="{x:Static main:ImageMonikers.Logo}"
-                            />
-                        <TextBlock Margin="10,0,0,0" Text="{Binding NextButtonTitle, FallbackValue=Next}" />
-                    </StackPanel>
-                </Button.Content>
-            </Button>
+
+                <Button
+                    Name="RescanButton"
+                    Width="100"
+                    Margin="2"
+                    Padding="10,5,10,5"
+                    HorizontalAlignment="Right"
+                    Command="{Binding RescanCommand}"
+                    >
+                    <Button.Content>
+                        <StackPanel Orientation="Horizontal">
+                            <imaging:CrispImage
+                                Width="10"
+                                Height="10"
+                                Moniker="{x:Static main:ImageMonikers.Logo}"
+                                />
+                            <TextBlock Margin="10,0,0,0" Text="{Binding RescanButtonTitle, FallbackValue=Rescan}" />
+                        </StackPanel>
+                    </Button.Content>
+                </Button>
+
+                <Button
+                    Name="PreviousButton"
+                    Width="100"
+                    Margin="2"
+                    Padding="10,5,10,5"
+                    HorizontalAlignment="Right"
+                    Command="{Binding PreviousCommand}"
+                    >
+                    <Button.Content>
+                        <StackPanel Orientation="Horizontal">
+                            <imaging:CrispImage
+                                Width="10"
+                                Height="10"
+                                Moniker="{x:Static main:ImageMonikers.Logo}"
+                                />
+                            <TextBlock Margin="10,0,0,0" Text="{Binding PreviousButtonTitle, FallbackValue=Previous}" />
+                        </StackPanel>
+                    </Button.Content>
+                </Button>
+
+                <Button
+                    Name="NextButton"
+                    Width="80"
+                    Margin="2"
+                    Padding="10,5,10,5"
+                    HorizontalAlignment="Right"
+                    Command="{Binding NextCommand}"
+                    >
+                    <Button.Content>
+                        <StackPanel Orientation="Horizontal">
+                            <imaging:CrispImage
+                                Width="10"
+                                Height="10"
+                                Moniker="{x:Static main:ImageMonikers.Logo}"
+                                />
+                            <TextBlock Margin="10,0,0,0" Text="{Binding NextButtonTitle, FallbackValue=Next}" />
+                        </StackPanel>
+                    </Button.Content>
+                </Button>
+
+            </StackPanel>
 
         </Grid>
 

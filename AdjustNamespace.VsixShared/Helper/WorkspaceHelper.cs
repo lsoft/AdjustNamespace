@@ -108,7 +108,10 @@ namespace AdjustNamespace.Helper
             return result;
         }
 
-        public static async Task<(Document?, SyntaxNode?)> GetDocumentAndSyntaxRootAsync(this Workspace workspace, string filePath)
+        public static async Task<(Document?, SyntaxNode?)> GetDocumentAndSyntaxRootAsync(
+            this Workspace workspace,
+            string filePath
+            )
         {
             var document = workspace.GetDocument(filePath);
             if (document == null)

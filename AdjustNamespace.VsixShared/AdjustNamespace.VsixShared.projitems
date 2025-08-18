@@ -20,12 +20,19 @@
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\AddUsingFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\NamespaceFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Fixer\Specific\QualifiedNameFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)adjusting\SubjectFileCollector.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Command\AdjustSelectedCommand.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Command\ShowReleaseNotesCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Command\EditSkippedPathsCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Command\AdjustSolutionCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\DocumentChangerHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\EmbeddedResourceHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\ExtensionPath.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\HashSetHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\NameHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)InfoBar\InfoBarService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)InfoBar\ReleaseNotesInfoBarService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)NamespaceReplaceRegex.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceCenter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\XamlAdjuster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Command\AdjustNamespaceCommand.cs" />
@@ -70,6 +77,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PerformingViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PreparationStepViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\ISelectItemViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ui\viewmodel\select\KnownRegex.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectedStepViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectFileViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectFolderViewModel.cs" />
@@ -95,6 +103,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlXmlns.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)UI\TextLikeButtonResource.xaml">
+      <SubType>Designer</SubType>
+      <Generator>XamlIntelliSenseFileGenerator</Generator>
+    </EmbeddedResource>
     <Page Include="$(MSBuildThisFileDirectory)UI\Control\PerformingUserControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

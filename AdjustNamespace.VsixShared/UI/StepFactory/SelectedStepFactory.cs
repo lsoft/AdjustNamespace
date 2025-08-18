@@ -12,6 +12,12 @@ namespace AdjustNamespace.UI.StepFactory
         private readonly ContentControl _targetControl;
         private readonly IStepFactory _nextStepFactory;
 
+        public PreparationStepFactory? PreviousStepFactory
+        {
+            get;
+            set;
+        }
+
         public SelectedStepFactory(
             VsServices vss,
             ContentControl targetControl,
@@ -41,6 +47,7 @@ namespace AdjustNamespace.UI.StepFactory
 
             var vm = new SelectedStepViewModel(
                 _vss,
+                PreviousStepFactory!,
                 _nextStepFactory,
                 a
                 );

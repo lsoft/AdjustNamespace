@@ -20,7 +20,6 @@
             <RowDefinition Height="auto" />
             <RowDefinition />
             <RowDefinition Height="auto" />
-            <RowDefinition Height="auto" />
         </Grid.RowDefinitions>
 
         <TextBlock
@@ -50,57 +49,8 @@
             />
 
         <Grid
-            Name="RegexGrid"
-            Grid.Row="3"
-            Margin="0,10,0,0"
-            HorizontalAlignment="Stretch"
-            >
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="auto" />
-                <ColumnDefinition />
-                <ColumnDefinition Width="auto" />
-                <ColumnDefinition />
-                <ColumnDefinition Width="auto" />
-            </Grid.ColumnDefinitions>
-
-            <TextBlock
-                Grid.Column="0"
-                Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                Margin="5,0,10,0"
-                VerticalAlignment="Center"
-                Text="Modify produced namespace with regex"
-                />
-
-            <TextBox
-                Grid.Column="1"
-                Text="{Binding Path=ReplaceRegex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                />
-
-            <TextBlock
-                Grid.Column="2"
-                Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                Margin="10,0,10,0"
-                VerticalAlignment="Center"
-                Text="with the following"
-                />
-
-            <TextBox
-                Grid.Column="3"
-                Text="{Binding Path=ReplacedString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                />
-
-            <TextBlock
-                Grid.Column="4"
-                Foreground="{DynamicResource {x:Static vsshell:VsBrushes.WindowTextKey}}"
-                Margin="10,0,10,0"
-                VerticalAlignment="Center"
-                Text="(fill both to enable)"
-                />
-        </Grid>
-
-        <Grid
             Name="ButtonGrid"
-            Grid.Row="4"
+            Grid.Row="3"
             Margin="0,10,0,0"
             HorizontalAlignment="Stretch"
             >

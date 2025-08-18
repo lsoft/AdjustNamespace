@@ -6,13 +6,19 @@ namespace AdjustNamespace.UI.ViewModel
 {
     public readonly struct SelectedStepParameters
     {
-        public readonly List<FileEx> FileExs;
-        public readonly NamespaceReplaceRegex ReplaceRegex;
+        public readonly HashSet<string> FilePaths;
 
-        public SelectedStepParameters(List<FileEx> fileExs, NamespaceReplaceRegex replaceRegex)
+        public SelectedStepParameters(
+            HashSet<string> filePaths
+            )
         {
-            FileExs = fileExs;
-            ReplaceRegex = replaceRegex;
+            if (filePaths is null)
+            {
+                throw new ArgumentNullException(nameof(filePaths));
+            }
+
+            FilePaths = filePaths;
         }
+
     }
 }

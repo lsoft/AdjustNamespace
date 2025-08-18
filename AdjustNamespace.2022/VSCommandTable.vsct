@@ -78,6 +78,13 @@
         </Strings>
       </Button>
 
+      <Button guid="guidAdjustNamespacePackageCmdSet" id="ShowReleaseNotesCommandId" priority="0x0210" type="Button">
+        <Parent guid="guidAdjustNamespacePackageCmdSet" id="ExtensionSubMenuGroupService" />
+        <Strings>
+          <ButtonText>Show release notes...</ButtonText>
+        </Strings>
+      </Button>
+
     </Buttons>
 
     <Bitmaps>
@@ -101,6 +108,9 @@
       <IDSymbol name="AdjustSolutionCommandId" value="0x0301" />
       <IDSymbol name="AdjustSelectedCommandId" value="0x0302" />
       <IDSymbol name="EditSkippedPathsCommandId" value="0x0322" />
+      <IDSymbol name="ShowReleaseNotesCommandId" value="0x0323" />
+
+      
     </GuidSymbol>
 
     <GuidSymbol name="guidImages" value="{6309e701-5f02-4bc7-8376-02ec55028dbf}" >

@@ -1,12 +1,5 @@
 ﻿using AdjustNamespace.Helper;
-using EnvDTE80;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.VisualStudio.ComponentModelHost;
-using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.PlatformUI;
-using Microsoft.VisualStudio.Shell;
-using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -15,12 +8,6 @@ using AdjustNamespace.UI.StepFactory;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 using Microsoft.CodeAnalysis;
-using EnvDTE;
-using AdjustNamespace.Namespace;
-using Community.VisualStudio.Toolkit;
-using System.Runtime.Serialization;
-using System.Diagnostics;
-using AdjustNamespace.Xaml;
 using AdjustNamespace.Adjusting;
 
 namespace AdjustNamespace.UI.ViewModel
@@ -39,8 +26,6 @@ namespace AdjustNamespace.UI.ViewModel
         private ICommand? _repeatCommand;
         private ICommand? _nextCommand;
 
-        private List<FileEx>? _filteredFileExs = null;
-
         public string MainMessage
         {
             get => _mainMessage;
@@ -56,18 +41,6 @@ namespace AdjustNamespace.UI.ViewModel
             get;
             private set;
         }
-
-        public string ReplaceRegex
-        {
-            get;
-            set;
-        } = string.Empty;
-
-        public string ReplacedString
-        {
-            get;
-            set;
-        } = string.Empty;
 
         public ICommand CloseCommand
         {
@@ -119,19 +92,13 @@ namespace AdjustNamespace.UI.ViewModel
                     _nextCommand = new AsyncRelayCommand(
                         async a =>
                         {
-                            if (_filteredFileExs != null)
-                            {
-                                var replaceRegex = new NamespaceReplaceRegex(ReplaceRegex, ReplacedString);
+                            var parameters = new SelectedStepParameters(
+                                _filePaths
+                                );
 
-                                var parameters = new SelectedStepParameters(
-                                    _filteredFileExs,
-                                    replaceRegex
-                                    );
-
-                                await _nextStepFactory.CreateAsync(
-                                    parameters
-                                    );
-                            }
+                            await _nextStepFactory.CreateAsync(
+                                parameters
+                                );
                         },
                         r => !_blocked && !_isInProgress
                         );
@@ -189,23 +156,23 @@ namespace AdjustNamespace.UI.ViewModel
 
                 Logging.LogVS(excp);
             }
-            catch (FileProcessException excp)
-            {
-                await AddMessageAsync(
-                    $"Processing {excp.FilePath} fails."
-                    );
-                await AddMessageAsync(
-                    $"Adjust namespace can produce an incorrect results."
-                    );
-                await AddMessageAsync(
-                    excp.Message
-                    );
-                await AddMessageAsync(
-                    excp.StackTrace
-                    );
+            //catch (FileProcessException excp)
+            //{
+            //    await AddMessageAsync(
+            //        $"Processing {excp.FilePath} fails."
+            //        );
+            //    await AddMessageAsync(
+            //        $"Adjust namespace can produce an incorrect results."
+            //        );
+            //    await AddMessageAsync(
+            //        excp.Message
+            //        );
+            //    await AddMessageAsync(
+            //        excp.StackTrace
+            //        );
 
-                Logging.LogVS(excp);
-            }
+            //    Logging.LogVS(excp);
+            //}
             catch (Exception excp)
             {
                 await AddMessageAsync(
@@ -229,150 +196,32 @@ namespace AdjustNamespace.UI.ViewModel
         {
             _isInProgress = true;
 
-            DetectedMessages.Clear();
-
-            OnPropertyChanged();
-
-            await TaskScheduler.Default;
-
-            await CheckForSolutionCompilationAsync();
-
-            //extract project items (we need perform this in main thread)
-            var fileExtensions = await FillFileExtensionAsync();
-
-            //the below we may run into background thread
-            //await TaskScheduler.Default;
-
-            #region check for the target namespace already contains a type with same name
-
-            _filteredFileExs = new List<FileEx>();
-
-            // get all types in solution
-            var typesInSolutionPerNamespace = await NamespaceTypeContainer.CreateForAsync(
-                _vss.Workspace
-                );
-
-            var replaceRegex = new NamespaceReplaceRegex(ReplaceRegex, ReplacedString);
-
-            var total = fileExtensions.Count;
-            for (int i = 0; i < total; i++)
+            try
             {
-                FileExtension fileExtension = fileExtensions[i];
-                var subjectFilePath = fileExtension.FilePath;
-                var subjectProject = fileExtension.Project;
-                var subjectProjectItem = fileExtension.ProjectItem;
+                DetectedMessages.Clear();
 
-                MainMessage = $"{i+1}/{total} Processing {subjectFilePath}";
+                OnPropertyChanged();
 
-                if (subjectFilePath.EndsWith(".xaml"))
-                {
-                    //TODO: unify create XamlAdjuster across the VSIX codebase
-                    var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
-                        subjectProject,
-                        _vss,
-                        replaceRegex,
-                        subjectFilePath
-                        );
-                    if (!string.IsNullOrEmpty(targetNamespace))
-                    {
-                        var xamlAdjuster = new XamlAdjuster(
-                            _vss,
-                            false,
-                            subjectFilePath,
-                            targetNamespace!
-                            );
-                        if (await xamlAdjuster.IsChangesExistsAsync())
-                        {
-                            _filteredFileExs.Add(
-                                new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
-                                );
-                        }
-                    }
+                await TaskScheduler.Default;
 
-                    continue;
-                }
-                else
-                {
-                    var subjectDocument = _vss.Workspace.GetDocument(subjectFilePath);
-                    if (!subjectDocument.IsDocumentInScope())
-                    {
-                        continue;
-                    }
+                await CheckForSolutionCompilationAsync();
 
-                    var subjectSemanticModel = await subjectDocument!.GetSemanticModelAsync();
-                    if (subjectSemanticModel == null)
-                    {
-                        continue;
-                    }
+                //#region collect files which are subject to change    !!!AND!!!    check for the target namespace already contains a type with same name
 
-                    var subjectSyntaxRoot = await subjectDocument.GetSyntaxRootAsync();
-                    if (subjectSyntaxRoot == null)
-                    {
-                        continue;
-                    }
+                //_filteredFileExs.Clear();
 
-                    var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
-                        subjectProject, 
-                        _vss,
-                        replaceRegex,
-                        subjectFilePath
-                        );
-                    if (string.IsNullOrEmpty(targetNamespace))
-                    {
-                        continue;
-                    }
+                //var foundFileExs = await ScanForSubjectFilesAsync();
+                //_filteredFileExs.AddRange(foundFileExs);
 
-                    var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(subjectSyntaxRoot, targetNamespace!);
-                    if (ntc.IsEmpty)
-                    {
-                        continue;
-                    }
+                //#endregion
 
-                    //check for same types already exists in the destination namespace
-                    foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
-                    {
-                        var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
-                        if (symbolInfo == null)
-                        {
-                            continue;
-                        }
-
-                        var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
-                        if (symbolNamespace == targetNamespace)
-                        {
-                            continue;
-                        }
-
-                        if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
-                        {
-                            continue;
-                        }
-
-                        var targetNamespaceInfo = ntc.TransitionDict[symbolNamespace];
-                        if (typesInSolutionPerNamespace.CheckForTypeExists(targetNamespaceInfo.ModifiedName, symbolInfo.Name))
-                        {
-                            await AddMessageAsync(
-                                $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'"
-                                );
-
-                            _blocked = true;
-                            _filteredFileExs.Clear();
-                            return;
-                        }
-                    }
-
-                    _filteredFileExs.Add(
-                        new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
-                        );
-                }
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
             }
-
-            #endregion
-
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            MainMessage = $"Let's move next!";
-            _isInProgress = false;
+            finally
+            {
+                MainMessage = $"Let's move next!";
+                _isInProgress = false;
+            }
 
             OnPropertyChanged();
         }
@@ -419,54 +268,11 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
-        private async Task<List<FileExtension>> FillFileExtensionAsync()
-        {
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            var fileExtensions = new List<FileExtension>(_filePaths.Count);
-
-            var projectItems = await SolutionHelper.GetAllProjectItemsAsync(null);
-            foreach (var filePath in _filePaths)
-            {
-                try
-                {
-                    if(!projectItems.TryGetValue(filePath, out var pii))
-                    {
-                        continue;
-                    }
-
-                    fileExtensions.Add(new FileExtension(filePath, pii.Project, pii.ProjectItem));
-                }
-                catch (Exception ex)
-                {
-                    throw new FileProcessException(filePath, ex);
-                }
-            }
-
-            return fileExtensions;
-        }
-
         private async System.Threading.Tasks.Task AddMessageAsync(string message)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             DetectedMessages.Add(message);
-
-            //await TaskScheduler.Default;
-        }
-
-        private sealed class FileProcessException : Exception
-        {
-            public string FilePath { get; }
-
-            public FileProcessException(
-                string filePath,
-                Exception ex
-                )
-                : base($"Processing of {filePath} failed", ex)
-            {
-                FilePath = filePath;
-            }
         }
 
         private sealed class CompilationException : Exception
@@ -482,45 +288,6 @@ namespace AdjustNamespace.UI.ViewModel
             {
                 Project = project;
             }
-        }
-
-        /// <summary>
-        /// Extension for file from workspace.
-        /// </summary>
-        [DebuggerDisplay("{FilePath}")]
-        private readonly struct FileExtension
-        {
-            public readonly string FilePath;
-            public readonly SolutionItem Project;
-            public readonly string ProjectPath;
-            public readonly SolutionItem ProjectItem;
-
-            public FileExtension(
-                string filePath,
-                SolutionItem project,
-                SolutionItem projectItem
-                )
-            {
-                if (project is null)
-                {
-                    throw new ArgumentNullException(nameof(project));
-                }
-
-                if (projectItem is null)
-                {
-                    throw new ArgumentNullException(nameof(projectItem));
-                }
-                if (filePath is null)
-                {
-                    throw new ArgumentNullException(nameof(filePath));
-                }
-
-                FilePath = filePath;
-                Project = project;
-                ProjectPath = project.FullPath!;
-                ProjectItem = projectItem;
-            }
-
         }
 
     }

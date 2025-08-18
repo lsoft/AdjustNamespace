@@ -4,45 +4,10 @@ using EnvDTE80;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices;
 using System.IO;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace AdjustNamespace
 {
-    public sealed class NamespaceReplaceRegex
-    {
-        public string ReplaceRegex
-        {
-            get;
-        }
-
-        public string ReplacedString
-        {
-            get;
-        }
-
-        public NamespaceReplaceRegex(string replaceRegex, string replacedString)
-        {
-            ReplaceRegex = replaceRegex;
-            ReplacedString = replacedString;
-        }
-
-        public string Modify(string myNamespace)
-        {
-            if(string.IsNullOrEmpty(ReplaceRegex))
-            {
-                return myNamespace;
-            }
-            if (string.IsNullOrEmpty(ReplacedString))
-            {
-                return myNamespace;
-            }
-
-            var result = Regex.Replace(myNamespace, ReplaceRegex, ReplacedString);
-            return result;
-        }
-    }
-
     public readonly struct VsServices
     {
         public readonly IAsyncServiceProvider ServiceProvider;

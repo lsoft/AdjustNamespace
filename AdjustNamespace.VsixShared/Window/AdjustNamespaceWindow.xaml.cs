@@ -62,6 +62,7 @@ namespace AdjustNamespace.Window
                 System.Diagnostics.Process.Start("https://marketplace.visualstudio.com/items?itemName=lsoft.AdjustNamespaceVisualStudioExtension2022&ssr=false#review-details");
             }
         }
+
         public static AdjustNamespaceWindow Create(
             VsServices vss,
             HashSet<string> filePaths
@@ -87,6 +88,8 @@ namespace AdjustNamespace.Window
                         anw.CenterContentControl,
                         selsf
                         );
+
+                    selsf.PreviousStepFactory = prepsf;
 
                     await prepsf.CreateAsync(filePaths);
                 }

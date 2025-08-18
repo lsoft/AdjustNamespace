@@ -27,5 +27,13 @@ namespace AdjustNamespace.Options
         [DefaultValue(false)]
         [Browsable(false)]
         public bool StarsGiven { get; set; } = false;
+
+        [Category("Logic")]
+        [DisplayName("Last Version")]
+        [DefaultValue("0.0.0")]
+        [Browsable(false)]
+        public string LastVersion { get; set; } = "0.0.0";
+
+
     }
 }

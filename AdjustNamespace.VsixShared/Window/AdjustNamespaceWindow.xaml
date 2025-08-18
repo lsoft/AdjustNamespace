@@ -11,9 +11,9 @@
     xmlns:vsshell="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
     Title="Adjust namespaces..."
     Width="800"
-    Height="500"
-    d:DesignHeight="300"
-    d:DesignWidth="400"
+    Height="600"
+    d:DesignHeight="600"
+    d:DesignWidth="800"
     ui:VsTheme.UseVsTheme="True"
     Closed="DialogWindow_Closed"
     Loaded="DialogWindow_Loaded"
@@ -33,7 +33,7 @@
             Name="AwardCheckBox"
             Grid.Row="1"
             Margin="5"
-            Content="Open the VS Marketplace page in my browser when completed to award a star."
+            Content="Open the VS Marketplace page in my browser when completed to award a ★★★★★."
             />
 
     </Grid>
