@@ -1,4 +1,5 @@
 ﻿using AdjustNamespace.Adjusting.Adjuster;
+using AdjustNamespace.Helper;
 using AdjustNamespace.Xaml;
 using System;
 using System.Threading;
@@ -89,6 +90,14 @@ namespace AdjustNamespace.Adjusting
                 _openFilesToEnableUndo,
                 _subjectFilePath
                 );
+
+            //the `x:Class` of a xaml and the namespace of its code behind file are the two
+            //halves of one class. The code behind file is a usual C# file and is skipped when
+            //several projects compile it (see CsAdjuster), so this file has to be skipped too
+            if (_vss.Workspace.IsCompiledBySeveralProjects(_subjectFilePath + ".cs"))
+            {
+                return (xamlDocument, null);
+            }
 
             if (!xamlDocument.GetRootInfo(out var rootNamespace, out var rootName))
             {

@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using AdjustNamespace.Helper;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Threading;
@@ -26,6 +27,13 @@ namespace AdjustNamespace.Adjusting
         /// </summary>
         private readonly HashSet<string> _namespacesToRemove;
 
+        /// <summary>
+        /// The namespaces a type has been moved out of, no matter whether they are empty now.
+        /// Such a namespace may be gone for one project and still be alive for another one,
+        /// see <see cref="GetRemovedNamespaces"/>.
+        /// </summary>
+        private readonly HashSet<string> _touchedNamespaces;
+
         private NamespaceCenter(
             Dictionary<string, HashSet<string>> types
             )
@@ -37,6 +45,7 @@ namespace AdjustNamespace.Adjusting
 
             _types = types;
             _namespacesToRemove = new HashSet<string>();
+            _touchedNamespaces = new HashSet<string>();
         }
 
         /// <summary>
@@ -44,9 +53,16 @@ namespace AdjustNamespace.Adjusting
         /// (namespaces that does not exists after adjusting).
         /// </summary>
         /// <param name="namespacesToCheck">Using clauses of a document.</param>
+        /// <param name="compilation">
+        /// Compilation of the project of that document, or <c>null</c> if it is unknown.
+        /// A namespace is emptied for the whole solution, but a using clause is resolved
+        /// against a single project: a namespace which another project still fills is not
+        /// empty and is gone for this one nevertheless.
+        /// </param>
         /// <returns>Those of them which point to an emptied namespace.</returns>
         public List<SyntaxNode> GetRemovedNamespaces(
-            IReadOnlyList<UsingDirectiveSyntax> namespacesToCheck
+            IReadOnlyList<UsingDirectiveSyntax> namespacesToCheck,
+            Compilation? compilation = null
             )
         {
             if (namespacesToCheck is null)
@@ -65,7 +81,7 @@ namespace AdjustNamespace.Adjusting
             {
                 var nname = NormalizeUsingName(n.Name.ToString());
 
-                if (!_namespacesToRemove.Contains(nname))
+                if (!_namespacesToRemove.Contains(nname) && !IsGoneForThisProject(nname, compilation))
                 {
                     //there are a types in this namespace
                     continue;
@@ -75,6 +91,30 @@ namespace AdjustNamespace.Adjusting
             }
 
             return toRemove;
+        }
+
+        /// <summary>
+        /// The adjusting has taken a type out of this namespace and there is nothing of it
+        /// left in the given compilation: a using clause of it does not compile anymore,
+        /// even though another project of the solution still fills that namespace.
+        /// </summary>
+        private bool IsGoneForThisProject(
+            string namespaceName,
+            Compilation? compilation
+            )
+        {
+            if (compilation == null)
+            {
+                return false;
+            }
+
+            if (!_touchedNamespaces.Contains(namespaceName))
+            {
+                //we have not touched it, so it is not our business
+                return false;
+            }
+
+            return compilation.TryFindNamespace(namespaceName) == null;
         }
 
         /// <summary>
@@ -113,6 +153,9 @@ namespace AdjustNamespace.Adjusting
         public void TypeRemoved(ITypeSymbol type)
         {
             var cnn = type.ContainingNamespace.ToDisplayString();
+
+            _touchedNamespaces.Add(cnn);
+
             if (!_types.TryGetValue(cnn, out var set))
             {
                 return;

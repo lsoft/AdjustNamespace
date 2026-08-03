@@ -206,6 +206,87 @@ namespace AdjustNamespace.Helper
 
 
         /// <summary>
+        /// The namespace with the given full name, as this compilation sees it
+        /// (its own code plus everything it references).
+        /// </summary>
+        /// <returns><c>null</c> if there is no such namespace in this compilation.</returns>
+        public static INamespaceSymbol? TryFindNamespace(
+            this Compilation compilation,
+            string namespaceName
+            )
+        {
+            if (compilation is null)
+            {
+                throw new ArgumentNullException(nameof(compilation));
+            }
+
+            if (namespaceName is null)
+            {
+                throw new ArgumentNullException(nameof(namespaceName));
+            }
+
+            INamespaceSymbol? result = compilation.GlobalNamespace;
+
+            foreach (var part in namespaceName.Split('.'))
+            {
+                result = result!
+                    .GetNamespaceMembers()
+                    .FirstOrDefault(n => n.Name == part)
+                    ;
+
+                if (result == null)
+                {
+                    return null;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The namespace contains at least one type which is not declared in the given file.
+        ///
+        /// This is the question `does this namespace still exist for this project after the
+        /// given file has been moved out of it`: a namespace is emptied for the whole solution,
+        /// but a `using` clause is resolved against a single project, and another project may
+        /// fill that namespace without this one referencing it at all.
+        /// </summary>
+        /// <param name="compilation">Compilation of the project the question is asked for.</param>
+        /// <param name="namespaceName">Full name of the namespace.</param>
+        /// <param name="filePath">Full path of the file which is being moved out of it.</param>
+        public static bool IsNamespaceFilledOutside(
+            this Compilation compilation,
+            string namespaceName,
+            string filePath
+            )
+        {
+            var @namespace = compilation.TryFindNamespace(namespaceName);
+            if (@namespace == null)
+            {
+                return false;
+            }
+
+            foreach (var type in @namespace.GetAllTypes())
+            {
+                if (type.DeclaringSyntaxReferences.Length == 0)
+                {
+                    //a type of a referenced assembly, it stays where it is
+                    return true;
+                }
+
+                foreach (var reference in type.DeclaringSyntaxReferences)
+                {
+                    if (!string.Equals(reference.SyntaxTree.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// The type itself and all the types nested into it (recursively).
         /// </summary>
         public static IEnumerable<INamedTypeSymbol> GetNestedTypes(this INamedTypeSymbol type)

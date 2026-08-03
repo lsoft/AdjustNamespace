@@ -58,7 +58,15 @@ namespace AdjustNamespace.Adjusting
 
                 var namespaces = syntaxRoot.GetAllDescendants<UsingDirectiveSyntax>();
 
-                var toRemove = _namespaceCenter.GetRemovedNamespaces(namespaces);
+                //a file which several projects compile has a single text for all of them,
+                //so a clause which is dead for one project may be alive for another one:
+                //there is nothing we could do about it and we do not touch such a file
+                var compilation = workspace.IsCompiledBySeveralProjects(documentFilePath)
+                    ? null
+                    : await document.Project.GetCompilationAsync()
+                    ;
+
+                var toRemove = _namespaceCenter.GetRemovedNamespaces(namespaces, compilation);
                 if (toRemove.Count == 0)
                 {
                     continue;

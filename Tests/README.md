@@ -35,6 +35,7 @@ Everything except the [known bugs](#known-bugs) is green. What is covered:
 | The using clauses | `Adjusting\UsingPlacementTests` (a file without any using, a header, a region, a `global using`), `Adjusting\CleanupTests` (when an old using has to disappear and when it must not) |
 | The kinds of the declarations | `Adjusting\CsAdjusterTypeKindTests` (a record, a struct, a static and a generic class, the contradicting namespace declarations) |
 | The xaml files | `Xaml\XamlDocumentTests` (parsing and moving), `XamlReferenceKindTests` (the references outside of a tag and of a markup extension), `XamlFileWritingTests` (the encoding and the line endings of the written file), `Adjusting\XamlAdjusterTests` (the `x:Class` of the document itself) |
+| The shared and the multi target projects | `Adjusting\SharedProjectTests` (one file compiled by several projects: the ambiguous target namespace of a C# and of a xaml file, the references and the using clauses of every project, the file list of the solution, a namespace which several projects fill) |
 | The namespaces | `Namespace\NamespaceTransitionContainerTests`, `NamespaceNodeSearchTests`, `NamespaceCenterTests`, `NamespaceHelperTests` |
 | The fixers | `Fixer\AddUsingFixerTests` |
 | The helpers | `Helper\RoslynHelperTests`, `PredicateTests` |
@@ -68,6 +69,25 @@ and the failures of the full run are the list of the errors to fix. Right now th
 | `CsAdjusterTypeKindTests.The_contradicting_declarations_of_one_namespace_are_processed` | `namespace A { namespace B { } }` plus `namespace A.B { }` in one file produce two different transitions of `A.B`, and the references are fixed with the wrong one of them. |
 | `XamlReferenceKindTests.A_class_referenced_by_a_bare_attribute_value_is_moved` and three more of that file | A xaml class is referenced not only by a tag and by an `{x:Type}`/`{x:Static}` markup extension, but also by an attribute value (`TargetType="local:MyButton"`), by an attached property, by a custom markup extension and by `x:TypeArguments`. Such a reference is not moved and keeps pointing to the old namespace. |
 
+### A note about the shared projects
+
+A file which more than one project compiles is left as it is: whatever namespace is chosen for
+it, it is derived from one of these projects and does not match the other ones. Two cases which
+look the same in Roslyn (one file, several documents) are kept apart by
+`WorkspaceHelper.IsCompiledBySeveralProjects`:
+
+- a **shared project** referenced by several projects — the file belongs to several projects
+  with **different project files**, there is no target namespace and the file is skipped;
+- a **multi target project** (`net48;net8.0`) — Roslyn creates a project per target framework,
+  so the file belongs to several projects with the **same project file**. Such a file is
+  adjusted as usual, see `A_file_of_a_multi_target_project_is_adjusted`.
+
+A shared project referenced by a single project is not ambiguous either and is adjusted, see
+`A_file_of_a_shared_project_of_a_single_project_is_adjusted`. The fallback of
+`NamespaceHelper.GetProjectDefaultNamespaceAsync` (the default namespace of a project of an
+unknown kind is its name without the last part, `MyApp.Shared` -> `MyApp`) serves exactly that
+case now.
+
 ## Adding a test
 
 The files of `AdjustNamespace.Tests` are picked up by a glob, no need to register them anywhere
@@ -91,6 +111,26 @@ the target namespaces and the skipped folders behave as they do in a real soluti
 `.csproj` files on the disk and no MSBuild behind: the projects, their references and their
 documents live in an `AdhocWorkspace`, exactly as Roslyn sees them inside Visual Studio.
 
+A file which is compiled by more than one project (a shared project or a multi target one) is
+added with `AddSharedDocument` / `AddMultiTargetDocument`:
+
+```csharp
+using var solution = new TestSolution()
+    .AddProject("A")
+    .AddProject("B")
+    .AddSharedProject("Common")
+    .AddSharedDocument("Common", "Class1.cs", "namespace Legacy.Core { public class Class1 { } }", "A", "B")
+    ;
+```
+
+A shared project is no Roslyn project at all: only the folder of it is registered, and its file
+becomes a document of every project which references it, exactly as Visual Studio builds it.
+Visual Studio keeps a single file on the disk for all of these documents, so a change of any one
+of them is a change of all of them; the `AdhocWorkspace` knows nothing about it and
+`TestSolution` propagates such a change itself (`SyncLinkedDocuments`, performed by `TextOf` and
+`CompilationErrorsAsync`, so a test does not have to care). If the extension changes the
+documents of one file *differently*, the propagation throws instead of hiding it.
+
 # Manual tests
 
 The extension modifies the code of a solution opened in Visual Studio, so the whole wizard is
@@ -111,7 +151,7 @@ tested manually against a sample solution which lives here.
 | Project | What it covers |
 | --- | --- |
 | `TestProject` | Plain C# and WPF: classic, nested and file scoped namespaces, several namespaces in a single file, types declared in a `System.*` namespace (they must not be touched), nested and generic types, type constraints, WPF user controls with `x:Type` / `x:Static` references. |
-| `TestSharedProject` | A shared project (`.shproj`): the default namespace is derived from the project name. |
+| `TestSharedProject` | A shared project (`.shproj`): the default namespace is derived from the project name. It is imported by `TestProject` only, so the ambiguous case (a shared project referenced by several projects, see `SharedProjectTests`) is not covered here yet. |
 | `DatabaseProject` | C# files inside a `sqlproj`. |
 | `TestMauiApp` | MAUI xaml, which uses another uri for the xaml language namespace. |
 

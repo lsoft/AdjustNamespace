@@ -30,7 +30,28 @@ namespace AdjustNamespace.Tests.Infrastructure
             };
 
         private readonly Dictionary<string, ProjectId> _projects = new();
-        private readonly Dictionary<string, DocumentId> _documents = new();
+
+        /// <summary>
+        /// The documents of the solution, grouped by the file they are built of.
+        /// A file of a shared project (.shproj) and a file of a multi target project
+        /// (<c>net48;net8.0</c>) belong to more than one project at once, and Visual Studio
+        /// creates a separate Roslyn document for every one of them,
+        /// see <see cref="AddSharedDocument"/>.
+        /// </summary>
+        private readonly Dictionary<string, List<DocumentId>> _documents = new();
+
+        /// <summary>
+        /// The text every document had at the last <see cref="SyncLinkedDocuments"/>
+        /// (or at the moment it has been added).
+        /// </summary>
+        private readonly Dictionary<DocumentId, string> _lastKnownTexts = new();
+
+        /// <summary>
+        /// The folder of every project of the solution, including the shared ones
+        /// (which are no Roslyn projects at all) and the folder shared by the targets
+        /// of a multi target project.
+        /// </summary>
+        private readonly Dictionary<string, string> _folders = new();
 
         /// <summary>
         /// The workspace the solution lives in.
@@ -101,6 +122,60 @@ namespace AdjustNamespace.Tests.Infrastructure
         /// </summary>
         public TestSolution AddProject(string name)
         {
+            _folders[name] = Path.Combine(SolutionFolder, name);
+
+            AddProject(name, Path.Combine(SolutionFolder, name, name + ".csproj"));
+
+            return this;
+        }
+
+        /// <summary>
+        /// Add a shared project (.shproj). Such a project is no Roslyn project: its files
+        /// are compiled by every project which references it, so there is nothing to add
+        /// to the workspace here and only the folder of it is registered.
+        /// Its documents are added with <see cref="AddSharedDocument"/>.
+        /// </summary>
+        public TestSolution AddSharedProject(string name)
+        {
+            _folders[name] = Path.Combine(SolutionFolder, name);
+
+            return this;
+        }
+
+        /// <summary>
+        /// Add a multi target project (<c>&lt;TargetFrameworks&gt;net48;net8.0&lt;/TargetFrameworks&gt;</c>).
+        /// Visual Studio creates a separate Roslyn project for every target framework of such
+        /// a project, and all of them share the very same project file and folder.
+        /// The projects are named <c>{name} ({targetFramework})</c>;
+        /// the documents of it are added with <see cref="AddMultiTargetDocument"/>.
+        /// </summary>
+        public TestSolution AddMultiTargetProject(string name, params string[] targetFrameworks)
+        {
+            _folders[name] = Path.Combine(SolutionFolder, name);
+
+            foreach (var targetFramework in targetFrameworks)
+            {
+                var targetName = TargetProjectName(name, targetFramework);
+
+                _folders[targetName] = _folders[name];
+
+                AddProject(targetName, Path.Combine(SolutionFolder, name, name + ".csproj"));
+            }
+
+            return this;
+        }
+
+        /// <summary>
+        /// The name of the Roslyn project which compiles the given target framework
+        /// of a multi target project.
+        /// </summary>
+        public static string TargetProjectName(string projectName, string targetFramework)
+        {
+            return $"{projectName} ({targetFramework})";
+        }
+
+        private void AddProject(string name, string projectFilePath)
+        {
             var projectId = ProjectId.CreateNewId(name);
 
             var projectInfo = ProjectInfo
@@ -110,7 +185,7 @@ namespace AdjustNamespace.Tests.Infrastructure
                     name,
                     name,
                     LanguageNames.CSharp,
-                    filePath: Path.Combine(SolutionFolder, name, name + ".csproj")
+                    filePath: projectFilePath
                     )
                 .WithMetadataReferences(_metadataReferences)
                 //a library, otherwise every compilation reports the missing entry point
@@ -124,8 +199,6 @@ namespace AdjustNamespace.Tests.Infrastructure
             Apply(Workspace.CurrentSolution.AddProject(projectInfo));
 
             _projects[name] = projectId;
-
-            return this;
         }
 
         /// <summary>
@@ -151,22 +224,140 @@ namespace AdjustNamespace.Tests.Infrastructure
         /// <param name="body">Content of the file.</param>
         public TestSolution AddDocument(string projectName, string relativeFilePath, string body)
         {
-            var projectId = _projects[projectName];
-            var documentId = DocumentId.CreateNewId(projectId);
-            var filePath = PathOf(projectName, relativeFilePath);
-
-            Apply(
-                Workspace.CurrentSolution.AddDocument(
-                    documentId,
-                    Path.GetFileName(filePath),
-                    SourceText.From(body),
-                    filePath: filePath
-                    )
-                );
-
-            _documents[filePath] = documentId;
+            AddDocument(PathOf(projectName, relativeFilePath), body, new[] { projectName });
 
             return this;
+        }
+
+        /// <summary>
+        /// Add a file of a shared project into every project which references that shared
+        /// project. There is a single file on the disk and one Roslyn document per referencing
+        /// project, exactly as Visual Studio builds it.
+        /// </summary>
+        /// <param name="sharedProjectName">Name of the shared project (it has to be added already).</param>
+        /// <param name="relativeFilePath">Path of the file relative to the shared project folder.</param>
+        /// <param name="body">Content of the file.</param>
+        /// <param name="projectNames">The projects which reference the shared project.</param>
+        public TestSolution AddSharedDocument(
+            string sharedProjectName,
+            string relativeFilePath,
+            string body,
+            params string[] projectNames
+            )
+        {
+            AddDocument(PathOf(sharedProjectName, relativeFilePath), body, projectNames);
+
+            return this;
+        }
+
+        /// <summary>
+        /// Add a file of a multi target project. Every target framework of such a project
+        /// compiles it, so it becomes a document of every project
+        /// <see cref="AddMultiTargetProject"/> has created.
+        /// </summary>
+        public TestSolution AddMultiTargetDocument(
+            string projectName,
+            string relativeFilePath,
+            string body,
+            params string[] targetFrameworks
+            )
+        {
+            AddDocument(
+                PathOf(projectName, relativeFilePath),
+                body,
+                Array.ConvertAll(targetFrameworks, tf => TargetProjectName(projectName, tf))
+                );
+
+            return this;
+        }
+
+        private void AddDocument(string filePath, string body, string[] projectNames)
+        {
+            foreach (var projectName in projectNames)
+            {
+                var projectId = _projects[projectName];
+                var documentId = DocumentId.CreateNewId(projectId);
+
+                Apply(
+                    Workspace.CurrentSolution.AddDocument(
+                        documentId,
+                        Path.GetFileName(filePath),
+                        SourceText.From(body),
+                        filePath: filePath
+                        )
+                    );
+
+                if (!_documents.TryGetValue(filePath, out var documentIds))
+                {
+                    documentIds = new List<DocumentId>();
+                    _documents[filePath] = documentIds;
+                }
+
+                documentIds.Add(documentId);
+                _lastKnownTexts[documentId] = body;
+            }
+        }
+
+        /// <summary>
+        /// Propagate the changes of a file which is compiled by several projects to every
+        /// document of that file.
+        ///
+        /// The extension changes such a file through a single one of its documents
+        /// (see <c>WorkspaceHelper.GetDocument</c>), and in Visual Studio that is enough:
+        /// there is one file on the disk and one text buffer for all of the documents.
+        /// The <see cref="AdhocWorkspace"/> knows nothing about it, hence this explicit step.
+        /// It is performed by <see cref="TextOf"/> and <see cref="CompilationErrorsAsync"/>,
+        /// so a test does not have to care about it.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// The documents of one file have been changed differently. This is a defect of the
+        /// extension: a file may not be adjusted twice, once per project which compiles it.
+        /// </exception>
+        public void SyncLinkedDocuments()
+        {
+            foreach (var pair in _documents)
+            {
+                if (pair.Value.Count <= 1)
+                {
+                    continue;
+                }
+
+                var changedTexts = pair.Value
+                    .ConvertAll(TextOf)
+                    .FindAll(t => t != _lastKnownTexts[pair.Value[0]])
+                    .Distinct()
+                    .ToList();
+
+                if (changedTexts.Count == 0)
+                {
+                    continue;
+                }
+
+                if (changedTexts.Count > 1)
+                {
+                    throw new InvalidOperationException(
+                        $"The documents of '{pair.Key}' have been changed differently:{Environment.NewLine}"
+                        + string.Join(Environment.NewLine + "---" + Environment.NewLine, changedTexts)
+                        );
+                }
+
+                var text = changedTexts[0];
+
+                foreach (var documentId in pair.Value)
+                {
+                    if (TextOf(documentId) != text)
+                    {
+                        Apply(
+                            Workspace.CurrentSolution.WithDocumentText(
+                                documentId,
+                                SourceText.From(text)
+                                )
+                            );
+                    }
+
+                    _lastKnownTexts[documentId] = text;
+                }
+            }
         }
 
         /// <summary>
@@ -208,16 +399,28 @@ namespace AdjustNamespace.Tests.Infrastructure
         /// </summary>
         public string PathOf(string projectName, string relativeFilePath)
         {
-            return Path.Combine(SolutionFolder, projectName, relativeFilePath);
+            if (!_folders.TryGetValue(projectName, out var folder))
+            {
+                folder = Path.Combine(SolutionFolder, projectName);
+            }
+
+            return Path.Combine(folder, relativeFilePath);
         }
 
         /// <summary>
         /// The current text of the document, as it is in the workspace right now.
+        /// A file which is compiled by several projects has a single text,
+        /// see <see cref="SyncLinkedDocuments"/>.
         /// </summary>
         public string TextOf(string projectName, string relativeFilePath)
         {
-            var documentId = _documents[PathOf(projectName, relativeFilePath)];
+            SyncLinkedDocuments();
 
+            return TextOf(_documents[PathOf(projectName, relativeFilePath)][0]);
+        }
+
+        private string TextOf(DocumentId documentId)
+        {
             return Workspace.CurrentSolution
                 .GetDocument(documentId)!
                 .GetTextAsync()
@@ -267,6 +470,8 @@ namespace AdjustNamespace.Tests.Infrastructure
         /// </summary>
         public async System.Threading.Tasks.Task<List<string>> CompilationErrorsAsync()
         {
+            SyncLinkedDocuments();
+
             var result = new List<string>();
 
             foreach (var projectId in _projects.Values)

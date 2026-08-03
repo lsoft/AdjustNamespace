@@ -46,6 +46,7 @@ and then modified by the optional user regex.
 - The folders excluded by the user (see `Edit skipped paths...`) do not take a part in the resulting name.
 - The user regex is applied to the whole resulting namespace. The second step of the wizard offers a few built in samples, e.g. `^[^.]+` with an empty replacement renames the first part of every target namespace.
 - Files located outside of their project folder (linked files) are skipped.
+- Files compiled by more than one project are skipped: a file of a shared project (`.shproj`) which is referenced by several projects would get a namespace derived from one of them, which does not match the other ones. A shared project referenced by a single project is adjusted as usual, and so is a multi target project (`net48;net8.0`), whose files belong to several projects too but to a single project of the solution.
 
 ## Settings
 

@@ -82,6 +82,18 @@ regex. The default namespace comes from the project properties for C# and `sqlpr
 for the other project kinds the project name without its last part is used
 (`MyApp.Shared` -> `MyApp`).
 
+A file which more than one project compiles has no target namespace at all: the formula above
+gives another answer for every one of these projects. Such a file (a file of a shared project
+which is referenced by several projects) is skipped both by the scan and by `CsAdjuster`, see
+`WorkspaceHelper.IsCompiledBySeveralProjects`. `XamlAdjuster` asks the same question about the
+code behind file of the document (`{name}.xaml.cs`): the `x:Class` of a xaml and the namespace
+of its code behind are the two halves of one class and may not be moved separately. The multi target projects (`net48;net8.0`) are
+not affected: Visual Studio creates a Roslyn project per target framework, but all of them are
+the same project of the solution and have the same project file, and that is what the check
+compares. The same holds for the walk through the solution
+(`WorkspaceHelper.EnumerateAllDocumentFilePaths`): one file on the disk is one entry of the
+list, no matter how many projects compile it.
+
 ### Scanning (`SubjectFileCollector`)
 
 The collector binds the chosen file paths to their projects (this requires the main thread),
@@ -134,6 +146,20 @@ fresh snapshot and applied again.
 notified about every moved type. A namespace which has lost its last type is remembered, and
 `Cleanup.RemoveEmptyUsingStatementsForAsync` removes the using clauses of such namespaces from
 every C# document of the solution.
+
+A namespace is emptied for the whole solution, but a `using` clause is resolved against a single
+project: a namespace which another project still fills is not empty and is gone for this project
+nevertheless (the projects of a solution do not have to reference each other). Therefore both
+ends know about the compilation of the document they work with:
+
+- `NamespaceFixer` adds the `using` clause of the old namespace of the adjusted file only if
+  that namespace still contains something for the project of that file
+  (`RoslynHelper.IsNamespaceFilledOutside`);
+- `NamespaceCenter.GetRemovedNamespaces` removes a clause of a namespace the adjusting has
+  touched as soon as that namespace is gone for the given compilation, even if the rest of the
+  solution still fills it. A file which several projects compile has a single text for all of
+  them, so `Cleanup` passes no compilation for such a file and falls back to the solution wide
+  answer.
 
 ## The xaml subsystem
 

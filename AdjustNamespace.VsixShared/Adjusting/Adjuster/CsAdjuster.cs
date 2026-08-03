@@ -81,6 +81,14 @@ namespace AdjustNamespace.Adjusting
         /// <inheritdoc/>
         public async Task<bool> AdjustAsync()
         {
+            if (_vss.Workspace.IsCompiledBySeveralProjects(_subjectFilePath))
+            {
+                //a file of a shared project which is referenced by several projects:
+                //there is no target namespace which suits all of them
+                //skip this document
+                return false;
+            }
+
             var (subjectDocument, subjectSyntaxRoot) = await _vss.Workspace.GetDocumentAndSyntaxRootAsync(_subjectFilePath);
             if (subjectDocument == null || subjectSyntaxRoot == null)
             {

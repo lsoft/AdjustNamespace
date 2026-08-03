@@ -64,6 +64,26 @@ namespace AdjustNamespace.Adjusting.Fixer.Specific
                     );
         }
 
+        /// <summary>
+        /// The namespace the file is being moved out of still contains something for the project
+        /// of that file, i.e. a <c>using</c> clause of it compiles after the move.
+        /// The types of the file itself do not count: all of them are moving.
+        /// </summary>
+        private async Task<bool> IsAliveInItsProjectAsync(
+            Document document,
+            string namespaceName
+            )
+        {
+            var compilation = await document.Project.GetCompilationAsync();
+            if (compilation == null)
+            {
+                //we know nothing, so keep the old behaviour
+                return true;
+            }
+
+            return compilation.IsNamespaceFilledOutside(namespaceName, FilePath);
+        }
+
         /// <inheritdoc/>
         public async Task FixAsync()
         {
@@ -104,13 +124,21 @@ namespace AdjustNamespace.Adjusting.Fixer.Specific
                         //it's a subject for a future work
                         //so add at 100% cases now
 
+                        //...with a single exception: if this project has nothing in that
+                        //namespace anymore, such a clause does not compile. The namespace may
+                        //stay alive for the solution and be gone for this project at the same
+                        //time (another project fills it and this one does not reference it),
+                        //and then the cleanup has no reason to remove the clause again.
+
                         var cus = syntaxRoot as CompilationUnitSyntax;
                         if (cus == null)
                         {
                             //skip this namespace
                             break;
                         }
-                        if (!HasUsingOf(cus, ufNamespace!.Name.ToString()))
+                        if (!HasUsingOf(cus, ufNamespace!.Name.ToString())
+                            && await IsAliveInItsProjectAsync(openedDocument, ufNamespace!.Name.ToString())
+                            )
                         {
                             var newUsingStatement = SyntaxFactory.UsingDirective(
                                 SyntaxFactory.ParseName(

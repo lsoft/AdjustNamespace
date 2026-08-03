@@ -123,6 +123,13 @@ namespace AdjustNamespace.Adjusting
                         continue;
                     }
 
+                    if (_vss.Workspace.IsCompiledBySeveralProjects(subjectFilePath))
+                    {
+                        //a file of a shared project which is referenced by several projects:
+                        //there is no target namespace which suits all of them, see CsAdjuster
+                        continue;
+                    }
+
                     var subjectSemanticModel = await subjectDocument!.GetSemanticModelAsync();
                     if (subjectSemanticModel == null)
                     {

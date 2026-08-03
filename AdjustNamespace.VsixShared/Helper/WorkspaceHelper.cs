@@ -68,6 +68,9 @@ namespace AdjustNamespace.Helper
 
         /// <summary>
         /// Full paths of all the documents of the workspace which pass the given filters.
+        /// A file which several projects compile (a shared project, a multi target project)
+        /// is a single file on the disk and is reported once,
+        /// see <see cref="IsCompiledBySeveralProjects"/>.
         /// </summary>
         /// <param name="projectPredicate">Project filter, see <see cref="Predicate.IsProjectInScope"/>.</param>
         /// <param name="documentPredicate">Document filter, see <see cref="Predicate.IsDocumentInScope"/>.</param>
@@ -93,6 +96,7 @@ namespace AdjustNamespace.Helper
             }
 
             var result = new List<string>();
+            var addedFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var project in workspace.CurrentSolution.Projects)
             {
@@ -110,12 +114,70 @@ namespace AdjustNamespace.Helper
 
                     if (!string.IsNullOrEmpty(document.FilePath))
                     {
+                        if (!addedFilePaths.Add(document.FilePath!))
+                        {
+                            //that file is compiled by another project of the solution too
+                            continue;
+                        }
+
                         result.Add(document.FilePath!);
                     }
                 }
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// The file is compiled by more than one project of the solution, i.e. it is a file
+        /// of a shared project (.shproj) which is referenced by several projects.
+        ///
+        /// The namespace of a file is derived from the project it belongs to
+        /// (see <see cref="NamespaceHelper.TryDetermineTargetNamespaceAsync"/>), and every one
+        /// of these projects gives another answer, so there is no namespace such a file could
+        /// be adjusted to and it has to be left as it is.
+        ///
+        /// A multi target project (<c>net48;net8.0</c>) is NOT such a case: Visual Studio
+        /// creates a Roslyn project per target framework and all of them compile the very same
+        /// file, but all of them are the same project of the solution, hence the comparison
+        /// of the project files and not of the project count.
+        /// </summary>
+        public static bool IsCompiledBySeveralProjects(
+            this Workspace workspace,
+            string filePath
+            )
+        {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
+
+            if (filePath is null)
+            {
+                throw new ArgumentNullException(nameof(filePath));
+            }
+
+            var sln = workspace.CurrentSolution;
+
+            var projectFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var documentId in sln.GetDocumentIdsWithFilePath(filePath))
+            {
+                var project = sln.GetProject(documentId.ProjectId);
+                if (project == null)
+                {
+                    continue;
+                }
+
+                projectFilePaths.Add(project.FilePath ?? project.Name);
+
+                if (projectFilePaths.Count > 1)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
