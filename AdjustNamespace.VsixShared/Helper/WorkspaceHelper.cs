@@ -11,7 +11,8 @@ using System.Threading.Tasks;
 namespace AdjustNamespace.Helper
 {
     /// <summary>
-    /// Taken from  https://github.com/bert2/microscope completely.
+    /// Helpers around the Roslyn workspace of Visual Studio.
+    /// Partially taken from  https://github.com/bert2/microscope.
     /// Take a look to that repo, it's amazing!
     /// </summary>
     public static class WorkspaceHelper
@@ -30,6 +31,10 @@ namespace AdjustNamespace.Helper
             modifiers: null);
 
 
+        /// <summary>
+        /// Create a Roslyn document editor for the given file.
+        /// </summary>
+        /// <returns><c>null</c> if there is no such document in the workspace.</returns>
         public static async Task<DocumentEditor?> CreateDocumentEditorAsync(
             this Workspace workspace,
             string filePath
@@ -61,6 +66,11 @@ namespace AdjustNamespace.Helper
             return documentEditor;
         }
 
+        /// <summary>
+        /// Full paths of all the documents of the workspace which pass the given filters.
+        /// </summary>
+        /// <param name="projectPredicate">Project filter, see <see cref="Predicate.IsProjectInScope"/>.</param>
+        /// <param name="documentPredicate">Document filter, see <see cref="Predicate.IsDocumentInScope"/>.</param>
         public static IReadOnlyList<string> EnumerateAllDocumentFilePaths(
             this Workspace workspace,
             Func<Microsoft.CodeAnalysis.Project, bool> projectPredicate,
@@ -108,6 +118,10 @@ namespace AdjustNamespace.Helper
             return result;
         }
 
+        /// <summary>
+        /// Get the document and its syntax root from the current solution snapshot.
+        /// </summary>
+        /// <returns><c>(null, null)</c> if the document is not found or has no syntax tree.</returns>
         public static async Task<(Document?, SyntaxNode?)> GetDocumentAndSyntaxRootAsync(
             this Workspace workspace,
             string filePath
@@ -130,6 +144,10 @@ namespace AdjustNamespace.Helper
             return (document, syntaxRoot);
         }
 
+        /// <summary>
+        /// Get the document by its file path from the current solution snapshot.
+        /// </summary>
+        /// <returns><c>null</c> if there is no such document in the workspace.</returns>
         public static Document? GetDocument(this Workspace workspace, string filePath)
         {
             var sln = workspace.CurrentSolution;
@@ -151,6 +169,11 @@ namespace AdjustNamespace.Helper
         }
 
 
+        /// <summary>
+        /// Get the document by its file path and the guid of its project
+        /// (a file may belong to more than one project).
+        /// </summary>
+        /// <returns><c>null</c> if there is no such document in the workspace.</returns>
         // Code adapted from Microsoft.VisualStudio.LanguageServices.CodeLens.CodeLensCallbackListener.TryGetDocument()
         public static Document? GetDocument(this VisualStudioWorkspace workspace, string filePath, Guid projGuid)
         {
@@ -173,6 +196,11 @@ namespace AdjustNamespace.Helper
             return sln.GetDocument(currentContextId);
         }
 
+        /// <summary>
+        /// Resolve the document id which corresponds to the current context of a linked document
+        /// (a file shared between the projects or the targets of a multi-target project).
+        /// The corresponding Roslyn method is internal, hence the reflection.
+        /// </summary>
         public static DocumentId? GetDocumentIdInCurrentContext(
             this Workspace workspace,
             DocumentId? documentId

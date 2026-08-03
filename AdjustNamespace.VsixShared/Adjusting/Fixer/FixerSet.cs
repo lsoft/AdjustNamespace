@@ -7,12 +7,18 @@ namespace AdjustNamespace.Adjusting.Fixer
 {
     /// <summary>
     /// All fixer for specific file.
+    /// The order of the fixers inside the set matters: the qualified names are fixed first
+    /// (their spans become invalid after any other edit), then the using clauses are added
+    /// and only then the namespace clauses are changed.
     /// </summary>
     public readonly struct FixerSet
     {
         private readonly VsServices _vss;
         private readonly bool _openFilesToEnableUndo;
 
+        /// <summary>
+        /// Full path to the file these fixers work with.
+        /// </summary>
         public readonly string FilePath;
 
         private readonly List<IFixer> _fixers;
@@ -40,6 +46,10 @@ namespace AdjustNamespace.Adjusting.Fixer
             };
         }
 
+        /// <summary>
+        /// Get the fixer of the requested type.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">There is no fixer of such type in this set.</exception>
         public T Fixer<T>()
             where T : IFixer
         {
@@ -52,6 +62,9 @@ namespace AdjustNamespace.Adjusting.Fixer
             return (T)result;
         }
 
+        /// <summary>
+        /// Apply all the fixers of this file (in the order they have been created).
+        /// </summary>
         internal async System.Threading.Tasks.Task FixAllAsync()
         {
             if (_openFilesToEnableUndo)

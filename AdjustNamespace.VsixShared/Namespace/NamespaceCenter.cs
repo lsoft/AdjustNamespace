@@ -14,6 +14,10 @@ namespace AdjustNamespace.Adjusting
     /// </summary>
     public class NamespaceCenter
     {
+        /// <summary>
+        /// Types (full names) of the solution grouped by their containing namespace.
+        /// A type is removed from here as soon as it has been moved into another namespace.
+        /// </summary>
         private readonly Dictionary<string, HashSet<string>> _types;
 
         /// <summary>
@@ -38,6 +42,8 @@ namespace AdjustNamespace.Adjusting
         /// Filter incoming namespaces and return only those are allowed to delete
         /// (namespaces that does not exists after adjusting).
         /// </summary>
+        /// <param name="namespacesToCheck">Using clauses of a document.</param>
+        /// <returns>Those of them which point to an emptied namespace.</returns>
         public List<SyntaxNode> GetRemovedNamespaces(
             IReadOnlyList<UsingDirectiveSyntax> namespacesToCheck
             )
@@ -70,6 +76,11 @@ namespace AdjustNamespace.Adjusting
             return toRemove;
         }
 
+        /// <summary>
+        /// Report that the given type has been moved out of its namespace.
+        /// If it was the last type of that namespace, the namespace is marked
+        /// as the subject to remove from the using clauses.
+        /// </summary>
         public void TypeRemoved(ITypeSymbol type)
         {
             var cnn = type.ContainingNamespace.ToDisplayString();

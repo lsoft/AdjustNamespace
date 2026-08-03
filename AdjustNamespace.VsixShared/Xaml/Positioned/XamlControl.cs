@@ -2,24 +2,42 @@
 
 namespace AdjustNamespace.Xaml.Positioned
 {
+    /// <summary>
+    /// A tag which references a class through an xmlns alias: <c>&lt;alias:ClassName ...</c>.
+    /// </summary>
     public class XamlControl : IXamlPerformable
     {
+        /// <inheritdoc/>
         public int Index
         {
             get;
         }
+
+        /// <inheritdoc/>
         public int Length
         {
             get;
         }
+
+        /// <summary>
+        /// `/` for a closing tag, an empty string for an opening one.
+        /// </summary>
         public string TagPrefix
         {
             get;
         }
+
+        /// <summary>
+        /// xmlns alias of the tag.
+        /// </summary>
         public string Alias
         {
             get;
         }
+
+        /// <summary>
+        /// Name of the class (without the namespace).
+        /// </summary>
         public string ClassName
         {
             get;
@@ -40,6 +58,7 @@ namespace AdjustNamespace.Xaml.Positioned
             ClassName = className;
         }
 
+        /// <inheritdoc/>
         public bool Perform(
             XamlStructure structure,
             string sourceNamespace,

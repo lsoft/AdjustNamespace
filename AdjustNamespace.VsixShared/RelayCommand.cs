@@ -147,18 +147,34 @@ namespace AdjustNamespace
         #endregion // ICommand Members
     }
 
+    /// <summary>
+    /// The asynchronous counterpart of <see cref="RelayCommand"/>:
+    /// its execution logic returns a task which is awaited inside `async void` Execute.
+    /// </summary>
     public sealed class AsyncRelayCommand : ICommand
     {
         readonly Func<object, Task> _execute;
         readonly Predicate<object>? _canExecute;
 
+        /// <summary>
+        /// The command is being executed right now.
+        /// </summary>
         private long _isExecuting = 0L;
 
+        /// <summary>
+        /// Creates a new command that can always execute.
+        /// </summary>
+        /// <param name="execute">The execution logic.</param>
         public AsyncRelayCommand(Func<object, Task> execute)
             : this(execute, null)
         {
         }
 
+        /// <summary>
+        /// Creates a new command.
+        /// </summary>
+        /// <param name="execute">The execution logic.</param>
+        /// <param name="canExecute">The execution status logic.</param>
         public AsyncRelayCommand(Func<object, Task> execute, Predicate<object>? canExecute)
         {
             if (execute == null)
@@ -184,11 +200,13 @@ namespace AdjustNamespace
             }
         }
 
+        /// <inheritdoc/>
         public bool CanExecute(object parameter)
         {
             return _canExecute == null || _canExecute(parameter);
         }
 
+        /// <inheritdoc/>
         public async void Execute(object parameter)
         {
             Interlocked.Exchange(ref _isExecuting, 1);

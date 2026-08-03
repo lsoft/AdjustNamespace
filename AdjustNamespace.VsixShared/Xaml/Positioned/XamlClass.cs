@@ -2,25 +2,43 @@
 
 namespace AdjustNamespace.Xaml.Positioned
 {
+    /// <summary>
+    /// The <c>x:Class="A.B.ClassName"</c> attribute, i.e. the binding between
+    /// the xaml file and its code behind class.
+    /// </summary>
     public class XamlClass : IXamlPerformable
     {
+        /// <inheritdoc/>
         public int Index
         {
             get;
         }
+
+        /// <inheritdoc/>
         public int Length
         {
             get;
         }
+
+        /// <summary>
+        /// Namespace part of the class name. Empty if the class has no namespace.
+        /// </summary>
         public string Namespace
         {
             get;
         }
+
+        /// <summary>
+        /// Name of the class (without the namespace).
+        /// </summary>
         public string ClassName
         {
             get;
         }
 
+        /// <param name="index">Index of the attribute in the xaml body.</param>
+        /// <param name="length">Length of the attribute.</param>
+        /// <param name="fullClassName">Value of the attribute (the full class name).</param>
         public XamlClass(
             int index,
             int length,
@@ -43,6 +61,7 @@ namespace AdjustNamespace.Xaml.Positioned
             }
         }
 
+        /// <inheritdoc/>
         public bool Perform(
             XamlStructure structure,
             string sourceNamespace,

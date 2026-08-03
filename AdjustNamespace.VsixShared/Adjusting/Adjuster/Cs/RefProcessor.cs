@@ -15,12 +15,26 @@ using Microsoft.VisualStudio.LanguageServices;
 
 namespace AdjustNamespace.Adjusting.Adjuster.Cs
 {
+    /// <summary>
+    /// Processor of the references to a type which is being moved into another namespace.
+    /// For every found reference it creates a fixer:
+    /// <list type="bullet">
+    /// <item>a fully qualified name (<c>Some.Old.Namespace.Class1</c>) is rewritten in place
+    /// with <see cref="QualifiedNameFixer"/>;</item>
+    /// <item>in all the other cases a new `using` clause is added with <see cref="AddUsingFixer"/>.</item>
+    /// </list>
+    /// The fixers are not applied here, they are accumulated in the <see cref="FixerContainer"/>
+    /// and applied later all at once.
+    /// </summary>
     public readonly struct RefProcessor
     {
         private readonly VsServices _vss;
         private readonly FixerContainer _fixerContainer;
         private readonly NamespaceTransition _targetNamespaceInfo;
 
+        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="fixerContainer">Container the created fixers are placed into.</param>
+        /// <param name="targetNamespaceInfo">Transition (old namespace -> new namespace) of the processed type.</param>
         public RefProcessor(
             VsServices vss,
             FixerContainer fixerContainer,
@@ -37,6 +51,10 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             _targetNamespaceInfo = targetNamespaceInfo;
         }
 
+        /// <summary>
+        /// Find all the references to the given type across the solution and create a fixer for each of them.
+        /// </summary>
+        /// <param name="symbolInfo">The type which is being moved into another namespace.</param>
         public async Task ProcessRefsAsync(
             INamedTypeSymbol symbolInfo
             )
@@ -63,6 +81,10 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             }
         }
 
+        /// <summary>
+        /// Determine the kind of the syntax at the reference location and create a suitable fixer for it.
+        /// A location we are unable to understand is skipped silently.
+        /// </summary>
         private async Task ProcessLocationAsync(
             ReferenceLocation location
             )
@@ -104,6 +126,9 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 return;
             }
 
+            //FindNode returns the closest enclosing node, which is not always the reference itself
+            //(`where T : Class1`, `class A : Class1`, `Foo(Class1.Bar)`),
+            //so we need to descend to the real type reference syntax
             if (syntax is TypeConstraintSyntax tcs)
             {
                 syntax = tcs.Type;
@@ -155,6 +180,10 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             }
         }
 
+        /// <summary>
+        /// Process a reference which is a part of a qualified name (<c>Some.Old.Namespace.Class1</c>).
+        /// The namespace part of that name is replaced with the target namespace.
+        /// </summary>
         private void ProcessQualifiedName(
             ReferenceLocation location,
             SemanticModel semanticModel,
@@ -193,6 +222,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                     );
         }
 
+        /// <summary>
+        /// Process a reference which is a part of a member access expression
+        /// (<c>Some.Old.Namespace.Class1.StaticMember</c>).
+        /// If the namespace is written explicitly, the whole expression is rebuilt
+        /// with the target namespace; otherwise a new `using` clause is enough.
+        /// </summary>
         private void ProcessMemberAccessExpression(
             ReferenceLocation location,
             SyntaxNode syntax,
@@ -246,6 +281,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                     );
         }
 
+        /// <summary>
+        /// Find all the references to the given type.
+        /// Roslyn does not report the usages of the extension methods as the references
+        /// to their containing static class, so such methods are queried additionally.
+        /// </summary>
         private static async Task<List<ReferencedSymbol>> FindReferencesForAsync(
             VisualStudioWorkspace workspace,
             INamedTypeSymbol symbolInfo

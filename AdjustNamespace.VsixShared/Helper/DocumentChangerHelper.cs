@@ -7,8 +7,24 @@ using System.Threading.Tasks;
 
 namespace AdjustNamespace.Helper
 {
+    /// <summary>
+    /// Helpers which apply a modification to a document of the Roslyn workspace.
+    ///
+    /// <c>Workspace.TryApplyChanges</c> fails if the solution has been changed by someone else
+    /// after our snapshot has been taken, so the modification is built and applied in a loop
+    /// until it succeeds.
+    /// </summary>
     public static class DocumentChangerHelper
     {
+        /// <summary>
+        /// Apply a modification to the document with the given file path.
+        /// </summary>
+        /// <param name="workspace">Roslyn workspace.</param>
+        /// <param name="filePath">Full path to the document to modify.</param>
+        /// <param name="provider">
+        /// Builder of the modified document; it takes the fresh document and its syntax root
+        /// and returns the modified document (or <c>null</c> to cancel the modification).
+        /// </param>
         public static async Task ApplyModifiedDocumentAsync(
             this Workspace workspace,
             string filePath,
@@ -51,6 +67,13 @@ namespace AdjustNamespace.Helper
             while (!r);
         }
 
+        /// <summary>
+        /// Apply a modification to a document of the workspace.
+        /// </summary>
+        /// <param name="workspace">Roslyn workspace.</param>
+        /// <param name="provider">
+        /// Builder of the modified document (or <c>null</c> to cancel the modification).
+        /// </param>
         public static async Task ApplyModifiedDocumentAsync(
             this Workspace workspace,
             Func<Workspace, Task<Document?>> provider

@@ -10,11 +10,18 @@ namespace AdjustNamespace.Window
 {
     /// <summary>
     /// Interaction logic for AdjustNamespaceWindow.xaml
+    ///
+    /// The modal wizard window. It hosts the steps one by one in its content control,
+    /// see <see cref="Create"/> and the <c>AdjustNamespace.UI.StepFactory</c> namespace.
     /// </summary>
     public partial class AdjustNamespaceWindow : DialogWindow
     {
+        /// <summary>
+        /// Builder of the first wizard step. It is invoked when the window is loaded.
+        /// </summary>
         private readonly Func<AdjustNamespaceWindow, System.Threading.Tasks.Task> _factory;
 
+        /// <param name="factory">Builder of the first wizard step.</param>
         public AdjustNamespaceWindow(
             Func<AdjustNamespaceWindow, System.Threading.Tasks.Task> factory
             )
@@ -30,10 +37,15 @@ namespace AdjustNamespace.Window
         }
 
 
+        /// <summary>
+        /// Show the first wizard step and (from time to time) the `please rate this extension` checkbox.
+        /// </summary>
         private async void DialogWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
+                //ask for a rating only if the user has already adjusted something
+                //and has not rated the extension yet
                 var showAwardCheckBox = false;
                 if (!General.Instance.StarsGiven)
                 {
@@ -53,6 +65,9 @@ namespace AdjustNamespace.Window
             }
         }
 
+        /// <summary>
+        /// Open the marketplace page if the user has agreed to rate the extension.
+        /// </summary>
         private void DialogWindow_Closed(object sender, EventArgs e)
         {
             if(this.AwardCheckBox.IsChecked.GetValueOrDefault(false))
@@ -63,6 +78,12 @@ namespace AdjustNamespace.Window
             }
         }
 
+        /// <summary>
+        /// Build the wizard window with its chain of steps:
+        /// preparation -> selection -> performing.
+        /// </summary>
+        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="filePaths">Full paths of the files chosen by the user.</param>
         public static AdjustNamespaceWindow Create(
             VsServices vss,
             HashSet<string> filePaths

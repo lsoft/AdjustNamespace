@@ -4,10 +4,19 @@ using System.Reflection;
 
 namespace AdjustNamespace
 {
+    /// <summary>
+    /// Helpers which convert the Roslyn symbols and the reflection types into their string names.
+    /// </summary>
     public static class NameHelper
     {
+        /// <summary>
+        /// Format of a full type name: namespace + containing types + type name.
+        /// </summary>
         private static readonly SymbolDisplayFormat _symbolDisplayFormat = new SymbolDisplayFormat(typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces);
 
+        //Roslyn is unable to produce a reflection-like name (`A.B.Class1`2`) out of the box:
+        //the required option lives in the internal SymbolDisplayCompilerInternalOptions enum
+        //and the constructor which accepts it is internal too, hence the reflection below
         private static readonly Type _symbolDisplayCompilerInternalOptionsType = typeof(SymbolDisplayFormat).Assembly.GetType("Microsoft.CodeAnalysis.SymbolDisplayCompilerInternalOptions")!;
         private static readonly ConstructorInfo _constructor = typeof(SymbolDisplayFormat).GetConstructor(
             BindingFlags.NonPublic | BindingFlags.Instance,
@@ -52,6 +61,10 @@ namespace AdjustNamespace
             });
 
 
+        /// <summary>
+        /// Full name of the reflection type prefixed with `global::` (if it has a namespace).
+        /// </summary>
+        /// <exception cref="Exception">The type has no full name (a generic parameter, for example).</exception>
         public static string ToGlobalDisplayString(
             this System.Type type
             )
@@ -71,6 +84,9 @@ namespace AdjustNamespace
             return "global::" + ds;
         }
 
+        /// <summary>
+        /// Fully qualified (`global::`-prefixed by default) name of the symbol.
+        /// </summary>
         public static string ToGlobalDisplayString(
             this ISymbol symbol,
             SymbolDisplayFormat? format = null
@@ -81,6 +97,9 @@ namespace AdjustNamespace
             return ds;
         }
 
+        /// <summary>
+        /// Name of the symbol in the given format (in the Roslyn default one if no format is given).
+        /// </summary>
         public static string ToFullDisplayString(
             this ISymbol symbol,
             SymbolDisplayFormat? format = null
@@ -91,6 +110,9 @@ namespace AdjustNamespace
             return ds;
         }
 
+        /// <summary>
+        /// Full name of the symbol: namespace + containing types + name (without `global::`).
+        /// </summary>
         public static string ToFullyQualifiedName(
             this ISymbol s
             )
@@ -103,6 +125,13 @@ namespace AdjustNamespace
             return s.ToDisplayString(_symbolDisplayFormat);
         }
 
+        /// <summary>
+        /// Name of the type in the reflection format, i.e. the format
+        /// <c>System.Type.GetType</c> understands.
+        /// </summary>
+        /// <param name="s">The type.</param>
+        /// <param name="deepLevel">Append the assembly name (required for the generic arguments).</param>
+        /// <exception cref="Exception">A generic argument is not a named type.</exception>
         public static string ToReflectionFormat(
             this INamedTypeSymbol s,
             bool deepLevel = false

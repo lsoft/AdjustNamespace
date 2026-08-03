@@ -13,6 +13,12 @@ using System.Threading;
 
 namespace AdjustNamespace
 {
+    /// <summary>
+    /// The VSIX package of the extension.
+    /// It is loaded in the background (with and without a solution opened) and
+    /// only registers the commands; all the real work is started from the commands
+    /// (see the <c>AdjustNamespace.Command</c> namespace).
+    /// </summary>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
     [InstalledProductRegistration(Vsix.Name, Vsix.Description, Vsix.Version)]
     [ProvideMenuResource("Menus.ctmenu", 1)]
@@ -22,6 +28,11 @@ namespace AdjustNamespace
     [ProvideAutoLoad(VSConstants.UICONTEXT.SolutionExistsAndFullyLoaded_string, PackageAutoLoadFlags.BackgroundLoad)]
     public sealed class AdjustNamespacePackage : ToolkitPackage
     {
+        /// <summary>
+        /// Package entry point. Registers every menu command of the extension,
+        /// shows the release notes gold bar (if the extension has been updated)
+        /// and loads the shared WPF resources used by the wizard.
+        /// </summary>
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
@@ -41,6 +52,10 @@ namespace AdjustNamespace
                 );
         }
 
+        /// <summary>
+        /// Show the gold bar with a link to the release notes if the currently installed
+        /// version differs from the version the user has seen last time.
+        /// </summary>
         private static void ShowReleaseNotesInfoBarIfNeeded()
         {
             if (Vsix.Version != General.Instance.LastVersion)

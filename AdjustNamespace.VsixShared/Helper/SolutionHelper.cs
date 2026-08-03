@@ -15,12 +15,27 @@ using Microsoft.Internal.VisualStudio.PlatformUI;
 
 namespace AdjustNamespace.Helper
 {
+    /// <summary>
+    /// Helpers to walk through the solution tree (Community.VisualStudio.Toolkit objects).
+    /// Almost everything here requires the main thread.
+    /// </summary>
     public static class SolutionHelper
     {
+        /// <summary>
+        /// Kind (guid) of a database (sqlproj) project.
+        /// </summary>
         public const string DatabaseProjectKind = "{00d1a9c2-b5f0-4af3-8072-f6c62b433612}";
+
+        /// <summary>
+        /// Kind (guid) of a C# project.
+        /// </summary>
         public const string CSharpProjectKind = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}";
 
 
+        /// <summary>
+        /// Check the kind of the given project.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The given solution item is not a project.</exception>
         public static bool IsProjectOfType(this SolutionItem project, string projectType)
         {
             if (project.Type != SolutionItemType.Project)
@@ -41,6 +56,14 @@ namespace AdjustNamespace.Helper
         }
 
 
+        /// <summary>
+        /// Descend the solution tree and collect the items of the requested type.
+        /// The items which are visible in the `show all files` mode only
+        /// (i.e. those which are not the members of a project) are skipped.
+        /// </summary>
+        /// <param name="item">The item to start from (a solution, a project, a folder).</param>
+        /// <param name="type">Type of the items to collect.</param>
+        /// <param name="fullPath">Full path of the single item to search for; <c>null</c> to collect all of them.</param>
         public static async Task<List<SolutionItem>> ProcessDownRecursivelyForAsync(
             this SolutionItem item,
             SolutionItemType type,
@@ -78,6 +101,9 @@ namespace AdjustNamespace.Helper
             return result;
         }
 
+        /// <summary>
+        /// Full paths of every physical file of the currently opened solution.
+        /// </summary>
         public static async Task<List<string>> GetAllFilesFromAsync(
             )
         {
@@ -93,6 +119,10 @@ namespace AdjustNamespace.Helper
         }
 
 
+        /// <summary>
+        /// Find the file in the currently opened solution.
+        /// </summary>
+        /// <returns><c>null</c> if there is no such file in the solution.</returns>
         public static async Task<ProjectItemInformation?> TryGetProjectItemAsync(
             string filePath
             )
@@ -108,6 +138,10 @@ namespace AdjustNamespace.Helper
             return null;
         }
 
+        /// <summary>
+        /// Find the file in the given projects.
+        /// </summary>
+        /// <returns><c>null</c> if there is no such file in these projects.</returns>
         public static async Task<ProjectItemInformation?> TryGetProjectItemAsync(
             List<SolutionItem> projects,
             string filePath
@@ -125,6 +159,13 @@ namespace AdjustNamespace.Helper
             return null;
         }
 
+        /// <summary>
+        /// Build the map `file full path -> (its project, its project item)`.
+        /// It is much faster than to search for the files one by one.
+        /// If a file belongs to more than one project (a shared project, a multi-target project),
+        /// the first found project wins.
+        /// </summary>
+        /// <param name="projects">Projects to scan; <c>null</c> to scan the whole solution.</param>
         public static async Task<Dictionary<string, ProjectItemInformation>> GetAllProjectItemsAsync(
             List<SolutionItem>? projects
             )
@@ -166,9 +207,19 @@ namespace AdjustNamespace.Helper
 
     }
 
+    /// <summary>
+    /// A file of the solution together with the project it belongs to.
+    /// </summary>
     public readonly struct ProjectItemInformation
     {
+        /// <summary>
+        /// Project the file belongs to.
+        /// </summary>
         public readonly SolutionItem Project;
+
+        /// <summary>
+        /// Project item of the file.
+        /// </summary>
         public readonly SolutionItem ProjectItem;
 
         public ProjectItemInformation(

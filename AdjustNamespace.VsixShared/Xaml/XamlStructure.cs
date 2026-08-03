@@ -11,10 +11,29 @@ namespace AdjustNamespace.Xaml
     /// </summary>
     public readonly struct XamlStructure
     {
+        /// <summary>
+        /// Alias of the xaml language namespace (usually `x`).
+        /// </summary>
         public readonly XamlX XPrefix;
+
+        /// <summary>
+        /// clr-namespace declarations: <c>xmlns:alias="clr-namespace:A.B.C"</c>.
+        /// </summary>
         public readonly List<XamlXmlns> Xmlns;
+
+        /// <summary>
+        /// Tags with an alias: <c>&lt;alias:ClassName</c>.
+        /// </summary>
         public readonly List<XamlControl> Controls;
+
+        /// <summary>
+        /// Type references inside the markup extensions: <c>{x:Type alias:ClassName}</c>.
+        /// </summary>
         public readonly List<XamlAttributeReference> RefFroms;
+
+        /// <summary>
+        /// <c>x:Class</c> attributes.
+        /// </summary>
         public readonly List<XamlClass> Classes;
 
         public XamlStructure(
@@ -57,21 +76,35 @@ namespace AdjustNamespace.Xaml
             Classes = classes;
         }
 
+        /// <summary>
+        /// Get the clr-namespace declaration by its alias.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">There is no such alias in the document.</exception>
         public XamlXmlns GetByAlias(string alias)
         {
             return Xmlns.First(x => x.Alias == alias);
         }
 
+        /// <summary>
+        /// Try to find the clr-namespace declaration of the given namespace.
+        /// </summary>
+        /// <returns><c>null</c> if the namespace is not declared in the document.</returns>
         public XamlXmlns? TryGetByNamespace(string @namespace)
         {
             return Xmlns.FirstOrDefault(x => x.Namespace == @namespace);
         }
 
+        /// <summary>
+        /// Alias of the xaml language namespace (usually `x`).
+        /// </summary>
         public XamlX GetXPrefix()
         {
             return XPrefix;
         }
 
+        /// <summary>
+        /// All the places of the document which may reference a moved class.
+        /// </summary>
         public List<IXamlPerformable> GetPerformables()
         {
             var performables = new List<IXamlPerformable>();
@@ -83,6 +116,9 @@ namespace AdjustNamespace.Xaml
             return performables;
         }
 
+        /// <summary>
+        /// Build a copy of this structure with an additional clr-namespace declaration.
+        /// </summary>
         internal XamlStructure Add(XamlXmlns newXmlns)
         {
             var xmlns = new List<XamlXmlns>(Xmlns);

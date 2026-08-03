@@ -6,6 +6,10 @@ using AdjustNamespace.UI.ViewModel;
 
 namespace AdjustNamespace.UI.StepFactory
 {
+    /// <summary>
+    /// Factory of the first wizard step: the solution compilation check
+    /// (<see cref="PreparationStepViewModel"/>).
+    /// </summary>
     public class PreparationStepFactory : IStepFactory
     {
         private readonly VsServices _vss;
@@ -33,6 +37,8 @@ namespace AdjustNamespace.UI.StepFactory
             _nextStepFactory = nextStepFactory;
         }
 
+        /// <inheritdoc/>
+        /// <param name="argument">A <see cref="HashSet{T}"/> of the file paths chosen by the user.</param>
         public async System.Threading.Tasks.Task CreateAsync(object argument)
         {
             var v = new PreparationUserControl();

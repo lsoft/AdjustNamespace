@@ -6,25 +6,40 @@ using System.Windows;
 
 namespace AdjustNamespace.UI.ViewModel.Select
 {
+    /// <summary>
+    /// A file item of the list shown on the second wizard step.
+    /// </summary>
     public class SelectFileViewModel : BaseViewModel, ISelectItemViewModel
     {
+        /// <summary>
+        /// The folder item this file belongs to.
+        /// It is cleared in <see cref="Clear"/> to break the circular reference.
+        /// </summary>
         private SelectFolderViewModel? _parentViewModel;
 
         private bool _isChecked; //file cannot be in the middle state
         private bool _isSelected;
 
+        /// <inheritdoc/>
         public FileEx? FileEx
         {
             get;
         }
 
+        /// <summary>
+        /// Font of the item (a file is shown with the regular one).
+        /// </summary>
         public FontWeight FontWeight => FontWeights.Regular;
 
+        /// <summary>
+        /// Indent of the item (a file is shown under its folder).
+        /// </summary>
         public Thickness LeftMargin
         {
             get;
         }
 
+        /// <inheritdoc/>
         public bool? IsChecked
         {
             get => _isChecked;
@@ -36,17 +51,23 @@ namespace AdjustNamespace.UI.ViewModel.Select
             }
         }
 
+        /// <inheritdoc/>
         public bool IsSelected
         {
             get => _isSelected;
             set => _isSelected = value;
         }
 
+        /// <inheritdoc/>
         public string ItemPath
         {
             get;
         }
 
+        /// <summary>
+        /// Set the checkbox from the folder item without notifying that folder back
+        /// (otherwise the notification would bounce between the folder and its files).
+        /// </summary>
         public void SetCheckedStatusFromParent(bool isChecked)
         {
             _isChecked = isChecked;
@@ -54,6 +75,8 @@ namespace AdjustNamespace.UI.ViewModel.Select
         }
 
 
+        /// <param name="fileEx">The file behind this item.</param>
+        /// <param name="parentViewModel">The folder item this file belongs to.</param>
         public SelectFileViewModel(
             FileEx fileEx,
             SelectFolderViewModel parentViewModel
@@ -73,6 +96,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
             IsChecked = true;
         }
 
+        /// <inheritdoc/>
         public void Clear()
         {
             _parentViewModel = null;

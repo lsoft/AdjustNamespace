@@ -7,8 +7,20 @@ using System.Linq;
 
 namespace AdjustNamespace.Helper
 {
+    /// <summary>
+    /// Helpers around the Roslyn syntax trees and symbols.
+    /// </summary>
     public static class RoslynHelper
     {
+        /// <summary>
+        /// Climb up the qualified name (<c>A.B.C.Class1.NestedClass2</c>) until the left part
+        /// of the name stops being a type, i.e. until the namespace part is reached.
+        /// </summary>
+        /// <returns>
+        /// The outermost qualified name whose left part is a namespace,
+        /// or <c>null</c> if there is no namespace in that name at all
+        /// (<c>Class1.NestedClass2</c>, for example).
+        /// </returns>
         public static QualifiedNameSyntax? ToUpperSymbol(
             this QualifiedNameSyntax qns,
             SemanticModel semanticModel
@@ -37,6 +49,9 @@ namespace AdjustNamespace.Helper
 
         }
 
+        /// <summary>
+        /// Check if the node starts with the `global::` alias.
+        /// </summary>
         public static bool IsGlobal(this SyntaxNode node)
         {
             if (node is null)
@@ -47,6 +62,10 @@ namespace AdjustNamespace.Helper
             return node.ToString().StartsWith("global::");
         }
 
+        /// <summary>
+        /// Climb up the syntax tree while the parent node is of the type <typeparamref name="T"/>,
+        /// i.e. return the outermost node of that type in this chain.
+        /// </summary>
         public static T? ToUpperSyntax<T>(this SyntaxNode node)
             where T : SyntaxNode
         {
@@ -63,6 +82,10 @@ namespace AdjustNamespace.Helper
             return default;
         }
 
+        /// <summary>
+        /// Breadth-first search for the closest descendant (or the node itself)
+        /// of exactly the given type.
+        /// </summary>
         public static SyntaxNode? GoDownTo(this SyntaxNode node, Type targetType)
         {
             if (node.GetType() == targetType)
@@ -97,6 +120,9 @@ namespace AdjustNamespace.Helper
             return default;
         }
 
+        /// <summary>
+        /// All the descendants of the given type.
+        /// </summary>
         public static List<T> GetAllDescendants<T>(
             this SyntaxNode s
             )
@@ -111,6 +137,9 @@ namespace AdjustNamespace.Helper
             return r;
         }
 
+        /// <summary>
+        /// All the types (including the nested ones) of the namespace and of its child namespaces.
+        /// </summary>
         public static IEnumerable<INamedTypeSymbol> GetAllTypes(this INamespaceSymbol @namespace)
         {
             foreach (var type in @namespace.GetTypeMembers())
@@ -123,6 +152,9 @@ namespace AdjustNamespace.Helper
         }
 
 
+        /// <summary>
+        /// The type itself and all the types nested into it (recursively).
+        /// </summary>
         public static IEnumerable<INamedTypeSymbol> GetNestedTypes(this INamedTypeSymbol type)
         {
             yield return type;

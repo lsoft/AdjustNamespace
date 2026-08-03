@@ -11,6 +11,12 @@ using System.Windows.Input;
 
 namespace AdjustNamespace.UI.ViewModel
 {
+    /// <summary>
+    /// Viewmodel of the third (last) wizard step: the adjusting itself.
+    /// It processes the chosen files one by one (see <see cref="AdjusterFactory"/>),
+    /// then removes the using clauses of the emptied namespaces (see <see cref="Cleanup"/>)
+    /// and closes the wizard window.
+    /// </summary>
     public class PerformingViewModel : ChainViewModel
     {
         private readonly CancellationTokenSource _cts = new();
@@ -26,6 +32,9 @@ namespace AdjustNamespace.UI.ViewModel
 
         private string _progressMessage;
 
+        /// <summary>
+        /// Progress line of the step.
+        /// </summary>
         public string ProgressMessage
         {
             get => _progressMessage;
@@ -36,6 +45,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Cancel the adjusting. The already applied changes are not reverted.
+        /// </summary>
         public ICommand CancelCommand
         {
             get
@@ -58,6 +70,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="formCloser">Callback which closes the wizard window.</param>
+        /// <param name="parameters">Parameters of this step.</param>
         public PerformingViewModel(
             VsServices vss,
             Action formCloser,
@@ -77,6 +92,7 @@ namespace AdjustNamespace.UI.ViewModel
             _progressMessage = string.Empty;
         }
 
+        /// <inheritdoc/>
         public override async System.Threading.Tasks.Task StartAsync()
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -113,6 +129,9 @@ namespace AdjustNamespace.UI.ViewModel
             _formCloser();
         }
 
+        /// <summary>
+        /// The whole adjusting session: the files first, the cleanup then.
+        /// </summary>
         private async System.Threading.Tasks.Task PerformAdjustingAsync(CancellationToken cancellationToken)
         {
             var namespaceCenter = await NamespaceCenter.CreateForAsync(_vss.Workspace);
@@ -130,6 +149,9 @@ namespace AdjustNamespace.UI.ViewModel
             await CleanupAsync(namespaceCenter, cancellationToken);
         }
 
+        /// <summary>
+        /// Adjust the chosen files one by one until the user cancels the process.
+        /// </summary>
         private async Task<CancellationToken> AdjustAsync(AdjusterFactory adjusterFactory, CancellationToken cancellationToken)
             {
             var total = _subjectFilePaths.Count;
@@ -155,6 +177,10 @@ namespace AdjustNamespace.UI.ViewModel
             return cancellationToken;
         }
 
+        /// <summary>
+        /// Walk through every C# document of the solution and remove the using clauses
+        /// of the namespaces which became empty during the adjusting.
+        /// </summary>
         private async Task CleanupAsync(NamespaceCenter namespaceCenter, CancellationToken cancellationToken)
         {
             var cleanupDocuments = _vss.Workspace.EnumerateAllDocumentFilePaths(Predicate.IsProjectInScope, Predicate.IsDocumentInScope).ToList();

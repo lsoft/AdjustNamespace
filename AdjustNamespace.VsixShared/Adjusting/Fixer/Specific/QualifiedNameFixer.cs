@@ -15,8 +15,14 @@ namespace AdjustNamespace.Adjusting.Fixer
     public class QualifiedNameFixer : IFixer
     {
         private readonly Workspace _workspace;
+
+        /// <summary>
+        /// Nodes to be replaced (identified by their span in the original document)
+        /// and their replacements.
+        /// </summary>
         private readonly List<QualifiedNameFixerArgument> _arguments = new ();
 
+        /// <inheritdoc/>
         public string FilePath
         {
             get;
@@ -41,11 +47,15 @@ namespace AdjustNamespace.Adjusting.Fixer
             FilePath = filePath;
         }
 
+        /// <summary>
+        /// Schedule a replacement of a fully qualified name.
+        /// </summary>
         public void AddSubject(QualifiedNameFixerArgument qnsa)
         {
             _arguments.Add(qnsa);
         }
 
+        /// <inheritdoc/>
         public async Task FixAsync()
         {
             await _workspace.ApplyModifiedDocumentAsync(
@@ -71,9 +81,19 @@ namespace AdjustNamespace.Adjusting.Fixer
                 );
         }
 
+        /// <summary>
+        /// A single replacement: what to replace (a span in the document) and what to replace it with.
+        /// </summary>
         public readonly struct QualifiedNameFixerArgument
         {
+            /// <summary>
+            /// Span of the node to be replaced.
+            /// </summary>
             public readonly TextSpan SubjectNodeSpan;
+
+            /// <summary>
+            /// New syntax node to be placed instead of the node above.
+            /// </summary>
             public readonly SyntaxNode ToReplaceSyntax;
 
             public QualifiedNameFixerArgument(

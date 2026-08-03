@@ -16,8 +16,14 @@ namespace AdjustNamespace.Adjusting.Fixer
     public class AddUsingFixer : IFixer
     {
         private readonly Workspace _workspace;
+
+        /// <summary>
+        /// Namespaces to be added to the file. It is a set, so the duplicates
+        /// (a file may reference many types moved into the same namespace) are removed automatically.
+        /// </summary>
         private readonly HashSet<string> _symbolTargetNamespaces = new ();
 
+        /// <inheritdoc/>
         public string FilePath
         {
             get;
@@ -43,6 +49,10 @@ namespace AdjustNamespace.Adjusting.Fixer
         }
 
 
+        /// <summary>
+        /// Schedule a new using clause to be added to the file.
+        /// </summary>
+        /// <param name="symbolTargetNamespace">Namespace to add a using clause for.</param>
         public void AddSubject(string symbolTargetNamespace)
         {
             if (symbolTargetNamespace is null)
@@ -54,8 +64,12 @@ namespace AdjustNamespace.Adjusting.Fixer
         }
 
 
+        /// <inheritdoc/>
         public async Task FixAsync()
         {
+            //Workspace.TryApplyChanges fails if the solution has been changed by someone else
+            //in the meantime; in this case we have to rebuild our changes against the fresh
+            //solution snapshot and to try again
             bool r;
             do
             {
@@ -86,6 +100,7 @@ namespace AdjustNamespace.Adjusting.Fixer
 
                     if (usingSyntaxes.Count > 0)
                     {
+                        //put the new clause after the existing ones to preserve their order
                         var lastUsing = usingSyntaxes.Last();
 
                         syntaxRoot = syntaxRoot.InsertNodesAfter(
@@ -102,6 +117,7 @@ namespace AdjustNamespace.Adjusting.Fixer
                     }
                     else
                     {
+                        //there are no using clauses in this file at all
                         var cus = (CompilationUnitSyntax)syntaxRoot;
                         var modifiedcus = cus.AddUsings(
                             SyntaxFactory.UsingDirective(

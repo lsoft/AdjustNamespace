@@ -6,31 +6,28 @@ using System.Windows.Input;
 namespace AdjustNamespace.Helper
 {
     /// <summary>
-    /// Класс, реализующий базовую функциональность viewmodel идеологии MVVM
+    /// Base class of the MVVM viewmodels of the extension.
     /// </summary>
     public class BaseViewModel : INotifyPropertyChanged, IDisposable
     {
 
         /// <summary>
-        /// Событие изменения свойства
+        /// Property change notification for the WPF bindings.
         /// </summary>
         public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
-        /// Тестовое свойство бросания исключения в случае не нахождения биндинга
+        /// Throw an exception (instead of a Debug.Fail) if a notification
+        /// is raised for a property which does not exist. Debug only, see <see cref="VerifyPropertyName"/>.
         /// </summary>
         protected bool _throwOnInvalidPropertyName;
 
-        /// <summary>
-        /// конструктор
-        /// </summary>
-        /// <param name="dispatcher">Диспатчер WPF</param>
         protected BaseViewModel()
         {
         }
 
         /// <summary>
-        /// Активация евента изменения бинденого свойства
+        /// Notify that every property of this viewmodel may have been changed.
         /// </summary>
         protected void OnPropertyChanged()
         {
@@ -38,9 +35,9 @@ namespace AdjustNamespace.Helper
         }
 
         /// <summary>
-        /// Активация евента изменения бинденого свойства
+        /// Notify that the given property has been changed.
         /// </summary>
-        /// <param name="propertyName"></param>
+        /// <param name="propertyName">Name of the changed property; an empty string means `all of them`.</param>
         protected virtual void OnPropertyChanged(string propertyName)
         {
             VerifyPropertyName(propertyName);
@@ -52,9 +49,14 @@ namespace AdjustNamespace.Helper
                 handler(this, e);
             }
 
+            //the commands of the viewmodels rely on CommandManager.RequerySuggested,
+            //so their CanExecute has to be re-evaluated after every property change
             CommandManager.InvalidateRequerySuggested();
         }
 
+        /// <summary>
+        /// Debug check: the property with such a name really exists in this viewmodel.
+        /// </summary>
         [Conditional("DEBUG")]
         [DebuggerStepThrough]
         public void VerifyPropertyName(string propertyName)
@@ -78,6 +80,9 @@ namespace AdjustNamespace.Helper
             }
         }
 
+        /// <summary>
+        /// Release the resources of the derived viewmodel. Does nothing by default.
+        /// </summary>
         protected virtual void DisposeViewModel()
         {
 
@@ -85,6 +90,7 @@ namespace AdjustNamespace.Helper
 
         #region Implementation of IDisposable
 
+        /// <inheritdoc/>
         public void Dispose()
         {
             DisposeViewModel();

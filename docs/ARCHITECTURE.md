@@ -1,0 +1,166 @@
+# Architecture
+
+This document describes how AdjustNamespace is arranged inside. It is intended for the
+contributors; if you are looking for the user documentation, please read [../README.md](../README.md).
+
+## Projects
+
+| Project | Contents |
+| --- | --- |
+| `AdjustNamespace.VsixShared` | A shared MSBuild project with the whole code of the extension. |
+| `AdjustNamespace.2022` | The VSIX project for Visual Studio 2022: the manifest, the command table (`VSCommandTable.vsct`), the image manifest and the resources. |
+
+The extension targets .NET Framework 4.8 and is built against
+[Community.VisualStudio.Toolkit](https://github.com/VsixCommunity/Community.VisualStudio.Toolkit),
+Roslyn (`Microsoft.CodeAnalysis.*`) and `Microsoft.VisualStudio.LanguageServices`.
+The code which depends on the Visual Studio version is guarded with the `VS2022`
+conditional compilation symbol (file scoped namespaces, for example).
+
+The post-build event of `AdjustNamespace.2022` refreshes the `Tests/Subject` folder from
+`Tests/Standard`, see [../Tests/README.md](../Tests/README.md).
+
+## The big picture
+
+```
+ Command (AdjustNamespaceCommand / AdjustSolutionCommand / AdjustSelectedCommand)
+   |  collects the file paths chosen by the user
+   v
+ AdjustNamespaceWindow (modal wizard)
+   |
+   +--> 1. PreparationStepViewModel   - compiles the solution, reports the errors
+   |
+   +--> 2. SelectedStepViewModel      - SubjectFileCollector scans the files,
+   |                                    the user chooses what to adjust
+   |
+   +--> 3. PerformingViewModel        - AdjusterFactory + IAdjuster do the job,
+                                        Cleanup removes the emptied usings
+```
+
+### Namespaces of the codebase
+
+| Namespace | Responsibility |
+| --- | --- |
+| `AdjustNamespace.Command` | Menu commands. Each of them collects the file paths and opens the wizard. |
+| `AdjustNamespace.UI` | The wizard: the window, the steps (`StepFactory`), the viewmodels and the WPF controls. |
+| `AdjustNamespace.Adjusting` | The core: the scanner, the adjusters, the fixers and the final cleanup. |
+| `AdjustNamespace.Namespace` | Namespace transitions and the namespace state of the solution. |
+| `AdjustNamespace.Xaml` | Reading, modification and saving of the xaml files. |
+| `AdjustNamespace.Settings` | Per solution settings stored in the solution folder. |
+| `AdjustNamespace.Options` | Per user options stored by Visual Studio. |
+| `AdjustNamespace.InfoBar` | The release notes gold bar. |
+| `AdjustNamespace.Helper` | Helpers around Roslyn, the solution tree, WPF and MVVM. |
+
+`VsServices` is a small struct which carries the Visual Studio services (DTE, the Roslyn
+workspace, the component model) plus the settings of the opened solution. It is created once
+per command invocation and is passed everywhere by value.
+
+## The wizard
+
+The steps are chained through `IStepFactory`: every step knows the factory of the next one and
+replaces the content of the wizard window with the control of that step. The parameters are
+passed as a plain `object` (`SelectedStepParameters`, `PerformingParameters`).
+
+1. **`PreparationStepViewModel`** compiles every project of the solution and shows the found
+   errors. The adjusting relies on the semantic model, so a broken solution may produce
+   incorrect results. The user is allowed to move next anyway.
+2. **`SelectedStepViewModel`** runs `SubjectFileCollector` and shows the files which are really
+   the subject to change, grouped by their physical folder (`SelectFolderViewModel` +
+   `SelectFileViewModel`). Here the user tunes the target namespace regex
+   (`NamespaceReplaceRegex`, `KnownRegex`) and decides whether the affected files have to be
+   opened in the editor (this is the only way to make the changes undoable).
+3. **`PerformingViewModel`** creates `NamespaceCenter` and `AdjusterFactory`, adjusts the chosen
+   files one by one and finally runs `Cleanup` over every C# document of the solution.
+
+## The core
+
+### Determining the target namespace
+
+`NamespaceHelper.TryDetermineTargetNamespaceAsync` builds the target namespace as
+`project default namespace` + `folders between the project folder and the file`, skips the
+folders excluded by the user (`AdjustNamespaceSettings2.IsSkippedFolder`) and applies the user
+regex. The default namespace comes from the project properties for C# and `sqlproj` projects;
+for the other project kinds the project name without its last part is used
+(`MyApp.Shared` -> `MyApp`).
+
+### Scanning (`SubjectFileCollector`)
+
+The collector binds the chosen file paths to their projects (this requires the main thread),
+then for every file:
+
+- a xaml file is checked with `XamlAdjuster.IsChangesExistsAsync` (nothing is saved);
+- a C# file is checked for the namespace transitions (`NamespaceTransitionContainer`) and for
+  the type name conflicts in the target namespace (`NamespaceTypeContainer`). A conflict raises
+  `FileProcessException` and stops the scan: such a move would break the compilation.
+
+### Adjusting
+
+`AdjusterFactory` creates an `IAdjuster` for a file:
+
+- **`XamlAdjuster`** rewrites the `x:Class` attribute of the root element. The code behind file
+  is processed separately, as a usual C# file.
+- **`CsAdjuster`** does the main job:
+  1. `NamespaceTransitionContainer.GetNamespaceTransitionsFor` builds the transitions
+     (`old namespace -> new namespace`) of the file;
+  2. for every type declared in the file `RefProcessor` finds its references across the solution
+     (including the usages of its extension methods) and creates a fixer for each of them;
+  3. a fixer for the namespace declarations of the file itself is created;
+  4. `FixerContainer.FixAllAsync` applies all the created fixers;
+  5. the references to the moved types are fixed in the xaml files of the solution.
+
+### Fixers
+
+A fixer is a modification of one kind in one file. The fixers are accumulated during the
+analysis and are applied later, when the whole picture is known: this way a file is parsed and
+saved once, no matter how many references it contains.
+
+| Fixer | What it does |
+| --- | --- |
+| `QualifiedNameFixer` | Rewrites the fully qualified names (`A.B.Class1`, `A.B.Class1.StaticMember`). |
+| `AddUsingFixer` | Adds the missing `using` clauses. |
+| `NamespaceFixer` | Rewrites the namespace declarations of the adjusted file. |
+
+`FixerContainer` groups the fixers by file (`FixerSet`). The order of the fixers inside a set
+matters: the qualified names are identified by their spans in the original document, so they
+have to be rewritten before any other edit shifts these spans.
+
+Every modification of the Roslyn workspace goes through the `do { ... } while (!TryApplyChanges)`
+pattern (see `DocumentChangerHelper`): `Workspace.TryApplyChanges` fails if the solution has been
+changed by someone else after our snapshot has been taken, so the change is rebuilt against the
+fresh snapshot and applied again.
+
+### Cleanup
+
+`NamespaceCenter` knows all the types of the solution grouped by their namespaces and is
+notified about every moved type. A namespace which has lost its last type is remembered, and
+`Cleanup.RemoveEmptyUsingStatementsForAsync` removes the using clauses of such namespaces from
+every C# document of the solution.
+
+## The xaml subsystem
+
+A xaml file is processed as a plain text with a set of regexes instead of an XML DOM: this is
+the only way to keep the user's formatting untouched.
+
+- `XamlEngine` creates a `XamlDocument` over an `IXamlBodyProvider`:
+  `ClosedXamlBodyProvider` works with the file system (fast, not undoable) and
+  `OpenedXamlBodyProvider` works with the text buffer of the Visual Studio editor
+  (undoable, requires the main thread).
+- `XamlDocument` is immutable: every modification produces a new instance, and nothing is
+  written back until `SaveIfChangesExistsAgainst` is called. This allows to check whether a file
+  is a subject to change without touching it.
+- `XamlStructure` holds the interesting fragments of the body with their positions: the xaml
+  language alias (`XamlX`), the clr-namespace declarations (`XamlXmlns`), the tags
+  (`XamlControl`), the markup extensions (`XamlAttributeReference`) and the `x:Class` attributes
+  (`XamlClass`). The fragments which may reference a moved class implement `IXamlPerformable`
+  and are applied in the backward order, so the earlier positions stay valid.
+
+## Threading
+
+Visual Studio automation objects (DTE, the solution tree, the editor documents) are available
+from the main thread only, so such work is grouped into the separate steps which start with
+`ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync`. The heavy Roslyn analysis is moved
+to the thread pool with `await TaskScheduler.Default`.
+
+## Logging
+
+`Logging.LogVS` writes into `%TEMP%\AdjustNamespace.vs.log`. It is compiled into the debug builds
+only (`[Conditional("DEBUG")]`).

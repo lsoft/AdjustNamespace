@@ -8,6 +8,8 @@ namespace AdjustNamespace.Adjusting
 {
     /// <summary>
     /// Adjuster for xaml file.
+    /// It changes the `x:Class` attribute of the root element only
+    /// (the code behind file is adjusted separately by <see cref="CsAdjuster"/>).
     /// </summary>
     public class XamlAdjuster : IAdjuster
     {
@@ -16,6 +18,10 @@ namespace AdjustNamespace.Adjusting
         private readonly string _targetNamespace;
         private readonly bool _openFilesToEnableUndo;
 
+        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="openFilesToEnableUndo">Open the changed file in the editor (this allows the user to undo the changes).</param>
+        /// <param name="subjectFilePath">Full path to the xaml file to adjust.</param>
+        /// <param name="targetNamespace">The namespace the root class of that xaml should be moved into.</param>
         public XamlAdjuster(
             VsServices vss,
             bool openFilesToEnableUndo,
@@ -39,6 +45,7 @@ namespace AdjustNamespace.Adjusting
             _targetNamespace = targetNamespace;
         }
 
+        /// <inheritdoc/>
         public async Task<bool> AdjustAsync()
         {
             var (xamlDocument, modifiedDocument) = await TryModifyDocumentAsync();
@@ -52,6 +59,11 @@ namespace AdjustNamespace.Adjusting
             return true;
         }
 
+        /// <summary>
+        /// Check (without saving anything) if this xaml file is a subject to change.
+        /// Used by <see cref="SubjectFileCollector"/> to show the user only those files
+        /// which will really be modified.
+        /// </summary>
         public async Task<bool> IsChangesExistsAsync(
             )
         {
@@ -59,6 +71,13 @@ namespace AdjustNamespace.Adjusting
             return modifiedDocument.HasValue && modifiedDocument.Value.IsChangesExists(xamlDocument);
         }
 
+        /// <summary>
+        /// Build the modified version of the subject xaml document.
+        /// </summary>
+        /// <returns>
+        /// The original document and its modified copy. The modified copy is <c>null</c>
+        /// if the document has no root class at all or it is in the target namespace already.
+        /// </returns>
         private async Task<(XamlDocument, XamlDocument?)> TryModifyDocumentAsync(
             )
         {

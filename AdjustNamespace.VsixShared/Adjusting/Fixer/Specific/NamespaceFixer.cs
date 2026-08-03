@@ -13,12 +13,19 @@ namespace AdjustNamespace.Adjusting.Fixer.Specific
 {
     /// <summary>
     /// A fixer for editing namespace clauses to the correct one.
+    /// Both the classic (<c>namespace A { }</c>) and the file scoped (<c>namespace A;</c>)
+    /// declarations are supported.
     /// </summary>
     public class NamespaceFixer : IFixer
     {
         private readonly VsServices _vss;
+
+        /// <summary>
+        /// Namespace transitions to be applied to the file.
+        /// </summary>
         private readonly List<NamespaceTransitionContainer> _subjectList = new();
 
+        /// <inheritdoc/>
         public string FilePath
         {
             get;
@@ -33,19 +40,26 @@ namespace AdjustNamespace.Adjusting.Fixer.Specific
             FilePath = filePath;
         }
 
+        /// <summary>
+        /// Schedule the namespace transitions to be applied to the file.
+        /// </summary>
         public void AddSubject(NamespaceTransitionContainer ntc)
         {
             _subjectList.Add(ntc);
         }
 
+        /// <inheritdoc/>
         public async Task FixAsync()
         {
             var workspace = _vss.Workspace;
 
             foreach (var ntc in _subjectList)
             {
+                //only the root namespaces are renamed; the nested ones are renamed automatically
+                //because their full name contains the root one
                 foreach (var transition in ntc.Transitions.Where(ni => ni.IsRoot))
                 {
+                    //see the comment in AddUsingFixer.FixAsync about this do-while
                     bool r = true;
                     do
                     {

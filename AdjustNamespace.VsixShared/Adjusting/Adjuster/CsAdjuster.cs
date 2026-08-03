@@ -17,6 +17,14 @@ namespace AdjustNamespace.Adjusting
 {
     /// <summary>
     /// Adjuster for cs file.
+    ///
+    /// The workflow is:
+    /// 1) determine the namespace transitions (old namespace -> new namespace) for the file;
+    /// 2) find every reference to the types declared in this file and schedule a fix for each
+    ///    of them (a new using clause or an edited fully qualified name), see <see cref="RefProcessor"/>;
+    /// 3) schedule the fix of the namespace clauses of the file itself;
+    /// 4) apply all the scheduled fixes at once, see <see cref="FixerContainer"/>;
+    /// 5) fix the references to the moved types in the xaml files of the solution.
     /// </summary>
     public class CsAdjuster : IAdjuster
     {
@@ -27,6 +35,12 @@ namespace AdjustNamespace.Adjusting
         private readonly string _targetNamespace;
         private readonly List<string> _xamlFilePaths;
 
+        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="openFilesToEnableUndo">Open the changed files in the editor (this allows the user to undo the changes).</param>
+        /// <param name="namespaceCenter">Namespace state container shared across the whole adjusting session.</param>
+        /// <param name="subjectFilePath">Full path to the C# file to adjust.</param>
+        /// <param name="targetNamespace">The namespace the types of that file should be moved into.</param>
+        /// <param name="xamlFilePaths">All the xaml files of the solution (they may reference the moved types).</param>
         public CsAdjuster(
             VsServices vss,
             bool openFilesToEnableUndo,
@@ -64,6 +78,7 @@ namespace AdjustNamespace.Adjusting
             _xamlFilePaths = xamlFilePaths;
         }
 
+        /// <inheritdoc/>
         public async Task<bool> AdjustAsync()
         {
             var (subjectDocument, subjectSyntaxRoot) = await _vss.Workspace.GetDocumentAndSyntaxRootAsync(_subjectFilePath);
@@ -117,6 +132,17 @@ namespace AdjustNamespace.Adjusting
             return true;
         }
 
+        /// <summary>
+        /// Create the fixers for every reference to every type declared in the subject file.
+        /// </summary>
+        /// <param name="processedTypes">
+        /// (in/out) The types which have been moved. It is filled here and reused later
+        /// to fix the references in the xaml files.
+        /// </param>
+        /// <param name="syntaxRoot">Syntax root of the subject file.</param>
+        /// <param name="semanticModel">Semantic model of the subject file.</param>
+        /// <param name="ntc">Namespace transitions of the subject file.</param>
+        /// <param name="fixerContainer">(out) Container the created fixers are placed into.</param>
         private async Task FixReferencesAsync(
             HashSet<INamedTypeSymbol> processedTypes,
             SyntaxNode syntaxRoot,
@@ -175,6 +201,12 @@ namespace AdjustNamespace.Adjusting
             }
         }
 
+        /// <summary>
+        /// Fix the references to the moved types in the xaml files of the solution.
+        /// To keep it fast, the changes are firstly applied to an in-memory copy of the file,
+        /// and only if that copy differs from the original one the real (possibly opened
+        /// in the editor) document is touched.
+        /// </summary>
         private async System.Threading.Tasks.Task FixReferenceInXamlFilesAsync(
             NamespaceTransitionContainer ntc,
             HashSet<INamedTypeSymbol> processedTypes
@@ -218,6 +250,10 @@ namespace AdjustNamespace.Adjusting
             }
         }
 
+        /// <summary>
+        /// Apply the namespace transitions of every moved type to the given xaml document.
+        /// <see cref="XamlDocument"/> is immutable, hence a new document is returned.
+        /// </summary>
         private XamlDocument PerformChanges(
             XamlDocument document,
             NamespaceTransitionContainer ntc,

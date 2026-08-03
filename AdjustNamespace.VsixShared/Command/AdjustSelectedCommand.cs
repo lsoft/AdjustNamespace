@@ -8,10 +8,15 @@ using System.ComponentModel.Design;
 namespace AdjustNamespace.Command
 {
     /// <summary>
-    /// Command handler
+    /// Handler of the `Extensions -> Adjust Namespace -> Adjust namespaces in selected...` command.
+    /// Does the same as <see cref="AdjustNamespaceCommand"/> (processes the current solution explorer
+    /// selection), but is available from the main menu, i.e. regardless of the active window.
     /// </summary>
     internal sealed class AdjustSelectedCommand
     {
+        /// <summary>
+        /// Kind (guid) of a C# project. Kept for the future use.
+        /// </summary>
         public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
 
 
@@ -31,7 +36,7 @@ namespace AdjustNamespace.Command
         private readonly AsyncPackage package;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AdjustNamespaceCommand"/> class.
+        /// Initializes a new instance of the <see cref="AdjustSelectedCommand"/> class.
         /// Adds our command handlers for menu (commands must exist in the command table file)
         /// </summary>
         /// <param name="package">Owner package, not null.</param>

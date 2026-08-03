@@ -2,24 +2,43 @@
 
 namespace AdjustNamespace.Xaml.Positioned
 {
+    /// <summary>
+    /// A type reference inside a markup extension: <c>{x:Type alias:ClassName}</c>
+    /// or <c>{x:Static alias:ClassName...}</c>.
+    /// </summary>
     public class XamlAttributeReference : IXamlPerformable
     {
+        /// <inheritdoc/>
         public int Index
         {
             get;
         }
+
+        /// <inheritdoc/>
         public int Length
         {
             get;
         }
+
+        /// <summary>
+        /// Kind of the markup extension: `Type` or `Static`.
+        /// </summary>
         public string Prefix
         {
             get;
         }
+
+        /// <summary>
+        /// xmlns alias of the referenced class.
+        /// </summary>
         public string Alias
         {
             get;
         }
+
+        /// <summary>
+        /// Name of the referenced class (without the namespace).
+        /// </summary>
         public string ClassName
         {
             get;
@@ -40,6 +59,7 @@ namespace AdjustNamespace.Xaml.Positioned
             Prefix = prefix;
         }
 
+        /// <inheritdoc/>
         public bool Perform(
             XamlStructure structure,
             string sourceNamespace,

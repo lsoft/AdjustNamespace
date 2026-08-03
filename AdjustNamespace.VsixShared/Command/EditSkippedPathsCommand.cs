@@ -6,10 +6,16 @@ using System.ComponentModel.Design;
 namespace AdjustNamespace.Command
 {
     /// <summary>
-    /// Command handler
+    /// Handler of the `Extensions -> Adjust Namespace -> Edit skipped paths...` command.
+    /// Opens the editor (<see cref="EditSkippedPathsWindow"/>) of the folder list which
+    /// should not take a part in the target namespace, see
+    /// <see cref="Settings.AdjustNamespaceSettings.SkippedFolderSuffixes"/>.
     /// </summary>
     internal sealed class EditSkippedPathsCommand
     {
+        /// <summary>
+        /// Kind (guid) of a C# project. Kept for the future use.
+        /// </summary>
         public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
 
 
@@ -29,7 +35,7 @@ namespace AdjustNamespace.Command
         private readonly AsyncPackage package;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AdjustNamespaceCommand"/> class.
+        /// Initializes a new instance of the <see cref="EditSkippedPathsCommand"/> class.
         /// Adds our command handlers for menu (commands must exist in the command table file)
         /// </summary>
         /// <param name="package">Owner package, not null.</param>

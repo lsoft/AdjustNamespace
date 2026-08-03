@@ -8,6 +8,10 @@ using Microsoft.VisualStudio.Shell;
 
 namespace AdjustNamespace.UI
 {
+    /// <summary>
+    /// Attached property which makes a WPF control look like a native Visual Studio one
+    /// (it merges the shell styles into the resources of that control).
+    /// </summary>
     public static class VsTheme
     {
         private static readonly Dictionary<UIElement, bool> _isUsingVsTheme = new Dictionary<UIElement, bool>();
@@ -20,6 +24,9 @@ namespace AdjustNamespace.UI
             SetUseVsTheme((UIElement)d, (bool)e.NewValue);
         }
 
+        /// <summary>
+        /// Apply or revert the Visual Studio theme for the given element.
+        /// </summary>
         public static void SetUseVsTheme(UIElement element, bool value)
         {
             if (value)
@@ -39,11 +46,19 @@ namespace AdjustNamespace.UI
             _isUsingVsTheme[element] = value;
         }
 
+        /// <summary>
+        /// The Visual Studio theme is applied for the given element.
+        /// </summary>
         public static bool GetUseVsTheme(UIElement element)
         {
             return _isUsingVsTheme.TryGetValue(element, out var value) && value;
         }
 
+        /// <summary>
+        /// Load the styles of the Visual Studio shell.
+        /// These assemblies are internal ones, so any error here is swallowed:
+        /// a non themed window is better than a crashed one.
+        /// </summary>
         private static ResourceDictionary BuildThemeResources()
         {
             var allResources = new ResourceDictionary();

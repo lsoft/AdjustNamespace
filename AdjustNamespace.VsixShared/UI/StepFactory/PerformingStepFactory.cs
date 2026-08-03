@@ -6,6 +6,10 @@ using Microsoft.VisualStudio.PlatformUI;
 
 namespace AdjustNamespace.UI.StepFactory
 {
+    /// <summary>
+    /// Factory of the third (last) wizard step: the adjusting itself
+    /// (<see cref="PerformingViewModel"/>).
+    /// </summary>
     public class PerformingStepFactory : IStepFactory
     {
         private readonly VsServices _vss;
@@ -33,6 +37,8 @@ namespace AdjustNamespace.UI.StepFactory
             _targetControl = targetControl;
         }
 
+        /// <inheritdoc/>
+        /// <param name="argument">A <see cref="PerformingParameters"/> instance.</param>
         public async System.Threading.Tasks.Task CreateAsync(object argument)
         {
             var v = new PerformingUserControl();

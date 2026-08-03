@@ -9,11 +9,17 @@ using System.Threading;
 
 namespace AdjustNamespace.Adjusting
 {
+    /// <summary>
+    /// The final stage of the adjusting: removal of the using clauses which point
+    /// to the namespaces emptied by the adjusting.
+    /// </summary>
     public class Cleanup
     {
         private readonly VsServices _vss;
         private readonly NamespaceCenter _namespaceCenter;
 
+        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="namespaceCenter">Namespace state container which knows which namespaces became empty.</param>
         public Cleanup(
             VsServices vss,
             NamespaceCenter namespaceCenter
@@ -28,12 +34,17 @@ namespace AdjustNamespace.Adjusting
             _namespaceCenter = namespaceCenter;
         }
 
+        /// <summary>
+        /// Remove the using clauses of the emptied namespaces from the given document.
+        /// </summary>
+        /// <param name="documentFilePath">Full path to the document to clean up.</param>
         public async Task RemoveEmptyUsingStatementsForAsync(
             string documentFilePath
             )
         {
             var workspace = _vss.Workspace;
 
+            //see the comment in AddUsingFixer.FixAsync about this do-while
             bool r = true;
             do
             {

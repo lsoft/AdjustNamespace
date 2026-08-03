@@ -5,8 +5,13 @@ using System.Text;
 
 namespace AdjustNamespace.Xaml.BodyProvider
 {
+    /// <summary>
+    /// Body provider which works with the xaml file directly through the file system.
+    /// It is fast, but the changes made this way cannot be undone by the user.
+    /// </summary>
     public sealed class ClosedXamlBodyProvider : IXamlBodyProvider
     {
+        /// <inheritdoc/>
         public string XamlFilePath
         {
             get;
@@ -24,6 +29,7 @@ namespace AdjustNamespace.Xaml.BodyProvider
             XamlFilePath = xamlFilePath;
         }
 
+        /// <inheritdoc/>
         public string ReadText()
         {
             var result = File.ReadAllText(XamlFilePath);
@@ -31,6 +37,7 @@ namespace AdjustNamespace.Xaml.BodyProvider
             return result;
         }
 
+        /// <inheritdoc/>
         public void UpdateText(string text)
         {
             File.WriteAllText(XamlFilePath, text);

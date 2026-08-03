@@ -12,6 +12,7 @@ namespace AdjustNamespace.Adjusting.Fixer
 {
     /// <summary>
     /// Container for all fixers we produce.
+    /// The fixers are grouped by the file they are applied to (see <see cref="FixerSet"/>).
     /// </summary>
     public class FixerContainer
     {
@@ -29,6 +30,10 @@ namespace AdjustNamespace.Adjusting.Fixer
             _openFilesToEnableUndo = openFilesToEnableUndo;
         }
 
+        /// <summary>
+        /// Get the fixer of the requested type for the requested file.
+        /// The fixers for a file are created on the first demand.
+        /// </summary>
         public T Fixer<T>(string filePath)
             where T : IFixer
         {
@@ -40,6 +45,9 @@ namespace AdjustNamespace.Adjusting.Fixer
             return fixerSet.Fixer<T>();
         }
 
+        /// <summary>
+        /// Apply the fixers of every touched file.
+        /// </summary>
         public async Task FixAllAsync()
         {
             foreach (var pair in _dict)

@@ -7,10 +7,16 @@ using System.ComponentModel.Design;
 namespace AdjustNamespace.Command
 {
     /// <summary>
-    /// Command handler
+    /// Handler of the `Extensions -> Adjust Namespace -> Show release notes...` command.
+    /// Opens RELEASE_NOTES.md (shipped inside the VSIX) in the Visual Studio editor.
+    /// The same command is invoked from the release notes gold bar, see
+    /// <see cref="InfoBar.ReleaseNotesInfoBarService"/>.
     /// </summary>
     internal sealed class ShowReleaseNotesCommand
     {
+        /// <summary>
+        /// Kind (guid) of a C# project. Kept for the future use.
+        /// </summary>
         public static string ProjectKind = "{52AEFF70-BBD8-11d2-8598-006097C68E81}";
 
 
@@ -30,7 +36,7 @@ namespace AdjustNamespace.Command
         private readonly AsyncPackage package;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AdjustNamespaceCommand"/> class.
+        /// Initializes a new instance of the <see cref="ShowReleaseNotesCommand"/> class.
         /// Adds our command handlers for menu (commands must exist in the command table file)
         /// </summary>
         /// <param name="package">Owner package, not null.</param>

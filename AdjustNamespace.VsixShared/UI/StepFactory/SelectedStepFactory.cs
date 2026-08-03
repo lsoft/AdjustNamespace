@@ -6,12 +6,21 @@ using AdjustNamespace.UI.ViewModel;
 
 namespace AdjustNamespace.UI.StepFactory
 {
+    /// <summary>
+    /// Factory of the second wizard step: the file selection and the target namespace regex
+    /// (<see cref="SelectedStepViewModel"/>).
+    /// </summary>
     public class SelectedStepFactory : IStepFactory
     {
         private readonly VsServices _vss;
         private readonly ContentControl _targetControl;
         private readonly IStepFactory _nextStepFactory;
 
+        /// <summary>
+        /// Factory of the previous step (this step allows to go back).
+        /// It is a property (not a constructor parameter) because the steps reference
+        /// each other and hence cannot be constructed in a single pass.
+        /// </summary>
         public PreparationStepFactory? PreviousStepFactory
         {
             get;
@@ -39,6 +48,8 @@ namespace AdjustNamespace.UI.StepFactory
             _nextStepFactory = nextStepFactory;
         }
 
+        /// <inheritdoc/>
+        /// <param name="argument">A <see cref="SelectedStepParameters"/> instance.</param>
         public async System.Threading.Tasks.Task CreateAsync(object argument)
         {
             var a = (SelectedStepParameters)argument;

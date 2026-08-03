@@ -8,12 +8,17 @@ namespace AdjustNamespace.Window
 {
     /// <summary>
     /// Interaction logic for EditSkippedPathsWindow.xaml
+    ///
+    /// The editor of the folder list which must not take a part in the target namespace.
+    /// The list is stored in the settings file of the solution, see
+    /// <see cref="Settings.AdjustNamespaceSettings.SkippedFolderSuffixes"/>.
     /// </summary>
     public partial class EditSkippedPathsWindow : DialogWindow
     {
         private readonly VsServices _vss;
         private readonly string _solutionFolder;
 
+        /// <param name="vss">Visual Studio services.</param>
         public EditSkippedPathsWindow(
             VsServices vss
             )
@@ -31,6 +36,9 @@ namespace AdjustNamespace.Window
             }
         }
 
+        /// <summary>
+        /// Ask the user for a folder and add it into the list (the duplicates are ignored).
+        /// </summary>
         public void Add_Click(object sender, RoutedEventArgs e)
         {
             using (var w = new FolderBrowserDialog())
@@ -60,6 +68,9 @@ namespace AdjustNamespace.Window
             }
         }
 
+        /// <summary>
+        /// Ask the user for a new folder for the selected item of the list.
+        /// </summary>
         public void Edit_Click(object sender, RoutedEventArgs e)
         {
             var selectvm = this.PathList.SelectedItem as ItemViewModel;
@@ -104,6 +115,11 @@ namespace AdjustNamespace.Window
             }
         }
 
+        /// <summary>
+        /// Convert the chosen folder into a path relative to the solution folder
+        /// (so the settings file can be shared across the team); a folder outside
+        /// of the solution folder is stored as a rooted path.
+        /// </summary>
         private (bool pathRooted, string fpath) Determine(FolderBrowserDialog w)
         {
             var pathRooted = true;
@@ -118,6 +134,9 @@ namespace AdjustNamespace.Window
             return (pathRooted, fpath);
         }
 
+        /// <summary>
+        /// Remove the selected item from the list.
+        /// </summary>
         public void Delete_Click(object sender, RoutedEventArgs e)
         {
             var selectvm = this.PathList.SelectedItem as ItemViewModel;
@@ -129,6 +148,9 @@ namespace AdjustNamespace.Window
             this.PathList.Items.Remove(selectvm);
         }
 
+        /// <summary>
+        /// Write the list into the settings file of the solution and close the window.
+        /// </summary>
         public void Save_Click(object sender, RoutedEventArgs e)
         {
             _vss.Settings.Settings.SkippedFolderSuffixes.Clear();
@@ -144,19 +166,31 @@ namespace AdjustNamespace.Window
             this.Close();
         }
 
+        /// <summary>
+        /// Close the window without saving.
+        /// </summary>
         public void Cancel_Click(object sender, RoutedEventArgs e)
         {
             this.Close();
         }
     }
 
+    /// <summary>
+    /// An item of the skipped folder list.
+    /// </summary>
     public sealed class ItemViewModel : BaseViewModel
     {
+        /// <summary>
+        /// The path is a rooted one (i.e. it is not relative to the solution folder).
+        /// </summary>
         public bool IsPathRooted
         {
             get;
         }
 
+        /// <summary>
+        /// The path itself, as it is stored in the settings file.
+        /// </summary>
         public string Suffix
         {
             get;

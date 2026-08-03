@@ -8,6 +8,10 @@ using System.Windows.Input;
 
 namespace AdjustNamespace.UI.Control
 {
+    /// <summary>
+    /// A behavior trigger which fires on the Space key only.
+    /// It is used to invert the checkboxes of the selected items with the keyboard.
+    /// </summary>
     public class SpaceKeyDownEventTrigger : EventTrigger
     {
 
@@ -16,6 +20,7 @@ namespace AdjustNamespace.UI.Control
         {
         }
 
+        /// <inheritdoc/>
         protected override void OnEvent(EventArgs eventArgs)
         {
             var e = eventArgs as KeyEventArgs;

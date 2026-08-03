@@ -4,28 +4,46 @@ using System.Linq;
 
 namespace AdjustNamespace.Helper
 {
+    /// <summary>
+    /// A set of small LINQ-like extensions used across the extension codebase.
+    /// </summary>
     public static class ListHelper
     {
+        /// <summary>
+        /// The n-th (zero based) item of the sequence.
+        /// </summary>
         public static T Nth<T>(this IEnumerable<T> c, int n)
         {
             return c.Skip(n).First();
         }
 
+        /// <summary>
+        /// The n-th (zero based) item of the sequence, or the default value if there is no such item.
+        /// </summary>
         public static T? NThOrDefault<T>(this IEnumerable<T> c, int n)
         {
             return c.Skip(n).FirstOrDefault();
         }
 
+        /// <summary>
+        /// The second item of the sequence.
+        /// </summary>
         public static T Second<T>(this IEnumerable<T> c)
         {
             return c.Skip(1).First();
         }
 
+        /// <summary>
+        /// The second item of the sequence, or the default value if there is no such item.
+        /// </summary>
         public static T? SecondOrDefault<T>(this IEnumerable<T> c)
         {
             return c.Skip(1).FirstOrDefault();
         }
 
+        /// <summary>
+        /// The items which match the predicate.
+        /// </summary>
         public static IReadOnlyList<T> FindAll<T>(
             this IReadOnlyList<T> list,
             Func<T, bool> predicate
@@ -54,6 +72,9 @@ namespace AdjustNamespace.Helper
             return result;
         }
 
+        /// <summary>
+        /// The items which do NOT match the predicate.
+        /// </summary>
         public static IReadOnlyList<T> RemoveAll<T>(
             this IEnumerable<T> source,
             Func<T, bool> selector
@@ -74,6 +95,9 @@ namespace AdjustNamespace.Helper
             return list;
         }
 
+        /// <summary>
+        /// Perform the action for every item of the sequence.
+        /// </summary>
         public static void ForEach<T>(
             this IEnumerable<T> list,
             Action<T> action
@@ -96,6 +120,9 @@ namespace AdjustNamespace.Helper
 
         }
 
+        /// <summary>
+        /// Flatten the sequence of sequences into a single list (LINQ SelectMany analogue).
+        /// </summary>
         public static List<T1> Collapse<T1, T2>(
             this IEnumerable<T2> list,
             Func<T2, IEnumerable<T1>> converter
@@ -124,6 +151,9 @@ namespace AdjustNamespace.Helper
             return result;
         }
 
+        /// <summary>
+        /// A shuffled copy of the sequence.
+        /// </summary>
         public static List<T> Shuffle<T>(
             this IEnumerable<T> list
             )
@@ -149,6 +179,9 @@ namespace AdjustNamespace.Helper
             return result;
         }
 
+        /// <summary>
+        /// Convert every item of the list (LINQ Select analogue with a preallocated result).
+        /// </summary>
         public static List<T2> ConvertAll<T1, T2>(
             this IReadOnlyList<T1> list,
             Func<T1, T2> converter
@@ -175,6 +208,10 @@ namespace AdjustNamespace.Helper
         }
 
 
+        /// <summary>
+        /// Convert every item to a string and join them with the separator
+        /// (with <see cref="Environment.NewLine"/> if no separator is given).
+        /// </summary>
         public static string Join<T>(
             this IEnumerable<T> list,
             Func<T, string> converter,
@@ -189,6 +226,9 @@ namespace AdjustNamespace.Helper
             return string.Join(separator, list.Select(a => converter(a)));
         }
 
+        /// <summary>
+        /// The value is not in the given sequence.
+        /// </summary>
         public static bool NotIn<T>(
             this T v,
             IEnumerable<T> array
@@ -198,6 +238,9 @@ namespace AdjustNamespace.Helper
                 !array.Contains(v);
         }
 
+        /// <summary>
+        /// The value is in the given sequence.
+        /// </summary>
         public static bool In<T>(
             this T v,
             IEnumerable<T> array
@@ -207,6 +250,9 @@ namespace AdjustNamespace.Helper
                 array.Contains(v);
         }
 
+        /// <summary>
+        /// The value is not in the given set of values.
+        /// </summary>
         public static bool NotIn<T>(
             this T v,
             params T[] array
@@ -216,6 +262,9 @@ namespace AdjustNamespace.Helper
                 !array.Contains(v);
         }
 
+        /// <summary>
+        /// The value is in the given set of values.
+        /// </summary>
         public static bool In<T>(
             this T v,
             params T[] array
@@ -225,6 +274,9 @@ namespace AdjustNamespace.Helper
                 array.Contains(v);
         }
 
+        /// <summary>
+        /// The value is not in the given set of values (compared with the given comparer).
+        /// </summary>
         public static bool NotIn<T>(
             this T v,
             IEqualityComparer<T> comparer,
@@ -235,6 +287,9 @@ namespace AdjustNamespace.Helper
                 !array.Contains(v, comparer);
         }
 
+        /// <summary>
+        /// The value is in the given set of values (compared with the given comparer).
+        /// </summary>
         public static bool In<T>(
             this T v,
             IEqualityComparer<T> comparer,
@@ -245,6 +300,11 @@ namespace AdjustNamespace.Helper
                 array.Contains(v, comparer);
         }
 
+        /// <summary>
+        /// Split the enumerator into the batches of the given size
+        /// (the last batch may be smaller).
+        /// </summary>
+        /// <exception cref="ArgumentException">The batch size is not positive.</exception>
         public static IEnumerable<List<T>> Split<T>(
             this IEnumerator<T> list,
             int splitCount
@@ -278,6 +338,11 @@ namespace AdjustNamespace.Helper
             }
         }
 
+        /// <summary>
+        /// Split the sequence into the batches of the given size
+        /// (the last batch may be smaller).
+        /// </summary>
+        /// <exception cref="ArgumentException">The batch size is not positive.</exception>
         public static IEnumerable<List<T>> Split<T>(
             this IEnumerable<T> list,
             int splitCount

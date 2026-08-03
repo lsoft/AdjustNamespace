@@ -12,6 +12,12 @@ using AdjustNamespace.Adjusting;
 
 namespace AdjustNamespace.UI.ViewModel
 {
+    /// <summary>
+    /// Viewmodel of the first wizard step.
+    /// It compiles every project of the solution and reports the compilation errors:
+    /// the adjusting is based on the semantic model, so a broken solution may lead
+    /// to the incorrect results. The user is allowed to move next anyway.
+    /// </summary>
     public class PreparationStepViewModel : ChainViewModel
     {
         private readonly VsServices _vss;
@@ -26,6 +32,9 @@ namespace AdjustNamespace.UI.ViewModel
         private ICommand? _repeatCommand;
         private ICommand? _nextCommand;
 
+        /// <summary>
+        /// Status line of the step.
+        /// </summary>
         public string MainMessage
         {
             get => _mainMessage;
@@ -36,12 +45,18 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Found compilation problems.
+        /// </summary>
         public ObservableCollection<string> DetectedMessages
         {
             get;
             private set;
         }
 
+        /// <summary>
+        /// Close the wizard.
+        /// </summary>
         public ICommand CloseCommand
         {
             get
@@ -64,6 +79,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Repeat the compilation check (available if a problem has been found).
+        /// </summary>
         public ICommand RepeatCommand
         {
             get
@@ -83,6 +101,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Go to the next wizard step.
+        /// </summary>
         public ICommand NextCommand
         {
             get
@@ -108,6 +129,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="nextStepFactory">Factory of the next wizard step.</param>
+        /// <param name="filePaths">Full paths of the files chosen by the user.</param>
         public PreparationStepViewModel(
             VsServices vss,
             IStepFactory nextStepFactory,
@@ -133,6 +157,7 @@ namespace AdjustNamespace.UI.ViewModel
             DetectedMessages = new ObservableCollection<string>();
         }
 
+        /// <inheritdoc/>
         public override async System.Threading.Tasks.Task StartAsync()
         {
             try
@@ -226,6 +251,10 @@ namespace AdjustNamespace.UI.ViewModel
             OnPropertyChanged();
         }
 
+        /// <summary>
+        /// Compile every project of the solution and collect the found errors.
+        /// </summary>
+        /// <exception cref="CompilationException">A project cannot be compiled at all.</exception>
         private async Task CheckForSolutionCompilationAsync()
         {
             var errorFound = false;
@@ -268,6 +297,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Add a message into <see cref="DetectedMessages"/> (from the main thread).
+        /// </summary>
         private async System.Threading.Tasks.Task AddMessageAsync(string message)
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
@@ -275,8 +307,14 @@ namespace AdjustNamespace.UI.ViewModel
             DetectedMessages.Add(message);
         }
 
+        /// <summary>
+        /// A project of the solution cannot be compiled.
+        /// </summary>
         private sealed class CompilationException : Exception
         {
+            /// <summary>
+            /// Name of the problem project.
+            /// </summary>
             public string? Project { get; }
 
             public CompilationException()

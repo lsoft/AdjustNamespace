@@ -3,8 +3,14 @@ using System;
 
 namespace AdjustNamespace
 {
+    /// <summary>
+    /// Image monikers of the extension, see Monikers.imagemanifest.
+    /// </summary>
     public static class ImageMonikers
     {
+        /// <summary>
+        /// Logo of the extension.
+        /// </summary>
         public static ImageMoniker Logo
         {
             get;

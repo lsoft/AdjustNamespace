@@ -4,6 +4,10 @@ using System.Text;
 
 namespace AdjustNamespace.Namespace
 {
+    /// <summary>
+    /// A single namespace transition: where the types of a namespace live now
+    /// and where they should live after the adjusting.
+    /// </summary>
     public readonly struct NamespaceTransition
     {
         /// <summary>
@@ -22,6 +26,9 @@ namespace AdjustNamespace.Namespace
         /// </summary>
         public readonly bool IsRoot;
 
+        /// <param name="originalName">Original namespace name.</param>
+        /// <param name="modifiedName">Desired (target) namespace name.</param>
+        /// <param name="isRoot">Is this original namespace is root in the document.</param>
         public NamespaceTransition(
             string originalName,
             string modifiedName,

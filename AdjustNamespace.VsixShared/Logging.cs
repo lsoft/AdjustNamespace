@@ -15,9 +15,12 @@ namespace AdjustNamespace
     {
         private static readonly object @lock = new object();
 
-        // Logs go to: C:\Users\<user>\AppData\Local\Temp\dpdt_extension.*.log
+        // Logs go to: C:\Users\<user>\AppData\Local\Temp\AdjustNamespace.vs.log
         private static readonly string vsLogFile = $"{Path.GetTempPath()}/AdjustNamespace.vs.log";
 
+        /// <summary>
+        /// Write a line into the log file. Debug builds only.
+        /// </summary>
         [Conditional("DEBUG")]
         public static void LogVS(
             object? data = null,
@@ -25,6 +28,10 @@ namespace AdjustNamespace
             [CallerMemberName] string? method = null)
             => Log(vsLogFile, file!, method!, data);
 
+        /// <summary>
+        /// Append a line (with a timestamp, a process id, a thread id and a caller)
+        /// into the given log file.
+        /// </summary>
         public static void Log(
             string logFile,
             string callingFile,

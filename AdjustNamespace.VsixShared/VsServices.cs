@@ -8,13 +8,41 @@ using System.Threading.Tasks;
 
 namespace AdjustNamespace
 {
+    /// <summary>
+    /// The set of the Visual Studio services the extension works with,
+    /// plus the settings of the currently opened solution.
+    /// It is created once per command invocation and is passed everywhere by value.
+    /// </summary>
     public readonly struct VsServices
     {
+        /// <summary>
+        /// Service provider of the package.
+        /// </summary>
         public readonly IAsyncServiceProvider ServiceProvider;
+
+        /// <summary>
+        /// DTE, the automation object model of Visual Studio.
+        /// </summary>
         public readonly DTE2 Dte;
+
+        /// <summary>
+        /// MEF composition container of Visual Studio.
+        /// </summary>
         public readonly IComponentModel ComponentModel;
+
+        /// <summary>
+        /// Roslyn workspace of the currently opened solution.
+        /// </summary>
         public readonly VisualStudioWorkspace Workspace;
+
+        /// <summary>
+        /// Reader/writer of the settings file which lives in the solution folder.
+        /// </summary>
         public readonly SettingsReader SettingsReader;
+
+        /// <summary>
+        /// Settings of the currently opened solution.
+        /// </summary>
         public readonly AdjustNamespaceSettings2 Settings;
 
         private VsServices(
@@ -58,6 +86,9 @@ namespace AdjustNamespace
                 );
         }
 
+        /// <summary>
+        /// Open the given file in the Visual Studio editor.
+        /// </summary>
         public async Task OpenFileAsync(
             string documentFullPath
             )
@@ -65,6 +96,10 @@ namespace AdjustNamespace
             _ = await VS.Documents.OpenAsync(documentFullPath);
         }
 
+        /// <summary>
+        /// Resolve all the required Visual Studio services and read the solution settings.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">One of the services is not available.</exception>
         public static async Task<VsServices> CreateAsync(
             Microsoft.VisualStudio.Shell.IAsyncServiceProvider serviceProvider
             )

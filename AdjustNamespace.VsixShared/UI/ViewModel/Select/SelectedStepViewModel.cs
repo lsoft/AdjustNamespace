@@ -14,6 +14,13 @@ using Microsoft.VisualStudio.Threading;
 
 namespace AdjustNamespace.UI.ViewModel
 {
+    /// <summary>
+    /// Viewmodel of the second wizard step.
+    /// It scans the chosen files (see <see cref="SubjectFileCollector"/>), shows the files
+    /// which are really the subject to change (grouped by their physical folder) and allows
+    /// the user to uncheck some of them, to tune the target namespace with a regex and
+    /// to decide whether the changed files should be opened in the editor.
+    /// </summary>
     public class SelectedStepViewModel : ChainViewModel
     {
         /// <summary>
@@ -28,6 +35,9 @@ namespace AdjustNamespace.UI.ViewModel
 
         //private readonly List<FileEx> _filteredFileExs;
 
+        /// <summary>
+        /// The scan has been finished successfully, so the user is allowed to move next.
+        /// </summary>
         private bool _statusOk = false;
 
         private Brush _foreground;
@@ -44,6 +54,9 @@ namespace AdjustNamespace.UI.ViewModel
         private string _replaceRegex = string.Empty;
         private string _replacedString = string.Empty;
 
+        /// <summary>
+        /// Status line of the step.
+        /// </summary>
         public string MainMessage
         {
             get => _mainMessage;
@@ -54,12 +67,18 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// The flat list shown to the user: a folder followed by its files, then the next folder etc.
+        /// </summary>
         public ObservableCollection<ISelectItemViewModel> ToFilterItems
         {
             get;
             private set;
         }
 
+        /// <summary>
+        /// Color of the status line.
+        /// </summary>
         public Brush Foreground
         {
             get => _foreground;
@@ -72,6 +91,10 @@ namespace AdjustNamespace.UI.ViewModel
 
         #region open files to enable undo checkbox
 
+        /// <summary>
+        /// The `open affected files` checkbox is available
+        /// (i.e. not too many files are checked, see <see cref="MaxFilesAllowedToOpen"/>).
+        /// </summary>
         public bool EnableOpenFileCheckBox
         {
             get => _enableOpenFileCheckBox;
@@ -82,8 +105,14 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Text of the `open affected files` checkbox.
+        /// </summary>
         public string OpenFileCheckBoxText => $"Open affected files to enable Undo (max is {MaxFilesAllowedToOpen} to prevent delays)";
 
+        /// <summary>
+        /// Open the changed files in the editor (this allows the user to undo the changes).
+        /// </summary>
         public bool OpenFilesToEnableUndo
         {
             get => _openFilesToEnableUndo;
@@ -96,6 +125,10 @@ namespace AdjustNamespace.UI.ViewModel
 
         #endregion
 
+        /// <summary>
+        /// The regex which additionally modifies the target namespace.
+        /// Changing it invalidates the scan results, so the user has to rescan.
+        /// </summary>
         public string ReplaceRegex
         {
             get => _replaceRegex;
@@ -109,6 +142,10 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// The replacement for the fragment found by <see cref="ReplaceRegex"/>.
+        /// Changing it invalidates the scan results, so the user has to rescan.
+        /// </summary>
         public string ReplacedString
         {
             get => _replacedString;
@@ -122,11 +159,17 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Built in regex samples the user may apply in one click.
+        /// </summary>
         public ObservableCollection<KnownRegex> KnownRegexes
         {
             get;
         }
 
+        /// <summary>
+        /// Close the wizard.
+        /// </summary>
         public ICommand CloseCommand
         {
             get
@@ -149,6 +192,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Go back to the previous wizard step.
+        /// </summary>
         public ICommand PreviousCommand
         {
             get
@@ -169,6 +215,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Rescan the chosen files (required after the regex has been changed).
+        /// </summary>
         public ICommand RescanCommand
         {
             get
@@ -188,6 +237,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Go to the last wizard step, i.e. start the adjusting of the checked files.
+        /// </summary>
         public ICommand NextCommand
         {
             get
@@ -219,6 +271,9 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Invert the checkbox of the selected items (bound to the Space key).
+        /// </summary>
         public ICommand InvertStatusCommand
         {
             get
@@ -247,6 +302,10 @@ namespace AdjustNamespace.UI.ViewModel
         }
 
 
+        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="previousStepFactory">Factory of the previous wizard step.</param>
+        /// <param name="nextStepFactory">Factory of the next wizard step.</param>
+        /// <param name="parameters">Parameters of this step.</param>
         public SelectedStepViewModel(
             VsServices vss,
             IStepFactory previousStepFactory,
@@ -309,11 +368,15 @@ namespace AdjustNamespace.UI.ViewModel
                 ]);
         }
 
+        /// <inheritdoc/>
         public override async System.Threading.Tasks.Task StartAsync()
         {
             await RescanAsync();
         }
 
+        /// <summary>
+        /// Drop the scan results (the user has changed the target namespace regex).
+        /// </summary>
         private void Reset()
         {
             MainMessage = "Target namespace regex changed. Press Rescan button.";
@@ -323,6 +386,9 @@ namespace AdjustNamespace.UI.ViewModel
             ToFilterItems.Clear();
         }
 
+        /// <summary>
+        /// Scan the chosen files and rebuild the list shown to the user.
+        /// </summary>
         private async Task RescanAsync()
         {
             try
@@ -367,12 +433,18 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
+        /// <summary>
+        /// Build the target namespace modifier out of the values entered by the user.
+        /// </summary>
         private NamespaceReplaceRegex CreateNamespaceReplaceRegex()
         {
             return new NamespaceReplaceRegex(ReplaceRegex, ReplacedString);
         }
 
 
+        /// <summary>
+        /// Build the flat `folder + its files` list out of the found files.
+        /// </summary>
         private void BuildTree(
             List<FileEx> filteredFileExs
             )
@@ -410,11 +482,19 @@ namespace AdjustNamespace.UI.ViewModel
             OnPropertyChanged();
         }
 
+        /// <summary>
+        /// Re-evaluate the state of the step after a checkbox has been changed.
+        /// Called by the child viewmodels.
+        /// </summary>
         public void RefreshStatus()
         {
             RefreshOpenFileCheckBox();
         }
 
+        /// <summary>
+        /// Disable (and uncheck) the `open affected files` checkbox if too many files are checked:
+        /// a lot of documents opened at once makes Visual Studio unresponsive.
+        /// </summary>
         private void RefreshOpenFileCheckBox()
         {
             var cnt = ToFilterItems

@@ -15,8 +15,12 @@ namespace AdjustNamespace
     /// </summary>
     public readonly struct NamespaceTypeContainer
     {
+        /// <summary>
+        /// Types of the solution grouped by their containing namespace.
+        /// </summary>
         private readonly Dictionary<string, List<INamedTypeSymbol>> _dictByNamespace;
 
+        /// <param name="unused">Not used; see the comment inside.</param>
         public NamespaceTypeContainer(
             bool unused //here is CS0568 in VS2019 without this
             )
@@ -25,6 +29,9 @@ namespace AdjustNamespace
                 );
         }
 
+        /// <summary>
+        /// Add a type into the container.
+        /// </summary>
         public void Add(INamedTypeSymbol symbol)
         {
             var key = symbol.ContainingNamespace.ToFullDisplayString();
@@ -36,6 +43,10 @@ namespace AdjustNamespace
             _dictByNamespace[key].Add(symbol);
         }
 
+        /// <summary>
+        /// Check if the given namespace contains a type with the given name.
+        /// This is how the name conflicts are detected before the adjusting starts.
+        /// </summary>
         public bool CheckForTypeExists(
             string namespaceName,
             string typeName
@@ -116,8 +127,12 @@ namespace AdjustNamespace
     {
         private readonly Dictionary<string, NamedTypeExtension> _dictByFullName;
 
+        /// <summary>
+        /// Types of the solution keyed by their full names.
+        /// </summary>
         public IReadOnlyDictionary<string, NamedTypeExtension> DictByFullName => _dictByFullName;
 
+        /// <param name="unused">Not used; see the comment inside.</param>
         public TypeContainer(
             bool unused //here is CS0568 in VS2019 without this
             )
@@ -187,10 +202,24 @@ namespace AdjustNamespace
         }
     }
 
+    /// <summary>
+    /// A type with its precalculated names (to avoid the repeated ToDisplayString calls).
+    /// </summary>
     public readonly struct NamedTypeExtension
     {
+        /// <summary>
+        /// The type itself.
+        /// </summary>
         public readonly INamedTypeSymbol Type;
+
+        /// <summary>
+        /// Full name of the type.
+        /// </summary>
         public readonly string TypeFullName;
+
+        /// <summary>
+        /// Name of the containing namespace.
+        /// </summary>
         public readonly string ContainingNamespaceName;
 
         public NamedTypeExtension(

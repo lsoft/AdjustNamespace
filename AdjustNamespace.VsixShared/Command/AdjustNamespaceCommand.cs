@@ -13,7 +13,9 @@ using System.Linq;
 namespace AdjustNamespace.Command
 {
     /// <summary>
-    /// Command handler
+    /// Handler of the `Adjust namespaces...` command from the solution explorer context menu.
+    /// Collects the files of the selected solution explorer items and opens the wizard
+    /// (<see cref="AdjustNamespaceWindow"/>) for them.
     /// </summary>
     internal sealed class AdjustNamespaceCommand
     {
@@ -99,6 +101,8 @@ namespace AdjustNamespace.Command
 
                 var vss = await VsServices.CreateAsync(ServiceProvider);
 
+                //this command is bound to the solution explorer context menu only,
+                //so there is nothing to do if the command has been invoked from elsewhere
                 if (vss.Dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
                 {
                     var sew = await VS.Windows.GetSolutionExplorerWindowAsync();
@@ -106,6 +110,8 @@ namespace AdjustNamespace.Command
                     {
                         var selection = await sew.GetSelectionAsync();
 
+                        //the selected item may be a solution, a project, a folder or a file,
+                        //so we need to descend to the physical files in any case
                         foreach (var item in selection)
                         {
                             var files = await item.ProcessDownRecursivelyForAsync(SolutionItemType.PhysicalFile, null);
