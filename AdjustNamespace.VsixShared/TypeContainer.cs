@@ -31,9 +31,16 @@ namespace AdjustNamespace
 
         /// <summary>
         /// Add a type into the container.
+        /// The nested types are skipped: <c>A.B.Container.Nested</c> belongs to its outer type
+        /// and not to the namespace <c>A.B</c>, so it must not produce a name conflict there.
         /// </summary>
         public void Add(INamedTypeSymbol symbol)
         {
+            if (symbol.ContainingType != null)
+            {
+                return;
+            }
+
             var key = symbol.ContainingNamespace.ToFullDisplayString();
             if (!_dictByNamespace.ContainsKey(key))
             {

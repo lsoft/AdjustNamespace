@@ -88,15 +88,17 @@ namespace AdjustNamespace.Xaml.Positioned
             }
 
             var sourceXmlns = structure.GetByAlias(Alias);
-            if (sourceXmlns.Namespace != sourceNamespace)
+            if (sourceXmlns == null || sourceXmlns.Namespace != sourceNamespace)
             {
+                //the alias is unknown (it is not a clr-namespace one)
+                //or it points to another namespace
                 return false;
             }
 
             //match!
 
             //get or create new xmlns
-            var targetXmlns = structure.TryGetByNamespace(targetNamespace);
+            var targetXmlns = structure.TryGetByNamespace(targetNamespace, sourceXmlns.Suffix);
             if (targetXmlns == null)
             {
                 targetXmlns = new XamlXmlns(

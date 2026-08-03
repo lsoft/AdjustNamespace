@@ -207,7 +207,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
             //replace QualifiedNameSyntax
             var mqns = uqns
-                .WithLeft(SyntaxFactory.ParseName((uqns.IsGlobal() ? "global::" : "") + " " + _targetNamespaceInfo.ModifiedName))
+                .WithLeft(SyntaxFactory.ParseName((uqns.IsGlobal() ? "global::" : "") + _targetNamespaceInfo.ModifiedName))
                 .WithLeadingTrivia(uqns.GetLeadingTrivia())
                 .WithTrailingTrivia(uqns.GetTrailingTrivia())
                 ;
@@ -246,11 +246,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
             var isGlobal = maes.IsGlobal();
 
-            var inss = (
-                from desc in maes.DescendantNodes()
-                where desc is IdentifierNameSyntax || desc is GenericNameSyntax
-                select desc
-                ).ToList();
+            var inss = GetChainOf(maes);
 
             var withoutNamespaceNodes = inss
                 .SkipWhile(s => !ReferenceEquals(s, syntax))
@@ -282,12 +278,37 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         }
 
         /// <summary>
+        /// The parts of a member access expression (<c>A.B.Class1.Value</c>) from the left
+        /// to the right: the innermost expression plus the name of every access.
+        ///
+        /// Only these nodes belong to the chain. A plain scan for the identifiers of the
+        /// expression would also give the type arguments of a generic type
+        /// (<c>Foo</c> of <c>A.B.Class1&lt;Foo&gt;.Value</c>) and would insert them
+        /// into the middle of the rebuilt expression.
+        /// </summary>
+        private static List<SyntaxNode> GetChainOf(MemberAccessExpressionSyntax maes)
+        {
+            var result = new List<SyntaxNode>();
+
+            ExpressionSyntax current = maes;
+            while (current is MemberAccessExpressionSyntax m)
+            {
+                result.Insert(0, m.Name);
+                current = m.Expression;
+            }
+
+            result.Insert(0, current);
+
+            return result;
+        }
+
+        /// <summary>
         /// Find all the references to the given type.
         /// Roslyn does not report the usages of the extension methods as the references
         /// to their containing static class, so such methods are queried additionally.
         /// </summary>
         private static async Task<List<ReferencedSymbol>> FindReferencesForAsync(
-            VisualStudioWorkspace workspace,
+            Workspace workspace,
             INamedTypeSymbol symbolInfo
             )
         {

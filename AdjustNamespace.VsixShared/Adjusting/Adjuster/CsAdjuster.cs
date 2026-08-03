@@ -184,7 +184,12 @@ namespace AdjustNamespace.Adjusting
                     continue;
                 }
 
-                var targetNamespaceInfo = ntc.TransitionDict[symbolNamespace];
+                if (!ntc.TransitionDict.TryGetValue(symbolNamespace, out var targetNamespaceInfo))
+                {
+                    //there is no transition for this namespace: the type is declared
+                    //outside of any namespace, for example. Nothing to move.
+                    continue;
+                }
 
                 if (symbolNamespace == targetNamespaceInfo.ModifiedName)
                 {
@@ -198,6 +203,7 @@ namespace AdjustNamespace.Adjusting
 
                 processedTypes.Add(symbolInfo);
                 _namespaceCenter.TypeRemoved(symbolInfo);
+                _namespaceCenter.TypeAdded(symbolInfo, targetNamespaceInfo.ModifiedName);
             }
         }
 
@@ -264,10 +270,16 @@ namespace AdjustNamespace.Adjusting
 
             foreach (var processedType in processedTypes)
             {
-                var targetNamespaceInfo = ntc.TransitionDict[processedType.ContainingNamespace.ToDisplayString()];
+                var sourceNamespace = processedType.ContainingNamespace.ToDisplayString();
+
+                if (!ntc.TransitionDict.TryGetValue(sourceNamespace, out var targetNamespaceInfo))
+                {
+                    //no transition for this namespace, see FixReferencesAsync
+                    continue;
+                }
 
                 result = result.MoveObject(
-                    processedType.ContainingNamespace.ToDisplayString(),
+                    sourceNamespace,
                     processedType.Name,
                     targetNamespaceInfo.ModifiedName
                     );

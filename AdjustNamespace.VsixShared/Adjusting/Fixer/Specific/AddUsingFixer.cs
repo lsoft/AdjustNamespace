@@ -89,7 +89,13 @@ namespace AdjustNamespace.Adjusting.Fixer
 
                     if (usingSyntaxes.Count > 0)
                     {
-                        if (usingSyntaxes.Any(s => s.Name.ToString() == symbolTargetNamespace))
+                        //`using Alias = A.B;` and `using static A.B;` do not import the namespace,
+                        //so they do not make the new using clause redundant
+                        if (usingSyntaxes.Any(s =>
+                            s.Alias == null
+                            && s.StaticKeyword.IsKind(SyntaxKind.None)
+                            && s.Name.ToString() == symbolTargetNamespace
+                            ))
                         {
                             //that using already exists
                             continue;
@@ -112,20 +118,19 @@ namespace AdjustNamespace.Adjusting.Fixer
                                         " " + symbolTargetNamespace
                                         )
                                     ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                                    .WithLeadingTrivia(lastUsing.GetLeadingTrivia())
+                                    .WithLeadingTrivia(lastUsing.GetIndentationOf())
                             });
                     }
                     else
                     {
                         //there are no using clauses in this file at all
                         var cus = (CompilationUnitSyntax)syntaxRoot;
-                        var modifiedcus = cus.AddUsings(
+                        var modifiedcus = cus.AddUsingKeepingHeader(
                             SyntaxFactory.UsingDirective(
                                 SyntaxFactory.ParseName(
                                     " " + symbolTargetNamespace
                                     )
                                 ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed, SyntaxFactory.CarriageReturnLineFeed)
-                                .WithLeadingTrivia(cus.GetLeadingTrivia())
                              );
 
                         syntaxRoot = modifiedcus;

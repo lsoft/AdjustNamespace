@@ -161,6 +161,13 @@ namespace AdjustNamespace.Adjusting
                             continue;
                         }
 
+                        if (symbolInfo.ContainingType != null)
+                        {
+                            //a nested type moves together with its outer type
+                            //and never conflicts with a type of the target namespace
+                            continue;
+                        }
+
                         var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
                         if (symbolNamespace == targetNamespace)
                         {
@@ -172,7 +179,13 @@ namespace AdjustNamespace.Adjusting
                             continue;
                         }
 
-                        var targetNamespaceInfo = ntc.TransitionDict[symbolNamespace];
+                        if (!ntc.TransitionDict.TryGetValue(symbolNamespace, out var targetNamespaceInfo))
+                        {
+                            //there is no transition for this namespace: the type is declared
+                            //outside of any namespace, for example. It is not moved at all.
+                            continue;
+                        }
+
                         if (typesInSolutionPerNamespace.CheckForTypeExists(targetNamespaceInfo.ModifiedName, symbolInfo.Name))
                         {
                             throw new FileProcessException(

@@ -4,6 +4,7 @@ using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Threading;
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -62,7 +63,7 @@ namespace AdjustNamespace.Adjusting
 
             foreach (var n in namespacesToCheck)
             {
-                var nname = n.Name.ToString();
+                var nname = NormalizeUsingName(n.Name.ToString());
 
                 if (!_namespacesToRemove.Contains(nname))
                 {
@@ -77,6 +78,34 @@ namespace AdjustNamespace.Adjusting
         }
 
         /// <summary>
+        /// The name of a using clause, as the namespaces are named here.
+        /// The clause is taken from the document as it is written by the user, and it may
+        /// contain the whitespace between the parts of the name (<c>using A . B;</c>)
+        /// and the <c>global::</c> alias (<c>using global::A.B;</c>).
+        /// </summary>
+        private static string NormalizeUsingName(string name)
+        {
+            var builder = new StringBuilder(name.Length);
+            foreach (var c in name)
+            {
+                if (!char.IsWhiteSpace(c))
+                {
+                    builder.Append(c);
+                }
+            }
+
+            var result = builder.ToString();
+
+            const string GlobalPrefix = "global::";
+            if (result.StartsWith(GlobalPrefix))
+            {
+                result = result.Substring(GlobalPrefix.Length);
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Report that the given type has been moved out of its namespace.
         /// If it was the last type of that namespace, the namespace is marked
         /// as the subject to remove from the using clauses.
@@ -86,6 +115,15 @@ namespace AdjustNamespace.Adjusting
             var cnn = type.ContainingNamespace.ToDisplayString();
             if (!_types.TryGetValue(cnn, out var set))
             {
+                return;
+            }
+
+            if (IsDeclaredInSeveralFiles(type))
+            {
+                //a partial type, and only one of its files is being adjusted right now:
+                //the rest of its declarations stay in this namespace, so it is not
+                //an empty one. When the last file of it is adjusted, there is a single
+                //declaration left and the namespace is emptied as usual.
                 return;
             }
 
@@ -105,10 +143,64 @@ namespace AdjustNamespace.Adjusting
         }
 
         /// <summary>
+        /// Report that the given type has been moved into the target namespace.
+        /// Such a namespace exists after the adjusting even if another file of the same
+        /// session has emptied it before (this is what a reorganization of the folders
+        /// looks like: A.B goes to X.Y and Other.C comes into A.B).
+        /// </summary>
+        /// <param name="type">The moved type, as it was before the move.</param>
+        /// <param name="targetNamespace">The namespace it has been moved into.</param>
+        public void TypeAdded(ITypeSymbol type, string targetNamespace)
+        {
+            if (!_types.TryGetValue(targetNamespace, out var set))
+            {
+                set = new HashSet<string>();
+                _types[targetNamespace] = set;
+            }
+
+            set.Add(BuildNameIn(type, targetNamespace));
+
+            _namespacesToRemove.Remove(targetNamespace);
+        }
+
+        /// <summary>
+        /// The full name the type will have in the given namespace.
+        /// </summary>
+        private static string BuildNameIn(ITypeSymbol type, string targetNamespace)
+        {
+            var typeFullName = type.ToDisplayString();
+            var containingNamespaceName = type.ContainingNamespace.ToDisplayString();
+
+            if (!typeFullName.StartsWith(containingNamespaceName + "."))
+            {
+                return typeFullName;
+            }
+
+            return targetNamespace + "." + typeFullName.Substring(containingNamespaceName.Length + 1);
+        }
+
+        /// <summary>
+        /// The type is a partial one declared in more than a single file.
+        /// The repeated declarations inside one file do not count: such a file is
+        /// adjusted at once.
+        /// </summary>
+        private static bool IsDeclaredInSeveralFiles(ITypeSymbol type)
+        {
+            var filePaths = new HashSet<string>();
+
+            foreach (var reference in type.DeclaringSyntaxReferences)
+            {
+                filePaths.Add(reference.SyntaxTree.FilePath);
+            }
+
+            return filePaths.Count > 1;
+        }
+
+        /// <summary>
         /// Build a namespace center for a whole workspace.
         /// </summary>
         public static async Task<NamespaceCenter> CreateForAsync(
-            VisualStudioWorkspace workspace
+            Workspace workspace
             )
         {
             if (workspace is null)

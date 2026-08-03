@@ -55,17 +55,19 @@ namespace AdjustNamespace.Settings
                     var rsfs = Path.GetFullPath(sfs)
                         .Trim(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-                    if (rsfs == fullFolderPath)
+                    if (IsSamePath(rsfs, fullFolderPath))
                     {
                         return true;
                     }
                 }
                 else
                 {
-                    var rsfs = Path.Combine(_solutionFolder, sfs)
+                    //GetFullPath normalizes the separators and resolves the relative parts,
+                    //so a path written with the unix separators matches too
+                    var rsfs = Path.GetFullPath(Path.Combine(_solutionFolder, sfs))
                         .Trim(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
-                    if (rsfs == fullFolderPath)
+                    if (IsSamePath(rsfs, fullFolderPath))
                     {
                         return true;
                     }
@@ -75,5 +77,13 @@ namespace AdjustNamespace.Settings
             return false;
         }
 
+        /// <summary>
+        /// Compare two full paths. The file system of Windows is case insensitive,
+        /// so a folder written in another case in the settings file has to match too.
+        /// </summary>
+        private static bool IsSamePath(string path1, string path2)
+        {
+            return string.Equals(path1, path2, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

@@ -31,11 +31,21 @@ namespace AdjustNamespace.Helper
             //(like nullable attributes, CallerMemberNameAttribute etc)
             //we do not want to remove System, System.*, Microsoft.* from
             //the codebase in this case
-            if (namespaceName.StartsWith("System"))
+
+            //only the first part of the name is compared: a namespace which merely
+            //begins with these words (SystemX.Utils, MicrosoftPatterns.Prism)
+            //belongs to the user and has to be adjusted as usual
+            var dotIndex = namespaceName.IndexOf('.');
+            var firstPart = dotIndex >= 0
+                ? namespaceName.Substring(0, dotIndex)
+                : namespaceName
+                ;
+
+            if (firstPart == "System")
             {
                 return true;
             }
-            if (namespaceName.StartsWith("Microsoft"))
+            if (firstPart == "Microsoft")
             {
                 return true;
             }

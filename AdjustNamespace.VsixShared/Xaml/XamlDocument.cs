@@ -3,6 +3,7 @@ using AdjustNamespace.Xaml.Positioned;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace AdjustNamespace.Xaml
@@ -124,7 +125,7 @@ namespace AdjustNamespace.Xaml
 
             //the newly created xmlns aliases are not in the body yet;
             //append them after the last existing xmlns clause
-            var reloadedXmlns = ReadXmlns(xaml).ToList();
+            var reloadedXmlns = ReadXmlns(xaml, ReadCommentSpans(xaml)).ToList();
             if (reloadedXmlns.Count > 0)
             {
                 var indexToInsert = reloadedXmlns.Max(x => x.Index + x.Length);
@@ -186,13 +187,48 @@ namespace AdjustNamespace.Xaml
         /// </summary>
         private static XamlStructure ReadStructure(string xaml)
         {
-            var xPrefix = ReadXPrefix(xaml);
-            var xmlns = ReadXmlns(xaml).ToList();
-            var controls = ReadControls(xaml).ToList();
-            var refFroms = ReadRefFromAttributes(xPrefix, xaml).ToList();
-            var classes = ReadClasses(xPrefix, xaml).ToList();
+            var comments = ReadCommentSpans(xaml);
+
+            var xPrefix = ReadXPrefix(xaml, comments);
+            var xmlns = ReadXmlns(xaml, comments).ToList();
+            var controls = ReadControls(xaml, comments).ToList();
+            var refFroms = ReadRefFromAttributes(xPrefix, xaml, comments).ToList();
+            var classes = ReadClasses(xPrefix, xaml, comments).ToList();
 
             return new XamlStructure(xPrefix, xmlns, controls, refFroms, classes);
+        }
+
+        /// <summary>
+        /// Find the xaml comments (<c>&lt;!-- --&gt;</c>). The document is processed as a plain
+        /// text, so the commented out markup has to be excluded from the parsing explicitly:
+        /// otherwise it is modified as a real one.
+        /// </summary>
+        private static List<(int Start, int End)> ReadCommentSpans(string xaml)
+        {
+            var result = new List<(int Start, int End)>();
+
+            foreach (Match match in Regex.Matches(xaml, @"<!--.*?-->", RegexOptions.Singleline))
+            {
+                result.Add((match.Index, match.Index + match.Length));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Is the given position inside a comment?
+        /// </summary>
+        private static bool IsCommented(List<(int Start, int End)> comments, int index)
+        {
+            foreach (var comment in comments)
+            {
+                if (index >= comment.Start && index < comment.End)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -201,12 +237,18 @@ namespace AdjustNamespace.Xaml
         /// </summary>
         private static IEnumerable<XamlAttributeReference> ReadRefFromAttributes(
             XamlX xPrefix,
-            string xaml
+            string xaml,
+            List<(int Start, int End)> comments
             )
         {
             var matches0 = Regex.Matches(xaml, @$"{{\s?{xPrefix.Alias}:Type\s+([\w\d]+)\s?:\s?([\w\d]+)");
             foreach (Match match in matches0)
             {
+                if (IsCommented(comments, match.Index))
+                {
+                    continue;
+                }
+
                 var xar = new XamlAttributeReference(
                     match.Index,
                     match.Length,
@@ -220,6 +262,11 @@ namespace AdjustNamespace.Xaml
             var matches1 = Regex.Matches(xaml, @$"{{\s?{xPrefix.Alias}:Static\s+([\w\d]+)\s?:\s?([\w\d]+)");
             foreach (Match match in matches1)
             {
+                if (IsCommented(comments, match.Index))
+                {
+                    continue;
+                }
+
                 var xar = new XamlAttributeReference(
                     match.Index,
                     match.Length,
@@ -236,22 +283,27 @@ namespace AdjustNamespace.Xaml
         /// Determine the alias of the xaml language namespace (usually `x`, but it may be renamed).
         /// WPF and MAUI use different uris for it.
         /// </summary>
-        private static XamlX ReadXPrefix(string xaml)
+        private static XamlX ReadXPrefix(string xaml, List<(int Start, int End)> comments)
         {
-            var matches = Regex.Matches(xaml, @"xmlns\s?:\s?([\w\d]+)\s?=\s?\""http:\/\/schemas\.microsoft\.com\/winfx\/2006\/xaml\""");
-            if (matches.Count == 0)
+            var match = FirstNotCommented(
+                Regex.Matches(xaml, @"xmlns\s?:\s?([\w\d]+)\s?=\s?\""http:\/\/schemas\.microsoft\.com\/winfx\/2006\/xaml\"""),
+                comments
+                );
+
+            if (match == null)
             {
                 //for maui
-                matches = Regex.Matches(xaml, @"xmlns\s?:\s?([\w\d]+)\s?=\s?\""http:\/\/schemas\.microsoft\.com\/winfx\/2009\/xaml\""");
+                match = FirstNotCommented(
+                    Regex.Matches(xaml, @"xmlns\s?:\s?([\w\d]+)\s?=\s?\""http:\/\/schemas\.microsoft\.com\/winfx\/2009\/xaml\"""),
+                    comments
+                    );
             }
 
-            if (matches.Count == 0)
+            if (match == null)
             {
                 // there is no x definition (i.e. ResourceDictionary etc)
                 return new XamlX(0, 0, "NO_X_ALIAS");
             }
-
-            var match = matches[0];
 
             return new XamlX(
                 match.Index,
@@ -261,15 +313,41 @@ namespace AdjustNamespace.Xaml
         }
 
         /// <summary>
+        /// The first match which is not inside a comment, if any.
+        /// </summary>
+        private static Match? FirstNotCommented(
+            MatchCollection matches,
+            List<(int Start, int End)> comments
+            )
+        {
+            foreach (Match match in matches)
+            {
+                if (!IsCommented(comments, match.Index))
+                {
+                    return match;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Find the clr-namespace declarations: <c>xmlns:alias="clr-namespace:A.B.C"</c>.
         /// </summary>
         private static IEnumerable<XamlXmlns> ReadXmlns(
-            string xaml
+            string xaml,
+            List<(int Start, int End)> comments
             )
         {
-            var matches = Regex.Matches(xaml, @"xmlns:([\w\d]+)=""clr-namespace:([\w\d._]+)([^""]*)""");
+            //the whitespace around the `:` and the `=` of an attribute is allowed by xml
+            var matches = Regex.Matches(xaml, @"xmlns\s*:\s*([\w\d]+)\s*=\s*""clr-namespace:([\w\d._]+)([^""]*)""");
             foreach (Match match in matches)
             {
+                if (IsCommented(comments, match.Index))
+                {
+                    continue;
+                }
+
                 var xx = new XamlXmlns(
                     match.Index,
                     match.Length,
@@ -286,12 +364,18 @@ namespace AdjustNamespace.Xaml
         /// Find the opening and closing tags with an alias: <c>&lt;alias:ClassName</c>, <c>&lt;/alias:ClassName</c>.
         /// </summary>
         private static IEnumerable<XamlControl> ReadControls(
-            string xaml
+            string xaml,
+            List<(int Start, int End)> comments
             )
         {
             var matches = Regex.Matches(xaml, @"<\s?(\/?)\s?([\w\d]+)\s?:\s?([\w\d]+)");
             foreach (Match match in matches)
             {
+                if (IsCommented(comments, match.Index))
+                {
+                    continue;
+                }
+
                 var xc = new XamlControl(
                     match.Index,
                     match.Length,
@@ -309,12 +393,18 @@ namespace AdjustNamespace.Xaml
         /// </summary>
         private static IEnumerable<XamlClass> ReadClasses(
             XamlX xPrefix,
-            string xaml
+            string xaml,
+            List<(int Start, int End)> comments
             )
         {
             var matches = Regex.Matches(xaml, @$"{xPrefix.Alias}:Class\s?=\s?""([\w\d._]+)""");
             foreach (Match match in matches)
             {
+                if (IsCommented(comments, match.Index))
+                {
+                    continue;
+                }
+
                 var xc = new XamlClass(
                     match.Index,
                     match.Length,
@@ -334,9 +424,7 @@ namespace AdjustNamespace.Xaml
         {
             var r = ReadStructure(xaml);
 
-            var aliases = new HashSet<string>();
-            r.Controls.ForEach(c => aliases.Add(c.Alias));
-            r.RefFroms.ForEach(c => aliases.Add(c.Alias));
+            var aliases = ReadUsedAliases(xaml, r.Xmlns);
 
             //in backward order!
             foreach (var xmln in r.Xmlns.OrderByDescending(x => x.Index))
@@ -348,6 +436,42 @@ namespace AdjustNamespace.Xaml
 
                 xmln.Remove(ref xaml);
             }
+        }
+
+        /// <summary>
+        /// Every alias which is used somewhere in the body.
+        ///
+        /// An alias may be referenced not only by a tag or by an <c>x:Type</c>/<c>x:Static</c>
+        /// markup extension, but also by a custom markup extension (<c>{conv:UpperCase}</c>)
+        /// and by an attached property (<c>attached:Helper.IsEnabled="True"</c>), so anything
+        /// which looks like <c>alias:</c> is taken into account here. An unrecognized usage
+        /// would cost us a removed xmlns clause and a broken document, hence this greediness.
+        /// </summary>
+        /// <param name="xaml">Body of the document.</param>
+        /// <param name="xmlnsList">The clr-namespace declarations of that body: they are
+        /// excluded from the scan, otherwise every alias is used by its own declaration.</param>
+        private static HashSet<string> ReadUsedAliases(
+            string xaml,
+            List<XamlXmlns> xmlnsList
+            )
+        {
+            var body = new StringBuilder(xaml);
+
+            foreach (var xmlns in xmlnsList)
+            {
+                for (var i = xmlns.Index; i < Math.Min(xmlns.Index + xmlns.Length, body.Length); i++)
+                {
+                    body[i] = ' ';
+                }
+            }
+
+            var aliases = new HashSet<string>();
+            foreach (Match match in Regex.Matches(body.ToString(), @"([\w\d]+)\s?:"))
+            {
+                aliases.Add(match.Groups[1].Value);
+            }
+
+            return aliases;
         }
     }
 }

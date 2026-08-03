@@ -34,8 +34,33 @@ Notes:
 
 ## Testing
 
-There is no automated test suite — the extension rewrites the code of a solution opened in
-Visual Studio. The manual procedure lives in [Tests/README.md](Tests/README.md).
+The core is covered by `Tests/AdjustNamespace.Tests` — an SDK style xunit project which imports
+the shared project and therefore **is** built and run by the plain `dotnet` CLI (this is the one
+exception to the "`dotnet build` does not work here" rule above):
+
+```bash
+dotnet test Tests/AdjustNamespace.Tests/AdjustNamespace.Tests.csproj
+```
+
+Everything except the tests with the trait `KnownBug` is green; keep it that way. A test which
+reveals an error before that error is fixed gets that trait: such tests describe the wanted
+behaviour and are red on purpose. Do not "fix" such a test to make it green — either fix the
+error in the extension and remove the trait, or leave the test as it is.
+`--filter "Category!=KnownBug"` gives a clean run, the full run lists the errors to fix and
+[Tests/README.md](Tests/README.md) describes them.
+
+Notes:
+
+- 6 files of the shared project are excluded from the test project (they need the code generated
+  by the VSIX project), and their `global using` directives are repeated in `GlobalUsings.cs` —
+  keep that file in sync with the header of `AdjustNamespacePackage.cs`.
+- `TestSolution.CompilationErrorsAsync()` compiles the whole test solution: a test of the
+  adjusting result should assert `Assert.Empty(await solution.CompilationErrorsAsync())` and not
+  the produced text only, otherwise a name which is written correctly but resolves to another
+  type slips through.
+- The whole wizard, `SubjectFileCollector` and `NamespaceHelper.TryDetermineTargetNamespaceAsync`
+  need the real Visual Studio (DTE, the solution tree) and are covered by the manual procedure
+  only, see [Tests/README.md](Tests/README.md).
 
 ## Line endings
 

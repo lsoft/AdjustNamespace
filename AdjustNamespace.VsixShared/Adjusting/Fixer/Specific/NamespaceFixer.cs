@@ -48,6 +48,22 @@ namespace AdjustNamespace.Adjusting.Fixer.Specific
             _subjectList.Add(ntc);
         }
 
+        /// <summary>
+        /// The file imports the given namespace already.
+        /// <c>using Alias = A.B;</c> and <c>using static A.B;</c> do not import it,
+        /// see <see cref="AddUsingFixer"/>.
+        /// </summary>
+        private static bool HasUsingOf(CompilationUnitSyntax cus, string namespaceName)
+        {
+            return cus
+                .GetAllDescendants<UsingDirectiveSyntax>()
+                .Any(s =>
+                    s.Alias == null
+                    && s.StaticKeyword.IsKind(SyntaxKind.None)
+                    && s.Name.ToString() == namespaceName
+                    );
+        }
+
         /// <inheritdoc/>
         public async Task FixAsync()
         {
@@ -94,13 +110,16 @@ namespace AdjustNamespace.Adjusting.Fixer.Specific
                             //skip this namespace
                             break;
                         }
-                        var newUsingStatement = SyntaxFactory.UsingDirective(
-                            SyntaxFactory.ParseName(
-                                " " + ufNamespace!.Name
-                                )
-                            ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+                        if (!HasUsingOf(cus, ufNamespace!.Name.ToString()))
+                        {
+                            var newUsingStatement = SyntaxFactory.UsingDirective(
+                                SyntaxFactory.ParseName(
+                                    " " + ufNamespace!.Name
+                                    )
+                                ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
 
-                        cus = cus.AddUsings(newUsingStatement);
+                            cus = cus.AddUsingKeepingHeader(newUsingStatement);
+                        }
 
                         if (!cus.TryFindNamespaceNodesFor(transition.OriginalName, out var fNamespaces))
                         {
@@ -108,31 +127,31 @@ namespace AdjustNamespace.Adjusting.Fixer.Specific
                             break;
                         }
 
-                        foreach (var fNamespace in fNamespaces!)
-                        {
-                            var newName = SyntaxFactory.ParseName(
-                                transition.ModifiedName
-                                );
-
-                            if (fNamespace is NamespaceDeclarationSyntax)
+                        //all the declarations are replaced at once: a node found in `cus`
+                        //does not belong to the tree produced by ReplaceNode anymore,
+                        //so replacing them one by one silently skips all of them but the first
+                        cus = cus!.ReplaceNodes(
+                            fNamespaces!,
+                            (fNamespace, _) =>
                             {
-                                newName = newName
+                                var newName = SyntaxFactory.ParseName(
+                                    transition.ModifiedName
+                                    );
+
+                                if (fNamespace is NamespaceDeclarationSyntax)
+                                {
+                                    newName = newName
+                                        .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
+                                        ;
+                                }
+
+                                return fNamespace.WithName(
+                                    newName
+                                    )
+                                    .WithLeadingTrivia(fNamespace.GetLeadingTrivia())
                                     .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
                                     ;
-                            }
-
-                            var fixedNamespace = fNamespace!.WithName(
-                                newName
-                                )
-                                .WithLeadingTrivia(fNamespace.GetLeadingTrivia())
-                                .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                                ;
-
-                            cus = cus!.ReplaceNode(
-                                fNamespace,
-                                fixedNamespace
-                                );
-                        }
+                            });
 
                         openedDocument = openedDocument.WithSyntaxRoot(cus!);
 

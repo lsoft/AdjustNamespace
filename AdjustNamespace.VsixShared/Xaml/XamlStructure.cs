@@ -79,19 +79,31 @@ namespace AdjustNamespace.Xaml
         /// <summary>
         /// Get the clr-namespace declaration by its alias.
         /// </summary>
-        /// <exception cref="InvalidOperationException">There is no such alias in the document.</exception>
-        public XamlXmlns GetByAlias(string alias)
+        /// <returns>
+        /// <c>null</c> if there is no such alias in the document: the alias may belong
+        /// to a namespace which is not a clr one (<c>&lt;x:Array&gt;</c>, for example).
+        /// </returns>
+        public XamlXmlns? GetByAlias(string alias)
         {
-            return Xmlns.First(x => x.Alias == alias);
+            return Xmlns.FirstOrDefault(x => x.Alias == alias);
         }
 
         /// <summary>
-        /// Try to find the clr-namespace declaration of the given namespace.
+        /// Try to find the clr-namespace declaration of the given namespace within
+        /// the given assembly.
         /// </summary>
-        /// <returns><c>null</c> if the namespace is not declared in the document.</returns>
-        public XamlXmlns? TryGetByNamespace(string @namespace)
+        /// <param name="namespace">The clr namespace.</param>
+        /// <param name="suffix">
+        /// The rest of the attribute value, i.e. <c>;assembly=D</c> or an empty string
+        /// for the assembly of the document itself. A declaration of the same namespace
+        /// in another assembly points to another type and must not be taken;
+        /// the comparison is a plain one, so an explicit <c>;assembly=</c> of the own
+        /// assembly leads to a second declaration instead of a wrong reuse.
+        /// </param>
+        /// <returns><c>null</c> if there is no such declaration in the document.</returns>
+        public XamlXmlns? TryGetByNamespace(string @namespace, string suffix)
         {
-            return Xmlns.FirstOrDefault(x => x.Namespace == @namespace);
+            return Xmlns.FirstOrDefault(x => x.Namespace == @namespace && x.Suffix == suffix);
         }
 
         /// <summary>

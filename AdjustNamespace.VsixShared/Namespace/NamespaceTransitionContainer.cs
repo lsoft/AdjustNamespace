@@ -37,12 +37,46 @@ namespace AdjustNamespace.Namespace
                 throw new ArgumentNullException(nameof(transitions));
             }
 
-            Transitions = transitions;
-            TransitionDict = BuildTransitionDict(transitions);
+            var distinctTransitions = Distinct(transitions);
 
-            IsEmpty = transitions.Count == 0;
+            Transitions = distinctTransitions;
+            TransitionDict = BuildTransitionDict(distinctTransitions);
+
+            IsEmpty = distinctTransitions.Count == 0;
         }
 
+        /// <summary>
+        /// Remove the equal transitions: the same namespace may be declared several times
+        /// in a single file (<c>namespace A.B { } namespace A.B { }</c>) and every declaration
+        /// produces its own transition, while such a namespace has to be moved once.
+        /// </summary>
+        private static List<NamespaceTransition> Distinct(
+            List<NamespaceTransition> transitions
+            )
+        {
+            var result = new List<NamespaceTransition>(transitions.Count);
+            var seen = new HashSet<(string, string, bool)>();
+
+            foreach (var info in transitions)
+            {
+                if (seen.Add((info.OriginalName, info.ModifiedName, info.IsRoot)))
+                {
+                    result.Add(info);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Key the transitions by the original namespace name.
+        /// </summary>
+        /// <remarks>
+        /// A namespace may still have two different transitions
+        /// (<c>namespace A { namespace B { } } </c> plus <c>namespace A.B { }</c> in one file
+        /// give <c>A.B -> X.Y.B</c> and <c>A.B -> X.Y</c>), which the dictionary cannot express;
+        /// the first one wins there.
+        /// </remarks>
         private static Dictionary<string, NamespaceTransition> BuildTransitionDict(
             List<NamespaceTransition> transitions
             )

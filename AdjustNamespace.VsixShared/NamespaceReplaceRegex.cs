@@ -1,3 +1,4 @@
+using System;
 using System.Text.RegularExpressions;
 
 namespace AdjustNamespace
@@ -49,8 +50,18 @@ namespace AdjustNamespace
                 return myNamespace;
             }
 
-            var result = Regex.Replace(myNamespace, ReplaceRegex, ReplacedString);
-            return result;
+            try
+            {
+                var result = Regex.Replace(myNamespace, ReplaceRegex, ReplacedString);
+                return result;
+            }
+            catch (ArgumentException)
+            {
+                //the regex is typed by the user and may be an incomplete one
+                //(`[unclosed`, for example) while they are typing it;
+                //such a regex modifies nothing instead of breaking the whole scanning
+                return myNamespace;
+            }
         }
     }
 }

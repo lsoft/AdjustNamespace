@@ -121,6 +121,59 @@ namespace AdjustNamespace.Helper
         }
 
         /// <summary>
+        /// Add a using clause in front of the existing ones.
+        ///
+        /// The header of a file (a license comment, for example) belongs to the leading trivia
+        /// of the first token of that file. A new clause added into a file without any using
+        /// becomes the first token and the header slides below it, hence the header is moved
+        /// onto the new clause here.
+        /// </summary>
+        public static CompilationUnitSyntax AddUsingKeepingHeader(
+            this CompilationUnitSyntax cus,
+            UsingDirectiveSyntax newUsing
+            )
+        {
+            if (cus.Usings.Count > 0)
+            {
+                //the header belongs to the first of them and stays where it is
+                return cus.AddUsings(newUsing);
+            }
+
+            var header = cus.GetLeadingTrivia();
+
+            return cus
+                .WithLeadingTrivia()
+                .AddUsings(
+                    newUsing.WithLeadingTrivia(header)
+                    );
+        }
+
+        /// <summary>
+        /// The indentation of the given node, i.e. the whitespace of the line it starts at.
+        ///
+        /// The rest of its leading trivia (the comments and the directives like
+        /// <c>#region</c> above it) belongs to that node only and must not be copied
+        /// onto a node placed next to it.
+        /// </summary>
+        public static SyntaxTriviaList GetIndentationOf(this SyntaxNode node)
+        {
+            var leadingTrivia = node.GetLeadingTrivia();
+
+            var result = new List<SyntaxTrivia>();
+            for (var i = leadingTrivia.Count - 1; i >= 0; i--)
+            {
+                if (!leadingTrivia[i].IsKind(SyntaxKind.WhitespaceTrivia))
+                {
+                    break;
+                }
+
+                result.Insert(0, leadingTrivia[i]);
+            }
+
+            return SyntaxFactory.TriviaList(result);
+        }
+
+        /// <summary>
         /// All the descendants of the given type.
         /// </summary>
         public static List<T> GetAllDescendants<T>(
