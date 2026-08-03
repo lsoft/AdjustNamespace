@@ -1,0 +1,42 @@
+# Проект собирается только под Windows/Visual Studio, поэтому в рабочем каталоге
+# все текстовые файлы должны иметь окончания строк CRLF независимо от настройки
+# core.autocrlf у конкретного разработчика.
+# В репозитории (в индексе) файлы при этом хранятся нормализованными, с LF.
+* text=auto eol=crlf
+
+# Исходники и файлы проектов -- явно текстовые
+*.cs        text eol=crlf
+*.xaml      text eol=crlf
+*.vsct      text eol=crlf
+*.xml       text eol=crlf
+*.json      text eol=crlf
+*.md        text eol=crlf
+*.txt       text eol=crlf
+*.svg       text eol=crlf
+*.plist     text eol=crlf
+*.manifest  text eol=crlf
+*.appxmanifest  text eol=crlf
+*.imagemanifest text eol=crlf
+*.vsixmanifest  text eol=crlf
+
+*.sln       text eol=crlf
+*.csproj    text eol=crlf
+*.shproj    text eol=crlf
+*.projitems text eol=crlf
+*.sqlproj   text eol=crlf
+
+# Бинарные файлы -- никаких преобразований
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.ttf   binary
+*.otf   binary
+*.snk   binary
+*.pfx   binary
+*.dll   binary
+*.exe   binary
+*.pdb   binary
+*.vsix  binary
+*.zip   binary
