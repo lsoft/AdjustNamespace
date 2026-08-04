@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33027.239
@@ -15,7 +15,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NewFolder3", "NewFolder3", 
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "TestSharedProject", "TestSharedProject\TestSharedProject.shproj", "{CD802BC9-8F39-412C-9929-4536B0EAD347}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestMauiApp", "TestMauiApp\TestMauiApp.csproj", "{629C7607-BF79-4449-9808-859D31207304}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestMauiApp", "TestMauiApp\TestMauiApp.csproj", "{629C7607-BF79-4449-9808-859D31207304}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

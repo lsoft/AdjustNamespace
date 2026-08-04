@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.4.33027.239
+# Visual Studio Version 18
+VisualStudioVersion = 18.9.12023.133 insiders
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "AdjustNamespace.VsixShared", "AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.shproj", "{B8F4DE5D-EEFF-4F14-9C3D-2A6EE41DB482}"
 EndProject
@@ -15,46 +15,46 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|arm64 = Debug|arm64
-		Debug|x86 = Debug|x86
 		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
 		Release|arm64 = Release|arm64
-		Release|x86 = Release|x86
 		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|arm64.ActiveCfg = Debug|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|arm64.Build.0 = Debug|Any CPU
-		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|x86.ActiveCfg = Debug|x86
-		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|x86.Build.0 = Debug|x86
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|x64.ActiveCfg = Debug|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|x64.Build.0 = Debug|Any CPU
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|x86.ActiveCfg = Debug|x86
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Debug|x86.Build.0 = Debug|x86
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|arm64.ActiveCfg = Release|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|arm64.Build.0 = Release|Any CPU
-		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|x86.ActiveCfg = Release|x86
-		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|x86.Build.0 = Release|x86
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|x64.ActiveCfg = Release|Any CPU
 		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|x64.Build.0 = Release|Any CPU
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|x86.ActiveCfg = Release|x86
+		{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}.Release|x86.Build.0 = Release|x86
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|arm64.ActiveCfg = Debug|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|arm64.Build.0 = Debug|Any CPU
-		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|x86.Build.0 = Debug|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|x64.ActiveCfg = Debug|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|x64.Build.0 = Debug|Any CPU
+		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Debug|x86.Build.0 = Debug|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|arm64.ActiveCfg = Release|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|arm64.Build.0 = Release|Any CPU
-		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|x86.ActiveCfg = Release|Any CPU
-		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|x86.Build.0 = Release|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|x64.ActiveCfg = Release|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|x64.Build.0 = Release|Any CPU
+		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|x86.ActiveCfg = Release|Any CPU
+		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -66,6 +66,7 @@ Global
 		SolutionGuid = {7332E76C-88D8-4DD6-866A-168626CDF920}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems*{1783c86a-4caa-4e1a-8834-518dc695bbec}*SharedItemsImports = 5
 		AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems*{b8f4de5d-eeff-4f14-9c3d-2a6ee41db482}*SharedItemsImports = 13
 		AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems*{e36d5f78-82af-4bfe-9147-3d70f51ce1fb}*SharedItemsImports = 4
 	EndGlobalSection
