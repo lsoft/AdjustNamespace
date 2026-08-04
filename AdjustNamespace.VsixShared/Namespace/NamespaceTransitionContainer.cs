@@ -117,7 +117,49 @@ namespace AdjustNamespace.Namespace
                 throw new ArgumentNullException(nameof(root));
             }
 
+            return new NamespaceTransitionContainer(
+                CollectTransitions(node, root)
+                );
+        }
 
+        /// <summary>
+        /// The same for all the syntax trees of a single file: a file which is compiled by
+        /// several projects has a tree per project, and a namespace declaration which is
+        /// guarded by a conditional compilation symbol exists in a part of them only,
+        /// see <see cref="Helper.WorkspaceHelper.GetDocuments"/>.
+        /// </summary>
+        /// <param name="nodes">Syntax roots of all the documents of the file.</param>
+        /// <param name="root">Target namespace for that file.</param>
+        public static NamespaceTransitionContainer GetNamespaceTransitionsFor(
+            IReadOnlyList<SyntaxNode> nodes,
+            string root
+            )
+        {
+            if (nodes is null)
+            {
+                throw new ArgumentNullException(nameof(nodes));
+            }
+
+            if (root is null)
+            {
+                throw new ArgumentNullException(nameof(root));
+            }
+
+            var transitions = new List<NamespaceTransition>();
+
+            foreach (var node in nodes)
+            {
+                transitions.AddRange(CollectTransitions(node, root));
+            }
+
+            return new NamespaceTransitionContainer(transitions);
+        }
+
+        private static List<NamespaceTransition> CollectTransitions(
+            SyntaxNode node,
+            string root
+            )
+        {
             var candidateNamespaces = (
                 from dnode in node.DescendantNodesAndSelf()
                 let tdnode = dnode as NamespaceDeclarationSyntax
@@ -142,8 +184,7 @@ namespace AdjustNamespace.Namespace
             candidateNamespaces.AddRange(candidateNamespaces2);
 #endif
 
-            return new NamespaceTransitionContainer(candidateNamespaces);
-
+            return candidateNamespaces;
         }
 
 #if VS2022

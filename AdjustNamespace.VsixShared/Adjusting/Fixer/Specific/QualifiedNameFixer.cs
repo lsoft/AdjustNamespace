@@ -62,23 +62,63 @@ namespace AdjustNamespace.Adjusting.Fixer
                 FilePath,
                 (document, syntaxRoot) =>
                 {
-                    var nodesToBeReplaced = _arguments.ConvertAll(
-                        a => syntaxRoot.FindNode(a.SubjectNodeSpan).GoDownTo(a.ToReplaceSyntax.GetType())!
+                    var changes = BuildChanges();
+                    if (changes.Count == 0)
+                    {
+                        //nothing to do
+                        return null;
+                    }
+
+                    var changedDocument = document.WithText(
+                        syntaxRoot.GetText().WithChanges(changes)
                         );
-
-                    var mSyntaxRoot = syntaxRoot.ReplaceNodes(
-                        nodesToBeReplaced,
-                        (n0, n1) =>
-                        {
-                            var founda = _arguments.First(a => n0.Span == a.SubjectNodeSpan);
-
-                            return founda.ToReplaceSyntax;
-                        });
-
-                    var changedDocument = document.WithSyntaxRoot(mSyntaxRoot);
                     return changedDocument;
                 }
                 );
+        }
+
+        /// <summary>
+        /// The scheduled replacements as the changes of the text of the file.
+        ///
+        /// A name is replaced by its span and not by its syntax node: a file which several
+        /// projects compile has a syntax tree per project, the references are found in all
+        /// of them, and a name which is guarded by a conditional compilation symbol is
+        /// a disabled text (i.e. a trivia and not a name) in a part of these trees.
+        /// The text is the same for all of them, so a span is valid everywhere.
+        /// </summary>
+        private List<TextChange> BuildChanges()
+        {
+            //`SourceText.WithChanges` does not accept the intersecting changes, while
+            //a nested name may well be scheduled twice (`A.B.Outer.Inner` is a reference
+            //to `Outer` and a reference to `Inner` at once). The longest one wins,
+            //exactly as it does when the syntax nodes are replaced.
+            var ordered = _arguments
+                .OrderBy(a => a.SubjectNodeSpan.Start)
+                .ThenByDescending(a => a.SubjectNodeSpan.Length)
+                .ToList();
+
+            var result = new List<TextChange>(ordered.Count);
+
+            var lastEnd = -1;
+            foreach (var argument in ordered)
+            {
+                if (argument.SubjectNodeSpan.Start < lastEnd)
+                {
+                    //inside of (or intersecting with) an already scheduled replacement
+                    continue;
+                }
+
+                result.Add(
+                    new TextChange(
+                        argument.SubjectNodeSpan,
+                        argument.ToReplaceSyntax.ToString()
+                        )
+                    );
+
+                lastEnd = argument.SubjectNodeSpan.End;
+            }
+
+            return result;
         }
 
         /// <summary>

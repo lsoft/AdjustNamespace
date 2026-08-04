@@ -130,18 +130,6 @@ namespace AdjustNamespace.Adjusting
                         continue;
                     }
 
-                    var subjectSemanticModel = await subjectDocument!.GetSemanticModelAsync();
-                    if (subjectSemanticModel == null)
-                    {
-                        continue;
-                    }
-
-                    var subjectSyntaxRoot = await subjectDocument.GetSyntaxRootAsync();
-                    if (subjectSyntaxRoot == null)
-                    {
-                        continue;
-                    }
-
                     var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
                         subjectProject,
                         _vss,
@@ -153,52 +141,89 @@ namespace AdjustNamespace.Adjusting
                         continue;
                     }
 
-                    var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(subjectSyntaxRoot, targetNamespace!);
+                    var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(
+                        await _vss.Workspace.GetSyntaxRootsAsync(subjectFilePath),
+                        targetNamespace!
+                        );
                     if (ntc.IsEmpty)
                     {
                         continue;
                     }
 
-                    //check for same types already exists in the destination namespace
-                    foreach (var foundType in subjectSyntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                    var isContradictory = false;
+                    foreach (var transition in ntc.Transitions)
                     {
-                        var symbolInfo = subjectSemanticModel.GetDeclaredSymbol(foundType);
-                        if (symbolInfo == null)
+                        if (await _vss.Workspace.IsNamespaceStateContradictoryAsync(subjectFilePath, transition.OriginalName))
+                        {
+                            //the projects which compile this file do not agree whether the
+                            //namespace it is moved out of stays alive, see CsAdjuster
+                            isContradictory = true;
+                            break;
+                        }
+                    }
+
+                    if (isContradictory)
+                    {
+                        continue;
+                    }
+
+                    //check for same types already exists in the destination namespace
+                    //(every project which compiles the file is asked: a type declared under
+                    //a conditional compilation symbol exists in a part of them only)
+                    foreach (var fileDocument in _vss.Workspace.GetDocuments(subjectFilePath))
+                    {
+                        var semanticModel = await fileDocument.GetSemanticModelAsync();
+                        if (semanticModel == null)
                         {
                             continue;
                         }
 
-                        if (symbolInfo.ContainingType != null)
-                        {
-                            //a nested type moves together with its outer type
-                            //and never conflicts with a type of the target namespace
-                            continue;
-                        }
-
-                        var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
-                        if (symbolNamespace == targetNamespace)
+                        var syntaxRoot = await fileDocument.GetSyntaxRootAsync();
+                        if (syntaxRoot == null)
                         {
                             continue;
                         }
 
-                        if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
+                        foreach (var foundType in syntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
                         {
-                            continue;
-                        }
+                            var symbolInfo = semanticModel.GetDeclaredSymbol(foundType);
+                            if (symbolInfo == null)
+                            {
+                                continue;
+                            }
 
-                        if (!ntc.TransitionDict.TryGetValue(symbolNamespace, out var targetNamespaceInfo))
-                        {
-                            //there is no transition for this namespace: the type is declared
-                            //outside of any namespace, for example. It is not moved at all.
-                            continue;
-                        }
+                            if (symbolInfo.ContainingType != null)
+                            {
+                                //a nested type moves together with its outer type
+                                //and never conflicts with a type of the target namespace
+                                continue;
+                            }
 
-                        if (typesInSolutionPerNamespace.CheckForTypeExists(targetNamespaceInfo.ModifiedName, symbolInfo.Name))
-                        {
-                            throw new FileProcessException(
-                                $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'",
-                                subjectFilePath
-                                );
+                            var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
+                            if (symbolNamespace == targetNamespace)
+                            {
+                                continue;
+                            }
+
+                            if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
+                            {
+                                continue;
+                            }
+
+                            if (!ntc.TransitionDict.TryGetValue(symbolNamespace, out var targetNamespaceInfo))
+                            {
+                                //there is no transition for this namespace: the type is declared
+                                //outside of any namespace, for example. It is not moved at all.
+                                continue;
+                            }
+
+                            if (typesInSolutionPerNamespace.CheckForTypeExists(targetNamespaceInfo.ModifiedName, symbolInfo.Name))
+                            {
+                                throw new FileProcessException(
+                                    $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'",
+                                    subjectFilePath
+                                    );
+                            }
                         }
                     }
 

@@ -53,16 +53,16 @@ namespace AdjustNamespace.Adjusting
         /// (namespaces that does not exists after adjusting).
         /// </summary>
         /// <param name="namespacesToCheck">Using clauses of a document.</param>
-        /// <param name="compilation">
-        /// Compilation of the project of that document, or <c>null</c> if it is unknown.
-        /// A namespace is emptied for the whole solution, but a using clause is resolved
-        /// against a single project: a namespace which another project still fills is not
-        /// empty and is gone for this one nevertheless.
+        /// <param name="compilations">
+        /// Compilations of the projects which compile that document, or <c>null</c> if they
+        /// are unknown. A namespace is emptied for the whole solution, but a using clause is
+        /// resolved against a single project: a namespace which another project still fills
+        /// is not empty and is gone for this one nevertheless.
         /// </param>
         /// <returns>Those of them which point to an emptied namespace.</returns>
         public List<SyntaxNode> GetRemovedNamespaces(
             IReadOnlyList<UsingDirectiveSyntax> namespacesToCheck,
-            Compilation? compilation = null
+            IReadOnlyList<Compilation>? compilations = null
             )
         {
             if (namespacesToCheck is null)
@@ -81,7 +81,7 @@ namespace AdjustNamespace.Adjusting
             {
                 var nname = NormalizeUsingName(n.Name.ToString());
 
-                if (!_namespacesToRemove.Contains(nname) && !IsGoneForThisProject(nname, compilation))
+                if (!_namespacesToRemove.Contains(nname) && !IsGoneForTheseProjects(nname, compilations))
                 {
                     //there are a types in this namespace
                     continue;
@@ -95,15 +95,18 @@ namespace AdjustNamespace.Adjusting
 
         /// <summary>
         /// The adjusting has taken a type out of this namespace and there is nothing of it
-        /// left in the given compilation: a using clause of it does not compile anymore,
-        /// even though another project of the solution still fills that namespace.
+        /// left in any of the given compilations: a using clause of it does not compile
+        /// anymore, even though another project of the solution still fills that namespace.
+        ///
+        /// All of these compilations compile the very same text, so the clause has to stay
+        /// as soon as a single one of them still has that namespace.
         /// </summary>
-        private bool IsGoneForThisProject(
+        private bool IsGoneForTheseProjects(
             string namespaceName,
-            Compilation? compilation
+            IReadOnlyList<Compilation>? compilations
             )
         {
-            if (compilation == null)
+            if (compilations == null || compilations.Count == 0)
             {
                 return false;
             }
@@ -114,7 +117,15 @@ namespace AdjustNamespace.Adjusting
                 return false;
             }
 
-            return compilation.TryFindNamespace(namespaceName) == null;
+            foreach (var compilation in compilations)
+            {
+                if (compilation.TryFindNamespace(namespaceName) != null)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>

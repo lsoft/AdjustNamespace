@@ -89,25 +89,37 @@ namespace AdjustNamespace.Adjusting
                 return false;
             }
 
-            var (subjectDocument, subjectSyntaxRoot) = await _vss.Workspace.GetDocumentAndSyntaxRootAsync(_subjectFilePath);
-            if (subjectDocument == null || subjectSyntaxRoot == null)
+            //a file may be compiled by several projects (the target frameworks of a multi target
+            //project), and every one of them parses it with its own conditional compilation
+            //symbols: a type which is declared under such a symbol exists in a part of these
+            //trees only, so all of them are taken into account
+            var subjectTrees = await GetSubjectTreesAsync();
+            if (subjectTrees.Count == 0)
             {
                 //skip this document
                 return false;
             }
 
-            var subjectSemanticModel = await subjectDocument.GetSemanticModelAsync();
-            if (subjectSemanticModel == null)
-            {
-                //skip this document
-                return false;
-            }
-
-            var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(subjectSyntaxRoot, _targetNamespace);
+            var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(
+                subjectTrees.ConvertAll(t => t.SyntaxRoot),
+                _targetNamespace
+                );
             if (ntc.IsEmpty)
             {
                 //skip this document
                 return false;
+            }
+
+            foreach (var transition in ntc.Transitions)
+            {
+                if (await _vss.Workspace.IsNamespaceStateContradictoryAsync(_subjectFilePath, transition.OriginalName))
+                {
+                    //the projects which compile this file do not agree whether the namespace
+                    //it is moved out of stays alive, and there is a single text for all of them:
+                    //whatever we do with the using clauses, one of these projects breaks
+                    //skip this document
+                    return false;
+                }
             }
 
             var fixerContainer = new FixerContainer(_vss, _openFilesToEnableUndo);
@@ -117,14 +129,13 @@ namespace AdjustNamespace.Adjusting
             //fix refs (adding a new using namespace clauses or edit fully qualified names)
             await FixReferencesAsync(
                 processedTypes,
-                subjectSyntaxRoot,
-                subjectSemanticModel,
+                subjectTrees,
                 ntc,
                 fixerContainer
                 );
 
             //fix namespaces of the current file
-            fixerContainer.Fixer<NamespaceFixer>(subjectDocument.FilePath!)
+            fixerContainer.Fixer<NamespaceFixer>(_subjectFilePath)
                 .AddSubject(ntc)
                 ;
 
@@ -141,77 +152,131 @@ namespace AdjustNamespace.Adjusting
         }
 
         /// <summary>
+        /// The documents the subject file is compiled as, with their syntax trees and semantic
+        /// models: one per project which compiles it, see <see cref="WorkspaceHelper.GetDocuments"/>.
+        /// </summary>
+        private async Task<List<SubjectTree>> GetSubjectTreesAsync()
+        {
+            var result = new List<SubjectTree>();
+
+            foreach (var document in _vss.Workspace.GetDocuments(_subjectFilePath))
+            {
+                var syntaxRoot = await document.GetSyntaxRootAsync();
+                if (syntaxRoot == null)
+                {
+                    //skip this document
+                    continue;
+                }
+
+                var semanticModel = await document.GetSemanticModelAsync();
+                if (semanticModel == null)
+                {
+                    //skip this document
+                    continue;
+                }
+
+                result.Add(new SubjectTree(syntaxRoot, semanticModel));
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Create the fixers for every reference to every type declared in the subject file.
         /// </summary>
         /// <param name="processedTypes">
         /// (in/out) The types which have been moved. It is filled here and reused later
         /// to fix the references in the xaml files.
         /// </param>
-        /// <param name="syntaxRoot">Syntax root of the subject file.</param>
-        /// <param name="semanticModel">Semantic model of the subject file.</param>
+        /// <param name="subjectTrees">The syntax trees of the subject file, one per project which compiles it.</param>
         /// <param name="ntc">Namespace transitions of the subject file.</param>
         /// <param name="fixerContainer">(out) Container the created fixers are placed into.</param>
         private async Task FixReferencesAsync(
             HashSet<INamedTypeSymbol> processedTypes,
-            SyntaxNode syntaxRoot,
-            SemanticModel semanticModel,
+            List<SubjectTree> subjectTrees,
             NamespaceTransitionContainer ntc,
             FixerContainer fixerContainer
             )
         {
+            //the same type is a separate symbol in every project which compiles the file,
+            //and the reference search of Roslyn covers all of them at once, so it is enough
+            //to process the first symbol of every type
+            var processedTypeNames = new HashSet<string>();
 
-            var foundSyntaxes = (
-                from snode in syntaxRoot.DescendantNodes()
-                where snode is TypeDeclarationSyntax || snode is EnumDeclarationSyntax || snode is DelegateDeclarationSyntax
-                select snode
-                ).ToList();
-
-            foreach (var foundTypeSyntax in foundSyntaxes)
+            foreach (var subjectTree in subjectTrees)
             {
-                var symbolInfo = (INamedTypeSymbol?)semanticModel.GetDeclaredSymbol(foundTypeSyntax);
-                if (symbolInfo == null)
+                var foundSyntaxes = (
+                    from snode in subjectTree.SyntaxRoot.DescendantNodes()
+                    where snode is TypeDeclarationSyntax || snode is EnumDeclarationSyntax || snode is DelegateDeclarationSyntax
+                    select snode
+                    ).ToList();
+
+                foreach (var foundTypeSyntax in foundSyntaxes)
                 {
-                    //skip this type
-                    continue;
+                    var symbolInfo = (INamedTypeSymbol?)subjectTree.SemanticModel.GetDeclaredSymbol(foundTypeSyntax);
+                    if (symbolInfo == null)
+                    {
+                        //skip this type
+                        continue;
+                    }
+
+                    if (!processedTypeNames.Add(symbolInfo.ToDisplayString()))
+                    {
+                        //already processed
+                        continue;
+                    }
+
+                    var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
+                    if (symbolNamespace == _targetNamespace)
+                    {
+                        continue;
+                    }
+
+                    if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
+                    {
+                        continue;
+                    }
+
+                    if (!ntc.TransitionDict.TryGetValue(symbolNamespace, out var targetNamespaceInfo))
+                    {
+                        //there is no transition for this namespace: the type is declared
+                        //outside of any namespace, for example. Nothing to move.
+                        continue;
+                    }
+
+                    if (symbolNamespace == targetNamespaceInfo.ModifiedName)
+                    {
+                        //current symbol is in target namespace already
+                        continue;
+                    }
+
+                    //create fixers for all references
+                    var refProcessor = new RefProcessor(_vss, fixerContainer, targetNamespaceInfo);
+                    await refProcessor.ProcessRefsAsync(symbolInfo);
+
+                    processedTypes.Add(symbolInfo);
+                    _namespaceCenter.TypeRemoved(symbolInfo);
+                    _namespaceCenter.TypeAdded(symbolInfo, targetNamespaceInfo.ModifiedName);
                 }
+            }
+        }
 
-                if (processedTypes.Contains(symbolInfo))
-                {
-                    //already processed
-                    continue;
-                }
+        /// <summary>
+        /// A syntax tree of the subject file with its semantic model.
+        /// </summary>
+        private readonly struct SubjectTree
+        {
+            public readonly SyntaxNode SyntaxRoot;
 
-                var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
-                if (symbolNamespace == _targetNamespace)
-                {
-                    continue;
-                }
+            public readonly SemanticModel SemanticModel;
 
-                if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
-                {
-                    continue;
-                }
-
-                if (!ntc.TransitionDict.TryGetValue(symbolNamespace, out var targetNamespaceInfo))
-                {
-                    //there is no transition for this namespace: the type is declared
-                    //outside of any namespace, for example. Nothing to move.
-                    continue;
-                }
-
-                if (symbolNamespace == targetNamespaceInfo.ModifiedName)
-                {
-                    //current symbol is in target namespace already
-                    continue;
-                }
-
-                //create fixers for all references
-                var refProcessor = new RefProcessor(_vss, fixerContainer, targetNamespaceInfo);
-                await refProcessor.ProcessRefsAsync(symbolInfo);
-
-                processedTypes.Add(symbolInfo);
-                _namespaceCenter.TypeRemoved(symbolInfo);
-                _namespaceCenter.TypeAdded(symbolInfo, targetNamespaceInfo.ModifiedName);
+            public SubjectTree(
+                SyntaxNode syntaxRoot,
+                SemanticModel semanticModel
+                )
+            {
+                SyntaxRoot = syntaxRoot;
+                SemanticModel = semanticModel;
             }
         }
 

@@ -35,7 +35,8 @@ Everything except the [known bugs](#known-bugs) is green. What is covered:
 | The using clauses | `Adjusting\UsingPlacementTests` (a file without any using, a header, a region, a `global using`), `Adjusting\CleanupTests` (when an old using has to disappear and when it must not) |
 | The kinds of the declarations | `Adjusting\CsAdjusterTypeKindTests` (a record, a struct, a static and a generic class, the contradicting namespace declarations) |
 | The xaml files | `Xaml\XamlDocumentTests` (parsing and moving), `XamlReferenceKindTests` (the references outside of a tag and of a markup extension), `XamlFileWritingTests` (the encoding and the line endings of the written file), `Adjusting\XamlAdjusterTests` (the `x:Class` of the document itself) |
-| The shared and the multi target projects | `Adjusting\SharedProjectTests` (one file compiled by several projects: the ambiguous target namespace of a C# and of a xaml file, the references and the using clauses of every project, the file list of the solution, a namespace which several projects fill) |
+| The shared projects | `Adjusting\SharedProjectTests` (one file compiled by several projects: the ambiguous target namespace of a C# and of a xaml file, the references and the using clauses of every project, the file list of the solution, a namespace which several projects fill) |
+| The multi target projects | `Adjusting\MultiTargetTests` (one file compiled by every target framework: the references and the using clauses, a file of a single target framework, xaml, the conditional compilation, a shared project referenced by a multi target one) |
 | The namespaces | `Namespace\NamespaceTransitionContainerTests`, `NamespaceNodeSearchTests`, `NamespaceCenterTests`, `NamespaceHelperTests` |
 | The fixers | `Fixer\AddUsingFixerTests` |
 | The helpers | `Helper\RoslynHelperTests`, `PredicateTests` |
@@ -88,6 +89,28 @@ A shared project referenced by a single project is not ambiguous either and is a
 unknown kind is its name without the last part, `MyApp.Shared` -> `MyApp`) serves exactly that
 case now.
 
+### A note about the multi target projects
+
+The projects of the target frameworks of a multi target project are not copies of each other:
+every one of them defines its own conditional compilation symbols and may compile its own files
+(`<Compile Condition="'$(TargetFramework)'=='net48'" />`). A file of such a project has one text
+and a syntax tree per target framework, so everything which reads it reads all of its documents
+(`WorkspaceHelper.GetDocuments`) and everything which writes it addresses a span of the text and
+not a node of a tree — a name which is a name for one target framework is a part of a disabled
+text for another one.
+
+Two of the tests describe the case which cannot be made consistent that way: the target
+frameworks disagree whether the namespace the file is moved out of stays alive, and the `using`
+clause of it is required by one of them and does not compile for another one. Such a file is
+left as it is, exactly as a file of a shared project which several projects compile.
+
+A file which belongs to a single target framework is an ordinary file for the extension and is
+adjusted as usual (`A_file_of_a_single_target_framework_is_adjusted`).
+
+The combination of both kinds is covered as well: a shared project referenced by a single multi
+target project is adjusted (one project of the solution), and a shared project referenced by a
+multi target project plus anything else is not.
+
 ## Adding a test
 
 The files of `AdjustNamespace.Tests` are picked up by a glob, no need to register them anywhere
@@ -122,6 +145,24 @@ using var solution = new TestSolution()
     .AddSharedDocument("Common", "Class1.cs", "namespace Legacy.Core { public class Class1 { } }", "A", "B")
     ;
 ```
+
+A multi target project is added with `AddMultiTargetProject`:
+
+```csharp
+using var solution = new TestSolution()
+    .AddMultiTargetProject("MyApp", "net48", "net8.0")
+    //a file of all the target frameworks
+    .AddDocument("MyApp", "Class1.cs", "namespace A.B { public class Class1 { } }")
+    //a file of a single one of them
+    .AddMultiTargetDocument("MyApp", "Legacy.cs", "namespace A.B { public class Legacy { } }", "net48")
+    ;
+```
+
+It creates a Roslyn project per target framework (`MyApp (net48)`, `MyApp (net8.0)`), all of them
+with the same project file, and every one of them defines the conditional compilation symbol of
+its target framework (`NET48`, `NET8_0`; the additional symbols of a real build, `NETFRAMEWORK`
+and `NET8_0_OR_GREATER`, are not defined). Everything which takes a project name accepts the name
+of such a project and means all of its target frameworks.
 
 A shared project is no Roslyn project at all: only the folder of it is registered, and its file
 becomes a document of every project which references it, exactly as Visual Studio builds it.

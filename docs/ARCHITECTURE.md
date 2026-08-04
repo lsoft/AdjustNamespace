@@ -94,6 +94,19 @@ compares. The same holds for the walk through the solution
 (`WorkspaceHelper.EnumerateAllDocumentFilePaths`): one file on the disk is one entry of the
 list, no matter how many projects compile it.
 
+A file has one target namespace but not necessarily one syntax tree: every project which
+compiles it parses it with its own conditional compilation symbols, so `#if NET8_0` is a code
+for one of them and a disabled text (a trivia) for another one. Everything which reads the file
+therefore works with all of its documents (`WorkspaceHelper.GetDocuments`): the namespace
+transitions, the types whose references have to be fixed and the declarations to rename are
+collected from every tree of it.
+
+There is one thing which cannot be made consistent that way: the projects may disagree whether
+the namespace the file is moved out of stays alive, and the `using` clause of it is then
+required by one of them and does not compile for another one. There is a single text for all of
+them, so such a file is skipped as well
+(`WorkspaceHelper.IsNamespaceStateContradictoryAsync`).
+
 ### Scanning (`SubjectFileCollector`)
 
 The collector binds the chosen file paths to their projects (this requires the main thread),
@@ -112,9 +125,14 @@ then for every file:
   is processed separately, as a usual C# file.
 - **`CsAdjuster`** does the main job:
   1. `NamespaceTransitionContainer.GetNamespaceTransitionsFor` builds the transitions
-     (`old namespace -> new namespace`) of the file;
+     (`old namespace -> new namespace`) of the file, over all of its syntax trees;
   2. for every type declared in the file `RefProcessor` finds its references across the solution
-     (including the usages of its extension methods) and creates a fixer for each of them;
+     (including the usages of its extension methods) and creates a fixer for each of them.
+     A file which several projects compile produces a separate symbol per project and Roslyn
+     cascades the search to all of them, so the same location is reported once per project:
+     the locations are deduplicated by their file and span, and every one of them is analyzed
+     against the tree it belongs to (`ReferenceLocation.Document`) and not against the tree of
+     the current context of that file;
   3. a fixer for the namespace declarations of the file itself is created;
   4. `FixerContainer.FixAllAsync` applies all the created fixers;
   5. the references to the moved types are fixed in the xaml files of the solution.
@@ -135,6 +153,14 @@ saved once, no matter how many references it contains.
 matters: the qualified names are identified by their spans in the original document, so they
 have to be rewritten before any other edit shifts these spans.
 
+`QualifiedNameFixer` and the renaming part of `NamespaceFixer` replace a span of the text and
+not a node of a syntax tree. A file may have a tree per project which compiles it, and a name
+which is a name in one of them is a part of a disabled text in another one, while the text is
+the same for all of them: a span is the only address which is valid everywhere.
+The changes of one file must not intersect, so the nested names (`A.B.Outer.Inner` is a
+reference to `Outer` and a reference to `Inner` at once) are collapsed to the longest one,
+exactly as `SyntaxNode.ReplaceNodes` does it.
+
 Every modification of the Roslyn workspace goes through the `do { ... } while (!TryApplyChanges)`
 pattern (see `DocumentChangerHelper`): `Workspace.TryApplyChanges` fails if the solution has been
 changed by someone else after our snapshot has been taken, so the change is rebuilt against the
@@ -153,13 +179,15 @@ nevertheless (the projects of a solution do not have to reference each other). T
 ends know about the compilation of the document they work with:
 
 - `NamespaceFixer` adds the `using` clause of the old namespace of the adjusted file only if
-  that namespace still contains something for the project of that file
+  that namespace still contains something for the projects of that file
   (`RoslynHelper.IsNamespaceFilledOutside`);
 - `NamespaceCenter.GetRemovedNamespaces` removes a clause of a namespace the adjusting has
-  touched as soon as that namespace is gone for the given compilation, even if the rest of the
-  solution still fills it. A file which several projects compile has a single text for all of
-  them, so `Cleanup` passes no compilation for such a file and falls back to the solution wide
-  answer.
+  touched as soon as that namespace is gone for the given compilations, even if the rest of the
+  solution still fills it.
+
+A file which several projects compile has a single text for all of them, so both of these
+questions are asked about every project which compiles it and the answers are merged: the clause
+stays as soon as a single one of them still needs it.
 
 ## The xaml subsystem
 

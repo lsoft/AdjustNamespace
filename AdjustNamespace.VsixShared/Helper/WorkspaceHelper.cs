@@ -181,6 +181,146 @@ namespace AdjustNamespace.Helper
         }
 
         /// <summary>
+        /// All the documents built of the given file: one per project which compiles it,
+        /// see <see cref="IsCompiledBySeveralProjects"/>.
+        ///
+        /// There is a single file on the disk and a single text behind all of them, but their
+        /// syntax trees are not necessarily the same: every target framework of a multi target
+        /// project defines its own conditional compilation symbols, so a fragment which is
+        /// a code for one of these documents is a disabled text (i.e. a trivia) for another one.
+        /// </summary>
+        public static IReadOnlyList<Document> GetDocuments(
+            this Workspace workspace,
+            string filePath
+            )
+        {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
+
+            if (filePath is null)
+            {
+                throw new ArgumentNullException(nameof(filePath));
+            }
+
+            var sln = workspace.CurrentSolution;
+
+            var result = new List<Document>();
+
+            foreach (var documentId in sln.GetDocumentIdsWithFilePath(filePath))
+            {
+                var document = sln.GetDocument(documentId);
+                if (document == null)
+                {
+                    continue;
+                }
+
+                result.Add(document);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The syntax roots of all the documents of the file, see <see cref="GetDocuments"/>.
+        /// The documents without a syntax tree are skipped.
+        /// </summary>
+        public static async Task<IReadOnlyList<SyntaxNode>> GetSyntaxRootsAsync(
+            this Workspace workspace,
+            string filePath
+            )
+        {
+            var result = new List<SyntaxNode>();
+
+            foreach (var document in workspace.GetDocuments(filePath))
+            {
+                var syntaxRoot = await document.GetSyntaxRootAsync();
+                if (syntaxRoot == null)
+                {
+                    continue;
+                }
+
+                result.Add(syntaxRoot);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The namespace still contains something for at least one of the projects which
+        /// compile the given file, after that file has been moved out of it
+        /// (see <see cref="RoslynHelper.IsNamespaceFilledOutside"/>).
+        /// </summary>
+        public static async Task<bool> IsNamespaceAliveOutsideAsync(
+            this Workspace workspace,
+            string filePath,
+            string namespaceName
+            )
+        {
+            foreach (var document in workspace.GetDocuments(filePath))
+            {
+                var compilation = await document.Project.GetCompilationAsync();
+                if (compilation == null)
+                {
+                    //we know nothing, so keep the old behaviour
+                    return true;
+                }
+
+                if (compilation.IsNamespaceFilledOutside(namespaceName, filePath))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// The projects which compile the given file do not agree whether the given namespace
+        /// still exists after that file has been moved out of it: another file fills it for
+        /// one of them and it becomes empty for another one.
+        ///
+        /// The `using` clause of such a namespace is required by the first ones and does not
+        /// compile for the second ones, and there is a single text for all of them, so there
+        /// is no correct way to move that file at all and it has to be left as it is.
+        /// This happens when a type of that namespace is declared under a conditional
+        /// compilation symbol of a target framework, or in a file of a single target framework.
+        /// </summary>
+        public static async Task<bool> IsNamespaceStateContradictoryAsync(
+            this Workspace workspace,
+            string filePath,
+            string namespaceName
+            )
+        {
+            bool? firstAnswer = null;
+
+            foreach (var document in workspace.GetDocuments(filePath))
+            {
+                var compilation = await document.Project.GetCompilationAsync();
+                if (compilation == null)
+                {
+                    continue;
+                }
+
+                var isAlive = compilation.IsNamespaceFilledOutside(namespaceName, filePath);
+
+                if (!firstAnswer.HasValue)
+                {
+                    firstAnswer = isAlive;
+                    continue;
+                }
+
+                if (firstAnswer.Value != isAlive)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Get the document and its syntax root from the current solution snapshot.
         /// </summary>
         /// <returns><c>(null, null)</c> if the document is not found or has no syntax tree.</returns>

@@ -4,6 +4,7 @@ using AdjustNamespace.Namespace;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.FindSymbols;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
@@ -66,6 +67,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
             var foundReferences = await FindReferencesForAsync(_vss.Workspace, symbolInfo);
 
+            //a file which several projects compile produces a separate symbol per project,
+            //and Roslyn cascades the search to all of them: the very same location is reported
+            //once per project which compiles the file it lives in
+            var processedLocations = new HashSet<(string, TextSpan)>();
+
             foreach (var foundReference in foundReferences)
             {
                 if (foundReference.Definition.ContainingNamespace.ToDisplayString() == _targetNamespaceInfo.ModifiedName)
@@ -76,6 +82,18 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
                 foreach (var location in foundReference.Locations)
                 {
+                    if (location.Document.FilePath == null)
+                    {
+                        //skip this location
+                        continue;
+                    }
+
+                    if (!processedLocations.Add((location.Document.FilePath, location.Location.SourceSpan)))
+                    {
+                        //this location has been reported by another project already
+                        continue;
+                    }
+
                     await ProcessLocationAsync(location);
                 }
             }
@@ -106,11 +124,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 return;
             }
 
-            var document = _vss.Workspace.GetDocument(location.Location.SourceTree.FilePath);
-            if (document == null)
-            {
-                return;
-            }
+            //the document of the location and not the document of that file in the current
+            //context: the span of the location belongs to the tree of that very document,
+            //and the trees of one file may differ (a reference under `#if NET8_0` is a code
+            //for one project which compiles the file and a disabled text for another one)
+            var document = location.Document;
 
             var root = await document.GetSyntaxRootAsync();
             if (root == null)

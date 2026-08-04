@@ -32,6 +32,14 @@ namespace AdjustNamespace.Tests.Infrastructure
         private readonly Dictionary<string, ProjectId> _projects = new();
 
         /// <summary>
+        /// The projects of the target frameworks of a multi target project, keyed by the name
+        /// of that project. A name found here is replaced with all of them, so a test names
+        /// the project of the solution and not the projects Roslyn creates of it,
+        /// see <see cref="AddMultiTargetProject"/>.
+        /// </summary>
+        private readonly Dictionary<string, List<string>> _targetProjects = new();
+
+        /// <summary>
         /// The documents of the solution, grouped by the file they are built of.
         /// A file of a shared project (.shproj) and a file of a multi target project
         /// (<c>net48;net8.0</c>) belong to more than one project at once, and Visual Studio
@@ -146,20 +154,35 @@ namespace AdjustNamespace.Tests.Infrastructure
         /// Add a multi target project (<c>&lt;TargetFrameworks&gt;net48;net8.0&lt;/TargetFrameworks&gt;</c>).
         /// Visual Studio creates a separate Roslyn project for every target framework of such
         /// a project, and all of them share the very same project file and folder.
-        /// The projects are named <c>{name} ({targetFramework})</c>;
-        /// the documents of it are added with <see cref="AddMultiTargetDocument"/>.
+        /// The projects are named <c>{name} ({targetFramework})</c> and every one of them
+        /// defines the conditional compilation symbol of its target framework,
+        /// see <see cref="PreprocessorSymbolOf"/>.
+        ///
+        /// Everything which takes a project name (<see cref="AddDocument"/>,
+        /// <see cref="AddProjectReference"/>, <see cref="AddSharedDocument"/>) accepts the name
+        /// of such a project and means all of its target frameworks;
+        /// <see cref="AddMultiTargetDocument"/> adds a file of a chosen part of them
+        /// (<c>&lt;Compile Condition="'$(TargetFramework)'=='net48'" /&gt;</c>).
         /// </summary>
         public TestSolution AddMultiTargetProject(string name, params string[] targetFrameworks)
         {
             _folders[name] = Path.Combine(SolutionFolder, name);
+            _targetProjects[name] = new List<string>();
 
             foreach (var targetFramework in targetFrameworks)
             {
                 var targetName = TargetProjectName(name, targetFramework);
 
                 _folders[targetName] = _folders[name];
+                _targetProjects[name].Add(targetName);
 
-                AddProject(targetName, Path.Combine(SolutionFolder, name, name + ".csproj"));
+                AddProject(
+                    targetName,
+                    Path.Combine(SolutionFolder, name, name + ".csproj"),
+                    new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+                        preprocessorSymbols: new[] { PreprocessorSymbolOf(targetFramework) }
+                        )
+                    );
             }
 
             return this;
@@ -174,7 +197,22 @@ namespace AdjustNamespace.Tests.Infrastructure
             return $"{projectName} ({targetFramework})";
         }
 
-        private void AddProject(string name, string projectFilePath)
+        /// <summary>
+        /// The conditional compilation symbol of a target framework
+        /// (<c>net48</c> -> <c>NET48</c>, <c>net8.0</c> -> <c>NET8_0</c>).
+        /// The additional symbols of a real build (<c>NETFRAMEWORK</c>, <c>NET</c>,
+        /// <c>NET8_0_OR_GREATER</c>) are not defined here.
+        /// </summary>
+        public static string PreprocessorSymbolOf(string targetFramework)
+        {
+            return targetFramework.ToUpperInvariant().Replace('.', '_').Replace('-', '_');
+        }
+
+        private void AddProject(
+            string name,
+            string projectFilePath,
+            Microsoft.CodeAnalysis.CSharp.CSharpParseOptions? parseOptions = null
+            )
         {
             var projectId = ProjectId.CreateNewId(name);
 
@@ -196,6 +234,11 @@ namespace AdjustNamespace.Tests.Infrastructure
                     )
                 ;
 
+            if (parseOptions != null)
+            {
+                projectInfo = projectInfo.WithParseOptions(parseOptions);
+            }
+
             Apply(Workspace.CurrentSolution.AddProject(projectInfo));
 
             _projects[name] = projectId;
@@ -203,17 +246,35 @@ namespace AdjustNamespace.Tests.Infrastructure
 
         /// <summary>
         /// Make <paramref name="projectName"/> reference <paramref name="referencedProjectName"/>.
+        /// Every target framework of a multi target project references it.
         /// </summary>
         public TestSolution AddProjectReference(string projectName, string referencedProjectName)
         {
-            Apply(
-                Workspace.CurrentSolution.AddProjectReference(
-                    _projects[projectName],
-                    new Microsoft.CodeAnalysis.ProjectReference(_projects[referencedProjectName])
-                    )
-                );
+            foreach (var name in ExpandTargets(projectName))
+            {
+                Apply(
+                    Workspace.CurrentSolution.AddProjectReference(
+                        _projects[name],
+                        new Microsoft.CodeAnalysis.ProjectReference(_projects[referencedProjectName])
+                        )
+                    );
+            }
 
             return this;
+        }
+
+        /// <summary>
+        /// The projects which compile the files of the named project: the project itself,
+        /// or the projects of all the target frameworks of a multi target project.
+        /// </summary>
+        private IEnumerable<string> ExpandTargets(string projectName)
+        {
+            if (_targetProjects.TryGetValue(projectName, out var targetNames))
+            {
+                return targetNames;
+            }
+
+            return new[] { projectName };
         }
 
         /// <summary>
@@ -273,7 +334,7 @@ namespace AdjustNamespace.Tests.Infrastructure
 
         private void AddDocument(string filePath, string body, string[] projectNames)
         {
-            foreach (var projectName in projectNames)
+            foreach (var projectName in projectNames.SelectMany(ExpandTargets))
             {
                 var projectId = _projects[projectName];
                 var documentId = DocumentId.CreateNewId(projectId);

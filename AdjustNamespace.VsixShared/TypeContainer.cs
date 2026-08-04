@@ -16,16 +16,21 @@ namespace AdjustNamespace
     public readonly struct NamespaceTypeContainer
     {
         /// <summary>
-        /// Types of the solution grouped by their containing namespace.
+        /// Names of the types of the solution grouped by their containing namespace.
+        ///
+        /// The names and not the symbols: a file which several projects compile declares
+        /// a separate type per project (a shared project, a target framework of a multi target
+        /// project), and all of these types are the same type for the question this container
+        /// answers.
         /// </summary>
-        private readonly Dictionary<string, List<INamedTypeSymbol>> _dictByNamespace;
+        private readonly Dictionary<string, HashSet<string>> _dictByNamespace;
 
         /// <param name="unused">Not used; see the comment inside.</param>
         public NamespaceTypeContainer(
             bool unused //here is CS0568 in VS2019 without this
             )
         {
-            _dictByNamespace = new Dictionary<string, List<INamedTypeSymbol>>(
+            _dictByNamespace = new Dictionary<string, HashSet<string>>(
                 );
         }
 
@@ -42,12 +47,13 @@ namespace AdjustNamespace
             }
 
             var key = symbol.ContainingNamespace.ToFullDisplayString();
-            if (!_dictByNamespace.ContainsKey(key))
+            if (!_dictByNamespace.TryGetValue(key, out var typeNames))
             {
-                _dictByNamespace[key] = new List<INamedTypeSymbol>();
+                typeNames = new HashSet<string>();
+                _dictByNamespace[key] = typeNames;
             }
 
-            _dictByNamespace[key].Add(symbol);
+            typeNames.Add(symbol.Name);
         }
 
         /// <summary>
@@ -61,35 +67,13 @@ namespace AdjustNamespace
         {
             if (!_dictByNamespace.TryGetValue(
                 namespaceName,
-                out var typesInTargetNamespace
+                out var typeNames
                 ))
             {
                 return false;
             }
 
-            if (typesInTargetNamespace == null)
-            {
-                return false;
-            }
-
-            foreach(var titn in typesInTargetNamespace)
-            {
-                var nn = titn.ContainingNamespace.ToFullDisplayString();
-                if(nn != namespaceName)
-                {
-                    continue;
-                }
-
-                var tn = titn.Name;
-                if(tn != typeName)
-                {
-                    continue;
-                }
-
-                return true;
-            }
-
-            return false;
+            return typeNames.Contains(typeName);
         }
 
         /// <summary>

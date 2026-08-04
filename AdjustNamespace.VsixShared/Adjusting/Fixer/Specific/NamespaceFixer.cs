@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using AdjustNamespace.Helper;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using AdjustNamespace.Namespace;
 
 namespace AdjustNamespace.Adjusting.Fixer.Specific
@@ -65,129 +66,167 @@ namespace AdjustNamespace.Adjusting.Fixer.Specific
         }
 
         /// <summary>
-        /// The namespace the file is being moved out of still contains something for the project
-        /// of that file, i.e. a <c>using</c> clause of it compiles after the move.
-        /// The types of the file itself do not count: all of them are moving.
+        /// The spans of the names of every declaration of the given namespace in the file.
+        ///
+        /// A file which several projects compile has a syntax tree per project, and
+        /// a declaration which is guarded by a conditional compilation symbol is a code for
+        /// a part of them and a disabled text for the rest, so all of these trees are asked.
+        /// There is a single text behind all of them, hence a span of any one of them
+        /// is a span of the file.
         /// </summary>
-        private async Task<bool> IsAliveInItsProjectAsync(
-            Document document,
+        private async Task<List<TextSpan>> FindNamespaceNameSpansAsync(
             string namespaceName
             )
         {
-            var compilation = await document.Project.GetCompilationAsync();
-            if (compilation == null)
+            var result = new List<TextSpan>();
+
+            foreach (var syntaxRoot in await _vss.Workspace.GetSyntaxRootsAsync(FilePath))
             {
-                //we know nothing, so keep the old behaviour
-                return true;
+                if (!syntaxRoot.TryFindNamespaceNodesFor(namespaceName, out var foundNamespaces))
+                {
+                    continue;
+                }
+
+                foreach (var foundNamespace in foundNamespaces)
+                {
+                    var span = foundNamespace.Name.Span;
+
+                    if (!result.Contains(span))
+                    {
+                        result.Add(span);
+                    }
+                }
             }
 
-            return compilation.IsNamespaceFilledOutside(namespaceName, FilePath);
+            //the changes of a text have to be ordered and must not intersect;
+            //the names of two declarations never do
+            result.Sort((a, b) => a.Start.CompareTo(b.Start));
+
+            return result;
         }
 
         /// <inheritdoc/>
         public async Task FixAsync()
         {
-            var workspace = _vss.Workspace;
-
             foreach (var ntc in _subjectList)
             {
                 //only the root namespaces are renamed; the nested ones are renamed automatically
                 //because their full name contains the root one
                 foreach (var transition in ntc.Transitions.Where(ni => ni.IsRoot))
                 {
-                    //see the comment in AddUsingFixer.FixAsync about this do-while
-                    bool r = true;
-                    do
-                    {
-                        var (openedDocument, syntaxRoot) = await workspace.GetDocumentAndSyntaxRootAsync(FilePath);
-                        if (openedDocument == null || syntaxRoot == null)
-                        {
-                            //something went wrong
-                            //skip this document
-                            return;
-                        }
-
-                        if (!syntaxRoot.TryFindNamespaceNodesFor(transition.OriginalName, out var ufNamespaces))
-                        {
-                            //skip this namespace
-                            break;
-                        }
-
-                        var ufNamespace = ufNamespaces.First();
-
-                        //class A : IA {}
-                        //we're moving A into a different namespace, but IA are not.
-                        //we need to insert 'using old namespace'
-                        //otherwise ia will not be resolved
-
-                        //we can't determite it is the case or it's not without a costly analysis
-                        //it's a subject for a future work
-                        //so add at 100% cases now
-
-                        //...with a single exception: if this project has nothing in that
-                        //namespace anymore, such a clause does not compile. The namespace may
-                        //stay alive for the solution and be gone for this project at the same
-                        //time (another project fills it and this one does not reference it),
-                        //and then the cleanup has no reason to remove the clause again.
-
-                        var cus = syntaxRoot as CompilationUnitSyntax;
-                        if (cus == null)
-                        {
-                            //skip this namespace
-                            break;
-                        }
-                        if (!HasUsingOf(cus, ufNamespace!.Name.ToString())
-                            && await IsAliveInItsProjectAsync(openedDocument, ufNamespace!.Name.ToString())
-                            )
-                        {
-                            var newUsingStatement = SyntaxFactory.UsingDirective(
-                                SyntaxFactory.ParseName(
-                                    " " + ufNamespace!.Name
-                                    )
-                                ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
-
-                            cus = cus.AddUsingKeepingHeader(newUsingStatement);
-                        }
-
-                        if (!cus.TryFindNamespaceNodesFor(transition.OriginalName, out var fNamespaces))
-                        {
-                            //skip this namespace
-                            break;
-                        }
-
-                        //all the declarations are replaced at once: a node found in `cus`
-                        //does not belong to the tree produced by ReplaceNode anymore,
-                        //so replacing them one by one silently skips all of them but the first
-                        cus = cus!.ReplaceNodes(
-                            fNamespaces!,
-                            (fNamespace, _) =>
-                            {
-                                var newName = SyntaxFactory.ParseName(
-                                    transition.ModifiedName
-                                    );
-
-                                if (fNamespace is NamespaceDeclarationSyntax)
-                                {
-                                    newName = newName
-                                        .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                                        ;
-                                }
-
-                                return fNamespace.WithName(
-                                    newName
-                                    )
-                                    .WithLeadingTrivia(fNamespace.GetLeadingTrivia())
-                                    .WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed)
-                                    ;
-                            });
-
-                        openedDocument = openedDocument.WithSyntaxRoot(cus!);
-
-                        r = workspace.TryApplyChanges(openedDocument.Project.Solution);
-                    }
-                    while (!r);
+                    //the using clause is added first: it shifts the spans of everything
+                    //which follows it
+                    await AddUsingOfTheOldNamespaceAsync(transition);
+                    await RenameNamespaceAsync(transition);
                 }
             }
+        }
+
+        /// <summary>
+        /// class A : IA {}
+        /// we're moving A into a different namespace, but IA are not.
+        /// we need to insert 'using old namespace'
+        /// otherwise ia will not be resolved
+        ///
+        /// we can't determite it is the case or it's not without a costly analysis
+        /// it's a subject for a future work
+        /// so add at 100% cases now
+        ///
+        /// ...with a single exception: if the projects which compile this file have nothing
+        /// in that namespace anymore, such a clause does not compile. The namespace may stay
+        /// alive for the solution and be gone for these projects at the same time (another
+        /// project fills it and these ones do not reference it), and then the cleanup has
+        /// no reason to remove the clause again.
+        /// </summary>
+        private async Task AddUsingOfTheOldNamespaceAsync(
+            NamespaceTransition transition
+            )
+        {
+            var workspace = _vss.Workspace;
+
+            if ((await FindNamespaceNameSpansAsync(transition.OriginalName)).Count == 0)
+            {
+                //this file does not declare that namespace, there is nothing to move
+                return;
+            }
+
+            if (!await workspace.IsNamespaceAliveOutsideAsync(FilePath, transition.OriginalName))
+            {
+                return;
+            }
+
+            await workspace.ApplyModifiedDocumentAsync(
+                FilePath,
+                (document, syntaxRoot) =>
+                {
+                    var cus = syntaxRoot as CompilationUnitSyntax;
+                    if (cus == null)
+                    {
+                        //skip this namespace
+                        return null;
+                    }
+
+                    if (HasUsingOf(cus, transition.OriginalName))
+                    {
+                        //that using already exists
+                        return null;
+                    }
+
+                    var newUsingStatement = SyntaxFactory.UsingDirective(
+                        SyntaxFactory.ParseName(
+                            " " + transition.OriginalName
+                            )
+                        ).WithTrailingTrivia(SyntaxFactory.CarriageReturnLineFeed);
+
+                    return document.WithSyntaxRoot(
+                        cus.AddUsingKeepingHeader(newUsingStatement)
+                        );
+                }
+                );
+        }
+
+        /// <summary>
+        /// Replace the name of every declaration of the old namespace with the new one.
+        /// Only the name is replaced and not the whole declaration: everything else of the
+        /// file (including the declarations which are a disabled text for the project we are
+        /// looking at) stays exactly as the user has written it.
+        /// </summary>
+        private async Task RenameNamespaceAsync(
+            NamespaceTransition transition
+            )
+        {
+            var workspace = _vss.Workspace;
+
+            //see the comment in AddUsingFixer.FixAsync about this do-while
+            bool r;
+            do
+            {
+                //the spans are rebuilt on every attempt: a failed TryApplyChanges means
+                //the file has been changed by someone else in the meantime
+                var spans = await FindNamespaceNameSpansAsync(transition.OriginalName);
+                if (spans.Count == 0)
+                {
+                    //skip this namespace
+                    return;
+                }
+
+                var (document, syntaxRoot) = await workspace.GetDocumentAndSyntaxRootAsync(FilePath);
+                if (document == null || syntaxRoot == null)
+                {
+                    //something went wrong
+                    //skip this document
+                    return;
+                }
+
+                var changedDocument = document.WithText(
+                    syntaxRoot.GetText().WithChanges(
+                        spans.ConvertAll(s => new TextChange(s, transition.ModifiedName))
+                        )
+                    );
+
+                r = workspace.TryApplyChanges(changedDocument.Project.Solution);
+            }
+            while (!r);
         }
     }
 }
