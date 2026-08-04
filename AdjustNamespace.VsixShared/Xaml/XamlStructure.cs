@@ -36,12 +36,20 @@ namespace AdjustNamespace.Xaml
         /// </summary>
         public readonly List<XamlClass> Classes;
 
+        /// <summary>
+        /// The <c>alias:ClassName</c> pairs which are neither a tag nor a
+        /// <c>{x:Type}</c>/<c>{x:Static}</c> markup extension: an attribute value,
+        /// an attached property, a custom markup extension, <c>x:TypeArguments</c>.
+        /// </summary>
+        public readonly List<XamlTypeUsage> TypeUsages;
+
         public XamlStructure(
             XamlX xPrefix,
             List<XamlXmlns> xmlns,
             List<XamlControl> controls,
             List<XamlAttributeReference> refFroms,
-            List<XamlClass> classes
+            List<XamlClass> classes,
+            List<XamlTypeUsage> typeUsages
             )
         {
             if (xPrefix is null)
@@ -69,11 +77,17 @@ namespace AdjustNamespace.Xaml
                 throw new ArgumentNullException(nameof(classes));
             }
 
+            if (typeUsages is null)
+            {
+                throw new ArgumentNullException(nameof(typeUsages));
+            }
+
             XPrefix = xPrefix;
             Xmlns = xmlns;
             Controls = controls;
             RefFroms = refFroms;
             Classes = classes;
+            TypeUsages = typeUsages;
         }
 
         /// <summary>
@@ -124,6 +138,7 @@ namespace AdjustNamespace.Xaml
             performables.AddRange(Controls);
             performables.AddRange(RefFroms);
             performables.AddRange(Classes);
+            performables.AddRange(TypeUsages);
 
             return performables;
         }
@@ -141,7 +156,8 @@ namespace AdjustNamespace.Xaml
                 xmlns,
                 Controls,
                 RefFroms,
-                Classes
+                Classes,
+                TypeUsages
                 );
         }
     }

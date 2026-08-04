@@ -23,6 +23,17 @@ My others extensions lives [here](https://marketplace.visualstudio.com/publisher
 
 # Adjust namespaces Release Notes
 
+## 0.5.0
+
+- Added an automated test suite and fixed a lot of the errors it has found.
+- Fixed the XAML references which are written neither in a tag nor in an `{x:Type}` / `{x:Static}` markup extension: an attribute value, an attached property, a custom markup extension, `x:TypeArguments`.
+- Fixed the placement of the generated `using` clauses in the files which declare several namespaces.
+- Fixed the rewritten names which were resolved to a wrong type.
+- Fixed the moving of the types of a file which declares one and the same namespace in several ways.
+- The files which more than one project compiles are not adjusted anymore: there is no target namespace which suits all of them.
+- Multi target projects: every target framework of a file is taken into account now.
+- Added the documentation of the internals.
+
 ## 0.4.0
 
 - Improved usability around target namespace regexes.

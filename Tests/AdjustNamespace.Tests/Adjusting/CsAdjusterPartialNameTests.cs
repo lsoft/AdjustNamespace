@@ -1,4 +1,4 @@
-using AdjustNamespace.Tests.Infrastructure;
+﻿using AdjustNamespace.Tests.Infrastructure;
 using Xunit;
 using static AdjustNamespace.Tests.Infrastructure.AdjustRunner;
 
@@ -137,12 +137,11 @@ namespace Other
         /// <summary>
         /// The rewritten name is a relative one and is resolved from the namespace of the
         /// file it is written in. If that namespace contains the first part of the target
-        /// namespace (<c>Some.X</c> vs the target <c>X.Y</c>), the rewritten name points
-        /// to <c>Some.X.Y</c> and the file does not compile anymore; only a <c>global::</c>
-        /// prefix makes such a name unambiguous.
+        /// namespace (<c>Some.X</c> vs the target <c>X.Y</c>), the rewritten name would point
+        /// to <c>Some.X.Y</c>; only a <c>global::</c> prefix makes such a name unambiguous,
+        /// so it is added exactly in that case.
         /// </summary>
         [Fact]
-        [Trait("Category", "KnownBug")]
         public async Task A_rewritten_name_is_resolved_unambiguously()
         {
             using var solution = new TestSolution()

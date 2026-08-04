@@ -1,4 +1,4 @@
-using AdjustNamespace.Tests.Infrastructure;
+﻿using AdjustNamespace.Tests.Infrastructure;
 using Xunit;
 
 namespace AdjustNamespace.Tests.Xaml
@@ -18,7 +18,6 @@ namespace AdjustNamespace.Tests.Xaml
         /// without any markup extension around it.
         /// </summary>
         [Fact]
-        [Trait("Category", "KnownBug")]
         public void A_class_referenced_by_a_bare_attribute_value_is_moved()
         {
             var body =
@@ -39,7 +38,6 @@ namespace AdjustNamespace.Tests.Xaml
         /// the tag of another control.
         /// </summary>
         [Fact]
-        [Trait("Category", "KnownBug")]
         public void A_class_of_an_attached_property_is_moved()
         {
             var body =
@@ -60,7 +58,6 @@ namespace AdjustNamespace.Tests.Xaml
         /// of it may be named both with and without the <c>Extension</c> suffix.
         /// </summary>
         [Fact]
-        [Trait("Category", "KnownBug")]
         public void A_class_of_a_custom_markup_extension_is_moved()
         {
             var body =
@@ -81,7 +78,6 @@ namespace AdjustNamespace.Tests.Xaml
         /// <c>x:TypeArguments</c> attribute.
         /// </summary>
         [Fact]
-        [Trait("Category", "KnownBug")]
         public void A_class_referenced_by_x_TypeArguments_is_moved()
         {
             var body =

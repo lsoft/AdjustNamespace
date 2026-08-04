@@ -124,13 +124,12 @@ namespace AdjustNamespace.Adjusting
 
             var fixerContainer = new FixerContainer(_vss, _openFilesToEnableUndo);
 
-            var processedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+            var processedTypes = new Dictionary<INamedTypeSymbol, NamespaceTransition>(SymbolEqualityComparer.Default);
 
             //fix refs (adding a new using namespace clauses or edit fully qualified names)
             await FixReferencesAsync(
                 processedTypes,
                 subjectTrees,
-                ntc,
                 fixerContainer
                 );
 
@@ -144,7 +143,6 @@ namespace AdjustNamespace.Adjusting
 
             //TODO: switch to IFixer infrastructure, and put above fixerContainer.FixAllAsync() clause
             await FixReferenceInXamlFilesAsync(
-                ntc,
                 processedTypes
                 );
 
@@ -185,16 +183,14 @@ namespace AdjustNamespace.Adjusting
         /// Create the fixers for every reference to every type declared in the subject file.
         /// </summary>
         /// <param name="processedTypes">
-        /// (in/out) The types which have been moved. It is filled here and reused later
-        /// to fix the references in the xaml files.
+        /// (in/out) The types which have been moved, with the transition of each of them.
+        /// It is filled here and reused later to fix the references in the xaml files.
         /// </param>
         /// <param name="subjectTrees">The syntax trees of the subject file, one per project which compiles it.</param>
-        /// <param name="ntc">Namespace transitions of the subject file.</param>
         /// <param name="fixerContainer">(out) Container the created fixers are placed into.</param>
         private async Task FixReferencesAsync(
-            HashSet<INamedTypeSymbol> processedTypes,
+            Dictionary<INamedTypeSymbol, NamespaceTransition> processedTypes,
             List<SubjectTree> subjectTrees,
-            NamespaceTransitionContainer ntc,
             FixerContainer fixerContainer
             )
         {
@@ -237,12 +233,21 @@ namespace AdjustNamespace.Adjusting
                         continue;
                     }
 
-                    if (!ntc.TransitionDict.TryGetValue(symbolNamespace, out var targetNamespaceInfo))
+                    //the transition of the very declaration this type is written in and not
+                    //the transition of its namespace: one namespace may have several of them,
+                    //see NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf
+                    var transition = NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf(
+                        foundTypeSyntax,
+                        _targetNamespace
+                        );
+                    if (!transition.HasValue)
                     {
-                        //there is no transition for this namespace: the type is declared
-                        //outside of any namespace, for example. Nothing to move.
+                        //there is no transition for this type: it is declared outside of any
+                        //namespace, for example. Nothing to move.
                         continue;
                     }
+
+                    var targetNamespaceInfo = transition.Value;
 
                     if (symbolNamespace == targetNamespaceInfo.ModifiedName)
                     {
@@ -254,7 +259,7 @@ namespace AdjustNamespace.Adjusting
                     var refProcessor = new RefProcessor(_vss, fixerContainer, targetNamespaceInfo);
                     await refProcessor.ProcessRefsAsync(symbolInfo);
 
-                    processedTypes.Add(symbolInfo);
+                    processedTypes[symbolInfo] = targetNamespaceInfo;
                     _namespaceCenter.TypeRemoved(symbolInfo);
                     _namespaceCenter.TypeAdded(symbolInfo, targetNamespaceInfo.ModifiedName);
                 }
@@ -287,8 +292,7 @@ namespace AdjustNamespace.Adjusting
         /// in the editor) document is touched.
         /// </summary>
         private async System.Threading.Tasks.Task FixReferenceInXamlFilesAsync(
-            NamespaceTransitionContainer ntc,
-            HashSet<INamedTypeSymbol> processedTypes
+            Dictionary<INamedTypeSymbol, NamespaceTransition> processedTypes
             )
         {
             if (processedTypes is null)
@@ -309,7 +313,6 @@ namespace AdjustNamespace.Adjusting
 
                 var modifiedTestDocument = PerformChanges(
                     testDocument,
-                    ntc,
                     processedTypes
                     );
 
@@ -320,7 +323,6 @@ namespace AdjustNamespace.Adjusting
 
                     var modifiedRealDocument = PerformChanges(
                         realDocument,
-                        ntc,
                         processedTypes
                         );
 
@@ -335,26 +337,17 @@ namespace AdjustNamespace.Adjusting
         /// </summary>
         private XamlDocument PerformChanges(
             XamlDocument document,
-            NamespaceTransitionContainer ntc,
-            HashSet<INamedTypeSymbol> processedTypes
+            Dictionary<INamedTypeSymbol, NamespaceTransition> processedTypes
             )
         {
             var result = document;
 
-            foreach (var processedType in processedTypes)
+            foreach (var pair in processedTypes)
             {
-                var sourceNamespace = processedType.ContainingNamespace.ToDisplayString();
-
-                if (!ntc.TransitionDict.TryGetValue(sourceNamespace, out var targetNamespaceInfo))
-                {
-                    //no transition for this namespace, see FixReferencesAsync
-                    continue;
-                }
-
                 result = result.MoveObject(
-                    sourceNamespace,
-                    processedType.Name,
-                    targetNamespaceInfo.ModifiedName
+                    pair.Key.ContainingNamespace.ToDisplayString(),
+                    pair.Key.Name,
+                    pair.Value.ModifiedName
                     );
             }
 

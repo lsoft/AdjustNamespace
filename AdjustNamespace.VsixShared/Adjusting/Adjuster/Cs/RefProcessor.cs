@@ -182,6 +182,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
                 ProcessMemberAccessExpression(
                     location,
+                    semanticModel,
                     syntax,
                     symbol,
                     maesr
@@ -223,9 +224,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 return;
             }
 
+            var isGlobal = uqns.IsGlobal()
+                || IsGlobalPrefixRequired(semanticModel, uqns.SpanStart, _targetNamespaceInfo.ModifiedName);
+
             //replace QualifiedNameSyntax
             var mqns = uqns
-                .WithLeft(SyntaxFactory.ParseName((uqns.IsGlobal() ? "global::" : "") + _targetNamespaceInfo.ModifiedName))
+                .WithLeft(SyntaxFactory.ParseName((isGlobal ? "global::" : "") + _targetNamespaceInfo.ModifiedName))
                 .WithLeadingTrivia(uqns.GetLeadingTrivia())
                 .WithTrailingTrivia(uqns.GetTrailingTrivia())
                 ;
@@ -248,6 +252,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         /// </summary>
         private void ProcessMemberAccessExpression(
             ReferenceLocation location,
+            SemanticModel semanticModel,
             SyntaxNode syntax,
             ISymbol symbol,
             MemberAccessExpressionSyntax maes
@@ -262,7 +267,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 return;
             }
 
-            var isGlobal = maes.IsGlobal();
+            var isGlobal = maes.IsGlobal()
+                || IsGlobalPrefixRequired(semanticModel, maes.SpanStart, _targetNamespaceInfo.ModifiedName);
 
             var inss = GetChainOf(maes);
 
@@ -293,6 +299,51 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                         modifiedMaesr
                         )
                     );
+        }
+
+        /// <summary>
+        /// A name we write into the file is a relative one and is resolved from the namespace
+        /// that file is in: <c>X.Y.Class1</c> written inside <c>namespace Some.X</c> is
+        /// <c>Some.X.Y.Class1</c> and not <c>X.Y.Class1</c>. Such a name has to be prefixed
+        /// with <c>global::</c>, which is the only way to name the root namespace explicitly.
+        ///
+        /// The prefix is added only when it is really required: it is a noise in the code and
+        /// almost no one writes it by hand.
+        /// </summary>
+        /// <param name="semanticModel">Semantic model of the document the name is written in.</param>
+        /// <param name="position">Position the name is written at.</param>
+        /// <param name="targetNamespace">The namespace the name starts with.</param>
+        private static bool IsGlobalPrefixRequired(
+            SemanticModel semanticModel,
+            int position,
+            string targetNamespace
+            )
+        {
+            if (string.IsNullOrEmpty(targetNamespace))
+            {
+                return false;
+            }
+
+            var dotIndex = targetNamespace.IndexOf('.');
+            var firstPart = dotIndex >= 0
+                ? targetNamespace.Substring(0, dotIndex)
+                : targetNamespace
+                ;
+
+            //everything which is visible at that position under the name of the first part
+            //of the target namespace: anything except the root level namespace of that very
+            //name shadows it and makes the written name mean something else
+            foreach (var symbol in semanticModel.LookupNamespacesAndTypes(position, name: firstPart))
+            {
+                if (symbol is INamespaceSymbol ns && ns.ToDisplayString() == firstPart)
+                {
+                    continue;
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>

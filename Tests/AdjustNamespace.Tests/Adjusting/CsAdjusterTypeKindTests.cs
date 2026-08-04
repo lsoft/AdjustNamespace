@@ -1,4 +1,4 @@
-using AdjustNamespace.Tests.Infrastructure;
+﻿using AdjustNamespace.Tests.Infrastructure;
 using Xunit;
 using static AdjustNamespace.Tests.Infrastructure.AdjustRunner;
 
@@ -198,11 +198,11 @@ namespace X.Y
         /// The very same namespace may be declared in a file both as a nested declaration
         /// and as a flat one. Only the outermost part of a name is replaced with the target
         /// namespace, so <c>A.B</c> becomes <c>X.B</c> in the first case and <c>X</c> in the
-        /// second one: the file gets two contradicting transitions of one namespace and
-        /// the references are fixed with the wrong one of them.
+        /// second one: one namespace gets two different transitions, and a type is moved by
+        /// the transition of the declaration it is written in and not by the one of its
+        /// namespace name.
         /// </summary>
         [Fact]
-        [Trait("Category", "KnownBug")]
         public async Task The_contradicting_declarations_of_one_namespace_are_processed()
         {
             using var solution = new TestSolution()

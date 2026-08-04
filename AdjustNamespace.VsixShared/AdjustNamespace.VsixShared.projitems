@@ -95,6 +95,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlAttributeReference.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlClass.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlControl.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlTypeUsage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlDocument.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlEngine.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\OpenedXamlBodyProvider.cs" />

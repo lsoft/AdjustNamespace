@@ -210,14 +210,20 @@ namespace AdjustNamespace.Adjusting
                                 continue;
                             }
 
-                            if (!ntc.TransitionDict.TryGetValue(symbolNamespace, out var targetNamespaceInfo))
+                            //the transition of the very declaration this type is written in,
+                            //exactly as CsAdjuster does it
+                            var transition = NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf(
+                                foundType,
+                                targetNamespace!
+                                );
+                            if (!transition.HasValue)
                             {
-                                //there is no transition for this namespace: the type is declared
+                                //there is no transition for this type: it is declared
                                 //outside of any namespace, for example. It is not moved at all.
                                 continue;
                             }
 
-                            if (typesInSolutionPerNamespace.CheckForTypeExists(targetNamespaceInfo.ModifiedName, symbolInfo.Name))
+                            if (typesInSolutionPerNamespace.CheckForTypeExists(transition.Value.ModifiedName, symbolInfo.Name))
                             {
                                 throw new FileProcessException(
                                     $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'",

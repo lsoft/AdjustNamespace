@@ -297,9 +297,8 @@ namespace Other
         }
 
         /// <summary>
-        /// A type declared outside of any namespace has no entry in
-        /// <c>NamespaceTransitionContainer.TransitionDict</c>: it is simply left alone,
-        /// and the rest of the file is adjusted as usual.
+        /// A type declared outside of any namespace has no transition at all: it is simply
+        /// left alone, and the rest of the file is adjusted as usual.
         /// </summary>
         [Fact]
         public async Task A_type_in_the_global_namespace_does_not_break_the_adjusting()

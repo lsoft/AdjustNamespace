@@ -81,6 +81,7 @@ XAML files:
 - the `x:Class` attribute;
 - the tags which reference a moved class through an xmlns alias;
 - the `{x:Type}` and `{x:Static}` markup extensions;
+- the other places where a class is referenced through an xmlns alias: an attribute value (`TargetType="local:MyButton"`), an attached property (`local:Helper.IsEnabled="True"`), a custom markup extension (`{local:UpperCase}`) and `x:TypeArguments`;
 - the `xmlns:...="clr-namespace:..."` clauses: a clause for the target namespace is created when required and the clauses which became unused are removed.
 
 ## Undo

@@ -127,6 +127,10 @@ then for every file:
   1. `NamespaceTransitionContainer.GetNamespaceTransitionsFor` builds the transitions
      (`old namespace -> new namespace`) of the file, over all of its syntax trees;
   2. for every type declared in the file `RefProcessor` finds its references across the solution
+     (the type is moved by the transition of the namespace declaration it is written in, see
+     `NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf`: only the outermost part
+     of a written name is replaced, so `namespace A { namespace B { } }` and `namespace A.B { }`
+     in one file are two different transitions of the very same namespace `A.B`)
      (including the usages of its extension methods) and creates a fixer for each of them.
      A file which several projects compile produces a separate symbol per project and Roslyn
      cascades the search to all of them, so the same location is reported once per project:
@@ -146,8 +150,14 @@ saved once, no matter how many references it contains.
 | Fixer | What it does |
 | --- | --- |
 | `QualifiedNameFixer` | Rewrites the fully qualified names (`A.B.Class1`, `A.B.Class1.StaticMember`). |
-| `AddUsingFixer` | Adds the missing `using` clauses. |
+| `AddUsingFixer` | Adds the missing `using` clauses, always among the clauses of the compilation unit. |
 | `NamespaceFixer` | Rewrites the namespace declarations of the adjusted file. |
+
+A name we write into a file is resolved relatively to the namespace that file is in, so
+`X.Y.Class1` written inside `namespace Some.X` means `Some.X.Y.Class1`. `RefProcessor` asks the
+semantic model whether the first part of the target namespace is shadowed at that position and
+prefixes the name with `global::` if it is; the same reasoning keeps `AddUsingFixer` out of the
+namespace declarations, because a `using` clause written inside one is resolved that way too.
 
 `FixerContainer` groups the fixers by file (`FixerSet`). The order of the fixers inside a set
 matters: the qualified names are identified by their spans in the original document, so they
@@ -203,9 +213,16 @@ the only way to keep the user's formatting untouched.
   is a subject to change without touching it.
 - `XamlStructure` holds the interesting fragments of the body with their positions: the xaml
   language alias (`XamlX`), the clr-namespace declarations (`XamlXmlns`), the tags
-  (`XamlControl`), the markup extensions (`XamlAttributeReference`) and the `x:Class` attributes
-  (`XamlClass`). The fragments which may reference a moved class implement `IXamlPerformable`
-  and are applied in the backward order, so the earlier positions stay valid.
+  (`XamlControl`), the `{x:Type}` / `{x:Static}` markup extensions (`XamlAttributeReference`),
+  the `x:Class` attributes (`XamlClass`) and every other `alias:ClassName` pair
+  (`XamlTypeUsage`: an attribute value, an attached property, a custom markup extension,
+  `x:TypeArguments`). The fragments which may reference a moved class implement
+  `IXamlPerformable` and are applied in the backward order, so the earlier positions stay valid.
+- The `XamlTypeUsage` scan is a greedy one: it collects everything which looks like an
+  `alias:ClassName` pair and is not a part of a fragment recognized above. Such a pair is
+  rewritten only if its alias is a clr-namespace one which points to the namespace the class
+  is moved out of, so the pairs which reference nothing (`mc:Ignorable="d"`, a time in a text)
+  are simply skipped.
 
 ## Threading
 

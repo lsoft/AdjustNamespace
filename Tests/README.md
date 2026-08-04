@@ -25,7 +25,7 @@ The tests run without Visual Studio at all:
   (`SubjectFileCollector`, `NamespaceHelper.TryDetermineTargetNamespaceAsync`, the wizard) is
   still covered by the manual test only.
 
-Everything except the [known bugs](#known-bugs) is green. What is covered:
+Everything is green, see [known bugs](#known-bugs). What is covered:
 
 | Area | Tests |
 | --- | --- |
@@ -61,14 +61,17 @@ While such tests exist, a clean run is
 dotnet test Tests/AdjustNamespace.Tests/AdjustNamespace.Tests.csproj --filter "Category!=KnownBug"
 ```
 
-and the failures of the full run are the list of the errors to fix. Right now these are:
+and the failures of the full run are the list of the errors to fix.
 
-| Test | The error it describes |
+**Right now there is no such test: the whole suite is green.** The errors which have been
+described here and are fixed since then:
+
+| The error | How it is fixed |
 | --- | --- |
-| `CsAdjusterPartialNameTests.A_rewritten_name_is_resolved_unambiguously` | A rewritten name is a relative one: `X.Y.Class1` written inside the namespace `Some.X` resolves to `Some.X.Y.Class1` and does not compile. Only a `global::` prefix makes such a name unambiguous. |
-| `UsingPlacementTests.The_new_using_is_added_into_the_namespace_which_needs_it` | A new using clause is added behind the last using of the file, and the using clauses inside a namespace declaration are visible in that namespace only: a file with several namespaces gets the clause into the wrong one. |
-| `CsAdjusterTypeKindTests.The_contradicting_declarations_of_one_namespace_are_processed` | `namespace A { namespace B { } }` plus `namespace A.B { }` in one file produce two different transitions of `A.B`, and the references are fixed with the wrong one of them. |
-| `XamlReferenceKindTests.A_class_referenced_by_a_bare_attribute_value_is_moved` and three more of that file | A xaml class is referenced not only by a tag and by an `{x:Type}`/`{x:Static}` markup extension, but also by an attribute value (`TargetType="local:MyButton"`), by an attached property, by a custom markup extension and by `x:TypeArguments`. Such a reference is not moved and keeps pointing to the old namespace. |
+| A rewritten name is a relative one: `X.Y.Class1` written inside the namespace `Some.X` resolves to `Some.X.Y.Class1` and does not compile. | `RefProcessor.IsGlobalPrefixRequired` asks the semantic model whether the first part of the target namespace is shadowed at that position and prefixes the name with `global::` if it is. |
+| A new using clause is added behind the last using of the file, and the using clauses inside a namespace declaration are visible in that namespace only: a file with several namespaces gets the clause into the wrong one. | `AddUsingFixer` looks at the using clauses of the compilation unit only and writes the new one among them: such a clause is visible in every namespace of the file and its name is resolved from the root namespace. |
+| `namespace A { namespace B { } }` plus `namespace A.B { }` in one file produce two different transitions of `A.B`, and the references are fixed with the wrong one of them. | A type is moved by the transition of the declaration it is written in (`NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf`) and not by a lookup of its namespace name. |
+| A xaml class is referenced not only by a tag and by an `{x:Type}`/`{x:Static}` markup extension, but also by an attribute value (`TargetType="local:MyButton"`), by an attached property, by a custom markup extension and by `x:TypeArguments`. Such a reference is not moved and keeps pointing to the old namespace. | Everything which looks like an `alias:ClassName` pair and is not a part of an already recognized fragment becomes a `XamlTypeUsage`. A pair is rewritten only if its alias is a clr-namespace one which points to the namespace the class is moved out of, so the pairs which are no type references at all (`mc:Ignorable="d"`) cost nothing. |
 
 ### A note about the shared projects
 

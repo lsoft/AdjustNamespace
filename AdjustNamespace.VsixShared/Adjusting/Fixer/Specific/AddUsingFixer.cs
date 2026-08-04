@@ -82,10 +82,14 @@ namespace AdjustNamespace.Adjusting.Fixer
 
                 foreach (var symbolTargetNamespace in _symbolTargetNamespaces)
                 {
-                    var usingSyntaxes = syntaxRoot
-                        .DescendantNodes()
-                        .OfType<UsingDirectiveSyntax>()
-                        .ToList();
+                    //only the clauses of the file itself are looked at, and a new one is placed
+                    //among them: a clause which is written inside a namespace declaration is
+                    //visible in that namespace only (so it neither makes the new one redundant
+                    //nor is a place for it), and its name is resolved relatively to that
+                    //namespace (so `using X.Y;` inside `namespace Some.X` is not `X.Y` at all)
+                    var cus = (CompilationUnitSyntax)syntaxRoot;
+
+                    var usingSyntaxes = cus.Usings.ToList();
 
                     if (usingSyntaxes.Count > 0)
                     {
@@ -124,7 +128,6 @@ namespace AdjustNamespace.Adjusting.Fixer
                     else
                     {
                         //there are no using clauses in this file at all
-                        var cus = (CompilationUnitSyntax)syntaxRoot;
                         var modifiedcus = cus.AddUsingKeepingHeader(
                             SyntaxFactory.UsingDirective(
                                 SyntaxFactory.ParseName(

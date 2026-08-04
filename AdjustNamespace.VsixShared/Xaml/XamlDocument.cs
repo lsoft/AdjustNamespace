@@ -195,7 +195,84 @@ namespace AdjustNamespace.Xaml
             var refFroms = ReadRefFromAttributes(xPrefix, xaml, comments).ToList();
             var classes = ReadClasses(xPrefix, xaml, comments).ToList();
 
-            return new XamlStructure(xPrefix, xmlns, controls, refFroms, classes);
+            //everything which has been recognized already occupies its own piece of the body;
+            //the rest of the `alias:Name` pairs is scanned afterwards
+            var known = new List<IXamlPositioned>();
+            known.Add(xPrefix);
+            known.AddRange(xmlns);
+            known.AddRange(controls);
+            known.AddRange(refFroms);
+            known.AddRange(classes);
+
+            var typeUsages = ReadTypeUsages(xaml, comments, known).ToList();
+
+            return new XamlStructure(xPrefix, xmlns, controls, refFroms, classes, typeUsages);
+        }
+
+        /// <summary>
+        /// Find the <c>alias:ClassName</c> pairs which are not a part of anything recognized
+        /// above: an attribute value (<c>TargetType="local:MyButton"</c>), an attached property
+        /// (<c>attached:Helper.IsEnabled="True"</c>), a custom markup extension
+        /// (<c>{conv:UpperCase}</c>) or <c>x:TypeArguments</c>.
+        ///
+        /// Everything which looks like such a pair is collected here, including the pairs which
+        /// are no type references at all (<c>mc:Ignorable="d"</c>, a time in a text). They cost
+        /// nothing: a pair is rewritten only if its alias is a clr-namespace one which points to
+        /// the namespace the class is moved out of, see <see cref="XamlTypeUsage.Perform"/>.
+        /// </summary>
+        /// <param name="known">The fragments which are recognized already: the pairs inside of
+        /// them are described by those fragments and must not be rewritten a second time.</param>
+        private static IEnumerable<XamlTypeUsage> ReadTypeUsages(
+            string xaml,
+            List<(int Start, int End)> comments,
+            List<IXamlPositioned> known
+            )
+        {
+            var occupied = known
+                .Where(k => k.Length > 0)
+                .Select(k => (Start: k.Index, End: k.Index + k.Length))
+                .ToList();
+
+            //the whitespace around the `:` of an attribute is allowed by xml
+            var matches = Regex.Matches(xaml, @"([\w\d]+)\s*:\s*([\w\d]+)");
+            foreach (Match match in matches)
+            {
+                if (IsCommented(comments, match.Index))
+                {
+                    continue;
+                }
+
+                var start = match.Index;
+                var end = match.Index + match.Length;
+
+                if (occupied.Any(o => start < o.End && end > o.Start))
+                {
+                    continue;
+                }
+
+                yield return new XamlTypeUsage(
+                    start,
+                    match.Length,
+                    match.Groups[1].Value,
+                    match.Groups[2].Value,
+                    IsInsideMarkupExtension(xaml, start)
+                    );
+            }
+        }
+
+        /// <summary>
+        /// The given position is the very beginning of a markup extension (<c>{conv:UpperCase}</c>).
+        /// </summary>
+        private static bool IsInsideMarkupExtension(string xaml, int index)
+        {
+            var i = index - 1;
+
+            while (i >= 0 && char.IsWhiteSpace(xaml[i]))
+            {
+                i--;
+            }
+
+            return i >= 0 && xaml[i] == '{';
         }
 
         /// <summary>

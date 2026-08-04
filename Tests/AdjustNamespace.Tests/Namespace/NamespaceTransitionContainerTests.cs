@@ -145,7 +145,7 @@ namespace A.B
 
         /// <summary>
         /// A type declared outside of any namespace has no transition at all, so the callers
-        /// have to look <c>TransitionDict</c> up carefully. See also the CsAdjuster tests.
+        /// have to be prepared for it. See also the CsAdjuster tests.
         /// </summary>
         [Fact]
         public void A_file_without_any_namespace_produces_nothing()

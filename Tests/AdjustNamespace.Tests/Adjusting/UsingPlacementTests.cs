@@ -1,11 +1,11 @@
-using AdjustNamespace.Tests.Infrastructure;
+﻿using AdjustNamespace.Tests.Infrastructure;
 using Xunit;
 using static AdjustNamespace.Tests.Infrastructure.AdjustRunner;
 
 namespace AdjustNamespace.Tests.Adjusting
 {
     /// <summary>
-    /// A new using clause is inserted behind the using clauses which are in the file already
+    /// A new using clause is inserted behind the using clauses of the file itself
     /// (see <see cref="AdjustNamespace.Adjusting.Fixer.AddUsingFixer"/>), and the files are
     /// written by the users: the clauses may be placed inside a namespace declaration,
     /// inside a region or may be absent at all.
@@ -14,12 +14,11 @@ namespace AdjustNamespace.Tests.Adjusting
     {
         /// <summary>
         /// The using clauses inside a namespace declaration are visible in that namespace
-        /// only. A new clause added behind the last using of the file lands in the wrong
-        /// namespace when the file declares several of them.
+        /// only, so they are neither looked at nor written into: the new clause is placed
+        /// among the clauses of the file itself and is visible in every namespace of it.
         /// </summary>
         [Fact]
-        [Trait("Category", "KnownBug")]
-        public async Task The_new_using_is_added_into_the_namespace_which_needs_it()
+        public async Task The_new_using_is_visible_in_the_namespace_which_needs_it()
         {
             using var solution = new TestSolution()
                 .AddProject("MyApp")

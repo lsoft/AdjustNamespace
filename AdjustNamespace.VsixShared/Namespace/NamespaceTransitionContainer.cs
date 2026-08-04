@@ -75,7 +75,8 @@ namespace AdjustNamespace.Namespace
         /// A namespace may still have two different transitions
         /// (<c>namespace A { namespace B { } } </c> plus <c>namespace A.B { }</c> in one file
         /// give <c>A.B -> X.Y.B</c> and <c>A.B -> X.Y</c>), which the dictionary cannot express;
-        /// the first one wins there.
+        /// the first one wins there. Whoever needs to know where a certain type lands has to
+        /// ask <see cref="TryGetTransitionOfTheDeclarationOf"/> instead.
         /// </remarks>
         private static Dictionary<string, NamespaceTransition> BuildTransitionDict(
             List<NamespaceTransition> transitions
@@ -153,6 +154,58 @@ namespace AdjustNamespace.Namespace
             }
 
             return new NamespaceTransitionContainer(transitions);
+        }
+
+        /// <summary>
+        /// The transition of the namespace declaration the given node is written in.
+        ///
+        /// A namespace is not always moved as a whole: only the outermost part of a written
+        /// name is replaced with the target namespace, so <c>namespace A { namespace B { } }</c>
+        /// and <c>namespace A.B { }</c> in one file are two different transitions of one and
+        /// the same namespace <c>A.B</c> (<c>X.B</c> and <c>X</c> for the target <c>X</c>).
+        /// The declaration a type is written in is the only thing which tells where that type
+        /// lands, hence this method instead of a lookup by the namespace name.
+        /// </summary>
+        /// <param name="node">A node of the document (a type declaration, for example).</param>
+        /// <param name="root">Target namespace for that document.</param>
+        /// <returns>
+        /// <c>null</c> if the node is not inside a namespace declaration at all
+        /// or if that namespace is the target one already.
+        /// </returns>
+        public static NamespaceTransition? TryGetTransitionOfTheDeclarationOf(
+            SyntaxNode node,
+            string root
+            )
+        {
+            if (node is null)
+            {
+                throw new ArgumentNullException(nameof(node));
+            }
+
+            if (root is null)
+            {
+                throw new ArgumentNullException(nameof(root));
+            }
+
+            SyntaxNode? p = node;
+            while (p != null)
+            {
+                if (p is NamespaceDeclarationSyntax nds)
+                {
+                    return TryGetNamespaceTransitionInfo(nds, root);
+                }
+
+#if VS2022
+                if (p is FileScopedNamespaceDeclarationSyntax fsnds)
+                {
+                    return TryGetNamespaceTransitionInfo(fsnds, root);
+                }
+#endif
+
+                p = p.Parent;
+            }
+
+            return null;
         }
 
         private static List<NamespaceTransition> CollectTransitions(
