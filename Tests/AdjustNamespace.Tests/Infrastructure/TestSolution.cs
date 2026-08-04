@@ -332,6 +332,33 @@ namespace AdjustNamespace.Tests.Infrastructure
             return this;
         }
 
+        /// <summary>
+        /// Replace the content of a document which has been added already.
+        ///
+        /// This is how a generated file behaves: it is not touched by the adjusting itself
+        /// and is rewritten by the next build out of the sources the adjusting has changed,
+        /// so a test is able to state what the solution looks like after that build.
+        /// </summary>
+        /// <param name="projectName">Name of the project the document belongs to.</param>
+        /// <param name="relativeFilePath">Path of the file relative to the project folder.</param>
+        /// <param name="body">The new content of the file.</param>
+        public TestSolution ReplaceDocument(string projectName, string relativeFilePath, string body)
+        {
+            foreach (var documentId in _documents[PathOf(projectName, relativeFilePath)])
+            {
+                Apply(
+                    Workspace.CurrentSolution.WithDocumentText(
+                        documentId,
+                        SourceText.From(body)
+                        )
+                    );
+
+                _lastKnownTexts[documentId] = body;
+            }
+
+            return this;
+        }
+
         private void AddDocument(string filePath, string body, string[] projectNames)
         {
             foreach (var projectName in projectNames.SelectMany(ExpandTargets))

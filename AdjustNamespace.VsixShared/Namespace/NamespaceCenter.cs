@@ -237,6 +237,11 @@ namespace AdjustNamespace.Adjusting
         /// The type is a partial one declared in more than a single file.
         /// The repeated declarations inside one file do not count: such a file is
         /// adjusted at once.
+        ///
+        /// The generated files do not count either: the code behind of a xaml file is
+        /// regenerated out of the <c>x:Class</c> the adjusting has just changed, so it
+        /// follows the type into the target namespace instead of staying behind,
+        /// see <see cref="GeneratedCodeHelper"/>.
         /// </summary>
         private static bool IsDeclaredInSeveralFiles(ITypeSymbol type)
         {
@@ -244,6 +249,11 @@ namespace AdjustNamespace.Adjusting
 
             foreach (var reference in type.DeclaringSyntaxReferences)
             {
+                if (GeneratedCodeHelper.IsGeneratedFile(reference.SyntaxTree.FilePath))
+                {
+                    continue;
+                }
+
                 filePaths.Add(reference.SyntaxTree.FilePath);
             }
 

@@ -28,6 +28,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Helper\DocumentChangerHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\EmbeddedResourceHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\ExtensionPath.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Helper\GeneratedCodeHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\HashSetHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Helper\NameHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)InfoBar\InfoBarService.cs" />

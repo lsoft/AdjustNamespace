@@ -174,7 +174,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
             if (syntax.Parent is QualifiedNameSyntax qns)
             {
-                ProcessQualifiedName(location, semanticModel, qns);
+                ProcessQualifiedName(location, semanticModel, syntax, symbol.Name, qns);
             }
             else if (syntax.Parent is MemberAccessExpressionSyntax maes)
             {
@@ -192,6 +192,15 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             {
                 //i don't know why we are here
 
+                if (syntax is SimpleNameSyntax sns
+                    && sns.Identifier.ValueText == symbol.Name
+                    && TryFixShadowedReference(location, semanticModel, sns, symbol.Name)
+                    )
+                {
+                    //a using clause would not help here, the name has been qualified instead
+                    return;
+                }
+
                 //add a new using clause
                 _fixerContainer
                     .Fixer<AddUsingFixer>(location.Document.FilePath)
@@ -203,9 +212,16 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         /// Process a reference which is a part of a qualified name (<c>Some.Old.Namespace.Class1</c>).
         /// The namespace part of that name is replaced with the target namespace.
         /// </summary>
+        /// <param name="location">The reference location.</param>
+        /// <param name="semanticModel">Semantic model of the document the reference lives in.</param>
+        /// <param name="syntax">The node of the reference itself, i.e. the name of the moved type.</param>
+        /// <param name="typeName">The name of the moved type.</param>
+        /// <param name="qns">The qualified name the reference is a part of.</param>
         private void ProcessQualifiedName(
             ReferenceLocation location,
             SemanticModel semanticModel,
+            SyntaxNode syntax,
+            string typeName,
             QualifiedNameSyntax qns
             )
         {
@@ -216,6 +232,21 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 //we need to add using for this reference
                 //(because these is no guarantee that namespace in THIS file
                 //will be fixed, THIS file can be excluded from adjusting by the user)
+
+                if (ReferenceEquals(qns.Left, syntax)
+                    && syntax is SimpleNameSyntax sns
+                    && sns.Identifier.ValueText == typeName
+                    && TryFixShadowedReference(
+                        location,
+                        semanticModel,
+                        qns.ToUpperSyntax<QualifiedNameSyntax>()!,
+                        typeName
+                        )
+                    )
+                {
+                    //a using clause would not help here, the name has been qualified instead
+                    return;
+                }
 
                 _fixerContainer
                     .Fixer<AddUsingFixer>(location.Document.FilePath!)
@@ -276,7 +307,16 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 .SkipWhile(s => !ReferenceEquals(s, syntax))
                 .ToList();
 
-            if (inss.IndexOf(syntax) <= 0) //namespace clauses exists
+            var typeIndex = inss.IndexOf(syntax);
+
+            //`typeIndex == 0` means that no namespace is written in front of the type name
+            //(`Class1.StaticMember`): a new using clause is enough, unless the short name
+            //of the type is shadowed by the target namespace and does not resolve to it
+            //anymore, see IsShadowedByTargetNamespace.
+            //`typeIndex < 0` means that we do not understand this chain at all
+            if (typeIndex < 0
+                || (typeIndex == 0 && !IsShadowedByTargetNamespace(semanticModel, maes.SpanStart, symbol.Name))
+                )
             {
                 _fixerContainer
                     .Fixer<AddUsingFixer>(location.Document.FilePath!)
@@ -299,6 +339,119 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                         modifiedMaesr
                         )
                     );
+        }
+
+        /// <summary>
+        /// Qualify a reference which a using clause is unable to fix, see
+        /// <see cref="IsShadowedByTargetNamespace"/>: the target namespace is written
+        /// in front of the name instead of being imported.
+        /// </summary>
+        /// <param name="location">The reference location.</param>
+        /// <param name="semanticModel">Semantic model of the document the reference lives in.</param>
+        /// <param name="nodeToReplace">
+        /// The whole name to be qualified: the name of the type itself (<c>Class1</c>)
+        /// or the name it is the head of (<c>Class1.NestedClass2</c>).
+        /// </param>
+        /// <param name="typeName">The name of the moved type, i.e. the head of that name.</param>
+        /// <returns><c>false</c> if the name resolves to the type as it is and needs no qualification.</returns>
+        private bool TryFixShadowedReference(
+            ReferenceLocation location,
+            SemanticModel semanticModel,
+            SyntaxNode nodeToReplace,
+            string typeName
+            )
+        {
+            if (!IsShadowedByTargetNamespace(semanticModel, nodeToReplace.SpanStart, typeName))
+            {
+                return false;
+            }
+
+            //`global::Class1` is a name of the root namespace already: the target namespace
+            //is written after that alias and not in front of it
+            var isAliasQualified = nodeToReplace.Parent is AliasQualifiedNameSyntax;
+
+            var isGlobal = !isAliasQualified
+                && (nodeToReplace.IsGlobal()
+                    || IsGlobalPrefixRequired(semanticModel, nodeToReplace.SpanStart, _targetNamespaceInfo.ModifiedName)
+                    );
+
+            var modified = SyntaxFactory.ParseName(
+                (isGlobal ? "global::" : "") + _targetNamespaceInfo.ModifiedName + "." + nodeToReplace.ToString()
+                );
+
+            _fixerContainer
+                .Fixer<QualifiedNameFixer>(location.Document.FilePath!)
+                .AddSubject(
+                    new QualifiedNameFixer.QualifiedNameFixerArgument(
+                        nodeToReplace.Span,
+                        modified
+                        )
+                    );
+
+            return true;
+        }
+
+        /// <summary>
+        /// The target namespace ends with the name of the type which is being moved into it
+        /// (<c>Class1</c> goes into <c>A.B.Class1</c>), and that namespace is a member of one
+        /// of the namespaces enclosing the reference.
+        ///
+        /// The members of an enclosing namespace are looked up before the using clauses of
+        /// the file, so the short name of such a type resolves to the namespace and not to
+        /// the type anymore: no using clause is able to fix such a reference (CS0118) and
+        /// it has to be qualified instead.
+        /// </summary>
+        /// <param name="semanticModel">Semantic model of the document the reference lives in.</param>
+        /// <param name="position">Position the name is written at.</param>
+        /// <param name="typeName">The short name of the moved type.</param>
+        private bool IsShadowedByTargetNamespace(
+            SemanticModel semanticModel,
+            int position,
+            string typeName
+            )
+        {
+            var targetNamespace = _targetNamespaceInfo.ModifiedName;
+
+            if (string.IsNullOrEmpty(targetNamespace) || string.IsNullOrEmpty(typeName))
+            {
+                return false;
+            }
+
+            var enclosingSymbol = semanticModel.GetEnclosingSymbol(position);
+
+            var @namespace = enclosingSymbol as INamespaceSymbol
+                ?? enclosingSymbol?.ContainingNamespace
+                ;
+
+            //every namespace the reference is written in, from the innermost one to the global
+            //one: `namespace A.B { }` declares the scope of `A` and the scope of `A.B`
+            while (true)
+            {
+                var scope = @namespace == null || @namespace.IsGlobalNamespace
+                    ? string.Empty
+                    : @namespace.ToDisplayString()
+                    ;
+
+                //the namespace this scope will contain under the name of the type
+                var candidate = scope.Length == 0
+                    ? typeName
+                    : scope + "." + typeName
+                    ;
+
+                if (targetNamespace == candidate
+                    || targetNamespace.StartsWith(candidate + ".", StringComparison.Ordinal)
+                    )
+                {
+                    return true;
+                }
+
+                if (@namespace == null || @namespace.IsGlobalNamespace)
+                {
+                    return false;
+                }
+
+                @namespace = @namespace.ContainingNamespace;
+            }
         }
 
         /// <summary>

@@ -274,12 +274,33 @@ namespace AdjustNamespace.Helper
                     return true;
                 }
 
+                //a partial type of the file which is being moved: the generated part of it
+                //(the code behind of a xaml file) is regenerated out of the sources we are
+                //adjusting right now and follows the type into the target namespace,
+                //so it does not keep this namespace alive
+                var isDeclaredInTheFile = false;
                 foreach (var reference in type.DeclaringSyntaxReferences)
                 {
-                    if (!string.Equals(reference.SyntaxTree.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(reference.SyntaxTree.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
                     {
-                        return true;
+                        isDeclaredInTheFile = true;
+                        break;
                     }
+                }
+
+                foreach (var reference in type.DeclaringSyntaxReferences)
+                {
+                    if (string.Equals(reference.SyntaxTree.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (isDeclaredInTheFile && GeneratedCodeHelper.IsGeneratedFile(reference.SyntaxTree.FilePath))
+                    {
+                        continue;
+                    }
+
+                    return true;
                 }
             }
 
