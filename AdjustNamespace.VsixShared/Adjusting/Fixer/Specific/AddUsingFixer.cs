@@ -98,7 +98,8 @@ namespace AdjustNamespace.Adjusting.Fixer
                         if (usingSyntaxes.Any(s =>
                             s.Alias == null
                             && s.StaticKeyword.IsKind(SyntaxKind.None)
-                            && s.Name.ToString() == symbolTargetNamespace
+                            //Name is nullable since Roslyn 5 (`using unsafe int*;` has no name)
+                            && s.Name?.ToString() == symbolTargetNamespace
                             ))
                         {
                             //that using already exists

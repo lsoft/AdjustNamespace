@@ -79,7 +79,8 @@ namespace AdjustNamespace.Adjusting
 
             foreach (var n in namespacesToCheck)
             {
-                var nname = NormalizeUsingName(n.Name.ToString());
+                //Name is nullable since Roslyn 5 (`using unsafe int*;` has no name)
+                var nname = NormalizeUsingName(n.Name?.ToString() ?? string.Empty);
 
                 if (!_namespacesToRemove.Contains(nname) && !IsGoneForTheseProjects(nname, compilations))
                 {

@@ -61,6 +61,12 @@ Notes:
 - The whole wizard, `SubjectFileCollector` and `NamespaceHelper.TryDetermineTargetNamespaceAsync`
   need the real Visual Studio (DTE, the solution tree) and are covered by the manual procedure
   only, see [Tests/README.md](Tests/README.md).
+- The test project references a **newer Roslyn than `AdjustNamespace.2022`** (only that compiler
+  understands the C# unions, see the note in [Tests/README.md](Tests/README.md)), so the code of
+  `AdjustNamespace.VsixShared` has to compile against both versions: do not use an API which
+  exists in one of them only. `Microsoft.VisualStudio.LanguageServices` has no release for that
+  Roslyn, hence the binding redirects and the explicit MEF composition in `TestSolution`; the
+  `NU1608` warnings about it are expected.
 
 ## Line endings
 

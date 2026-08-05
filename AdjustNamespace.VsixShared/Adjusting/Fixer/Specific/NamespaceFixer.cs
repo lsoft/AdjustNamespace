@@ -61,7 +61,8 @@ namespace AdjustNamespace.Adjusting.Fixer.Specific
                 .Any(s =>
                     s.Alias == null
                     && s.StaticKeyword.IsKind(SyntaxKind.None)
-                    && s.Name.ToString() == namespaceName
+                    //Name is nullable since Roslyn 5 (`using unsafe int*;` has no name)
+                    && s.Name?.ToString() == namespaceName
                     );
         }
 

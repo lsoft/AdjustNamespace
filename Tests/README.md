@@ -34,6 +34,7 @@ Everything is green, see [known bugs](#known-bugs). What is covered:
 | The member access expressions | `Adjusting\CsAdjusterMemberAccessTests` (a static member of a generic, of a nested and of a static class) |
 | The using clauses | `Adjusting\UsingPlacementTests` (a file without any using, a header, a region, a `global using`), `Adjusting\CleanupTests` (when an old using has to disappear and when it must not) |
 | The kinds of the declarations | `Adjusting\CsAdjusterTypeKindTests` (a record, a struct, a static and a generic class, the contradicting namespace declarations) |
+| The unions | `Adjusting\CsAdjusterUnionTests` (the union itself, its case types — a bare, a qualified, a `global::` qualified, a generic and a nullable one — a generic, a nested and a partial union, a union as a case of another union, a static member of a union, the conflict check), see [A note about the unions](#a-note-about-the-unions) |
 | The xaml files | `Xaml\XamlDocumentTests` (parsing and moving), `XamlReferenceKindTests` (the references outside of a tag and of a markup extension), `XamlFileWritingTests` (the encoding and the line endings of the written file), `Adjusting\XamlAdjusterTests` (the `x:Class` of the document itself), `Adjusting\GeneratedCodeBehindTests` (the generated part of a xaml class does not keep its old namespace alive) |
 | The shadowed names | `Adjusting\CsAdjusterNamespaceNameCollisionTests` (the target namespace ends with the name of the moved type, so a using clause is not enough and the reference is qualified) |
 | The shared projects | `Adjusting\SharedProjectTests` (one file compiled by several projects: the ambiguous target namespace of a C# and of a xaml file, the references and the using clauses of every project, the file list of the solution, a namespace which several projects fill) |
@@ -114,6 +115,31 @@ adjusted as usual (`A_file_of_a_single_target_framework_is_adjusted`).
 The combination of both kinds is covered as well: a shared project referenced by a single multi
 target project is adjusted (one project of the solution), and a shared project referenced by a
 multi target project plus anything else is not.
+
+### A note about the unions
+
+The [unions](https://github.com/dotnet/csharplang/blob/main/proposals/unions.md) of C#
+(`public union Pet(Cat, Dog);`) need a compiler which understands them, so
+`AdjustNamespace.Tests` references a **newer Roslyn than `AdjustNamespace.2022` does**
+(see the comments in the `.csproj`): the extension takes Roslyn from the Visual Studio it runs
+in and the test project brings its own. The consequence is that the code of
+`AdjustNamespace.VsixShared` has to compile against **both** of them — do not use an API which
+only one of these versions has (`SyntaxKind.UnionDeclaration`, for example, does not exist in
+the older one and is `[Experimental]` in the newer one).
+
+A test which declares a union asks `TestSolution.WithUnionSupport()` before it adds the projects.
+That switches the projects to the preview features of the language and gives every one of them
+the runtime types a union is lowered to (`IUnion`, `UnionAttribute`; `IsExternalInit` comes with
+them, because a case type is usually a positional record). These types belong to
+`System.Runtime.CompilerServices`, which is a special namespace for the extension, so the file
+of them is never adjusted.
+
+For the syntax tree a union is a `StructDeclarationSyntax` of the kind `UnionDeclaration`, i.e.
+an ordinary `TypeDeclarationSyntax`: everything which enumerates the declarations of a file sees
+it without a change. What is new is the **case list**: it is a `ParameterListSyntax` whose
+parameters consist of a type and have no name at all, and this is the only place where the span
+of a type reference is the span of a whole parameter. `RefProcessor` descends from such
+a parameter to its type, exactly as it does for a type constraint or for a base type.
 
 ## Adding a test
 

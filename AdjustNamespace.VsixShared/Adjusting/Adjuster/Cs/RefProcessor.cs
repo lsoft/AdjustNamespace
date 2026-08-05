@@ -159,6 +159,17 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             {
                 syntax = args.Expression;
             }
+            //a case of a union (`union Pet(Cat, Dog);`) is a parameter which consists of
+            //its type only, so the span of the reference is the span of the whole parameter
+            //and FindNode stops at it. An ordinary parameter has a name behind its type and
+            //is never the closest node of such a span.
+            if (syntax is ParameterSyntax ps
+                && ps.Type != null
+                && ps.Identifier.IsKind(SyntaxKind.None)
+                )
+            {
+                syntax = ps.Type;
+            }
 
             var semanticModel = await document.GetSemanticModelAsync();
             if (semanticModel == null)

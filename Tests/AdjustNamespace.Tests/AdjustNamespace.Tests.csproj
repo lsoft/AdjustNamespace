@@ -22,8 +22,19 @@
     <!-- the shared project brings its own file list, so the default globbing is off -->
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <IsPackable>false</IsPackable>
+    <!--
+      Microsoft.VisualStudio.LanguageServices is built against an older Roslyn than the one
+      resolved here (see the package references below), and WorkspaceHelper reflects into it,
+      so the assembly of it has to be bound to the Roslyn we really load.
+    -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <!-- the conflicting StreamJsonRpc/Microsoft.VisualStudio.* versions are expected and pre-existing -->
-    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+    <!--
+      NU1608: Microsoft.VisualStudio.LanguageServices pins Roslyn to its own version and we
+      resolve a newer one on purpose, see the package references below.
+    -->
+    <NoWarn>$(NoWarn);MSB3277;NU1608</NoWarn>
   </PropertyGroup>
 
   <Import Project="..\..\AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems" Label="Shared" />
@@ -52,11 +63,17 @@
     <!-- the same versions as in AdjustNamespace.2022 -->
     <PackageReference Include="Community.VisualStudio.Toolkit.17" Version="17.0.486" />
     <PackageReference Include="Microsoft.Bcl.HashCode" Version="1.1.1" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="4.4.0" />
+    <!--
+      Newer than the versions of AdjustNamespace.2022: the extension takes Roslyn from the
+      Visual Studio it runs in, and only this compiler understands the unions of C# 15
+      (see Adjusting\CsAdjusterUnionTests). Microsoft.VisualStudio.LanguageServices has no 5.x
+      release yet, so it stays at its own latest version and binds to the Roslyn below.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.6.0" />
     <!-- required by AdhocWorkspace to know the C# language; comes from VS itself in the real life -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.4.0" />
-    <PackageReference Include="Microsoft.VisualStudio.LanguageServices" Version="4.4.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" />
+    <PackageReference Include="Microsoft.VisualStudio.LanguageServices" Version="4.14.0" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.39" />
 
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

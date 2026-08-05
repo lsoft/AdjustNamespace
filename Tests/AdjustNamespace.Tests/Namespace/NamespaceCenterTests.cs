@@ -159,7 +159,7 @@ namespace AdjustNamespace.Tests.Namespace
 
             return namespaceCenter
                 .GetRemovedNamespaces(usingSyntaxes)
-                .ConvertAll(n => ((UsingDirectiveSyntax)n).Name.ToString())
+                .ConvertAll(n => ((UsingDirectiveSyntax)n).Name!.ToString())
                 ;
         }
     }

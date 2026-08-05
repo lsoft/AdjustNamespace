@@ -32,6 +32,7 @@ My others extensions lives [here](https://marketplace.visualstudio.com/publisher
 - Fixed the moving of the types of a file which declares one and the same namespace in several ways.
 - The files which more than one project compiles are not adjusted anymore: there is no target namespace which suits all of them.
 - Multi target projects: every target framework of a file is taken into account now.
+- Added the support of the C# unions (`public union Pet(Cat, Dog);`): a case type which is moved into another namespace was silently left behind and the union stopped compiling.
 - Added the documentation of the internals.
 
 ## 0.4.0

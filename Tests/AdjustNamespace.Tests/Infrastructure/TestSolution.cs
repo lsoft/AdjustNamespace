@@ -29,6 +29,25 @@ namespace AdjustNamespace.Tests.Infrastructure
                 MetadataReference.CreateFromFile(typeof(System.Collections.Generic.List<>).Assembly.Location),
             };
 
+        /// <summary>
+        /// The MEF composition an <see cref="AdhocWorkspace"/> lives in.
+        ///
+        /// The default one of Roslyn scans everything which looks like a workspace assembly
+        /// next to the test dll, and the output folder also contains the older
+        /// <c>Microsoft.CodeAnalysis.*</c> assemblies of Microsoft.VisualStudio.LanguageServices
+        /// (which has no release for the Roslyn we need, see the .csproj), so it fails to load
+        /// the types of them. Only the two assemblies a C# workspace really needs are composed
+        /// here, and both of them are the ones we reference.
+        /// </summary>
+        private static readonly Microsoft.CodeAnalysis.Host.HostServices _hostServices =
+            Microsoft.CodeAnalysis.Host.Mef.MefHostServices.Create(
+                new[]
+                {
+                    typeof(Workspace).Assembly,
+                    typeof(Microsoft.CodeAnalysis.CSharp.Formatting.CSharpFormattingOptions).Assembly,
+                }
+                );
+
         private readonly Dictionary<string, ProjectId> _projects = new();
 
         /// <summary>
@@ -60,6 +79,12 @@ namespace AdjustNamespace.Tests.Infrastructure
         /// of a multi target project.
         /// </summary>
         private readonly Dictionary<string, string> _folders = new();
+
+        /// <summary>
+        /// The projects of this solution understand the <c>union</c> declarations,
+        /// see <see cref="WithUnionSupport"/>.
+        /// </summary>
+        private bool _unionSupport;
 
         /// <summary>
         /// The workspace the solution lives in.
@@ -100,12 +125,63 @@ namespace AdjustNamespace.Tests.Infrastructure
                 );
             Directory.CreateDirectory(SolutionFolder);
 
-            Workspace = new AdhocWorkspace();
+            Workspace = new AdhocWorkspace(_hostServices);
             Settings = new AdjustNamespaceSettings2(
                 SolutionFolder,
                 new AdjustNamespaceSettings()
                 );
         }
+
+        /// <summary>
+        /// Compile the projects of this solution with the preview features of the language
+        /// and give them the runtime types a <c>union</c> declaration needs,
+        /// see <see cref="UnionSupportBody"/>.
+        ///
+        /// It has to be called before the projects are added: the parse options of a project
+        /// are a part of it.
+        /// </summary>
+        public TestSolution WithUnionSupport()
+        {
+            _unionSupport = true;
+
+            return this;
+        }
+
+        /// <summary>
+        /// The types a union declaration is lowered to. They are a part of the framework
+        /// .NET 11 ships and do not exist in the reference assemblies of net48 this solution
+        /// is compiled against, so they are declared as a source file of every project,
+        /// exactly as a project which targets an older framework has to do it.
+        ///
+        /// <c>IsExternalInit</c> is here for the same reason: a case type of a union is
+        /// usually a positional record.
+        ///
+        /// <c>System.*</c> is a special namespace for the extension
+        /// (<c>NamespaceHelper.IsSpecialNamespace</c>), so this file is never adjusted.
+        /// </summary>
+        public const string UnionSupportBody =
+@"namespace System.Runtime.CompilerServices
+{
+    public interface IUnion
+    {
+        object Value { get; }
+    }
+
+    [AttributeUsage(AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
+    public sealed class UnionAttribute : Attribute
+    {
+    }
+
+    public static class IsExternalInit
+    {
+    }
+}
+";
+
+        /// <summary>
+        /// The name of the file <see cref="WithUnionSupport"/> adds to every project.
+        /// </summary>
+        public const string UnionSupportFileName = "UnionSupport.cs";
 
         /// <summary>
         /// Exclude the given folders from the namespace chain, as the user does it
@@ -134,7 +210,23 @@ namespace AdjustNamespace.Tests.Infrastructure
 
             AddProject(name, Path.Combine(SolutionFolder, name, name + ".csproj"));
 
+            AddUnionSupportTo(name);
+
             return this;
+        }
+
+        /// <summary>
+        /// Give the project the runtime types a union declaration needs,
+        /// if <see cref="WithUnionSupport"/> has been asked for.
+        /// </summary>
+        private void AddUnionSupportTo(string projectName)
+        {
+            if (!_unionSupport)
+            {
+                return;
+            }
+
+            AddDocument(projectName, UnionSupportFileName, UnionSupportBody);
         }
 
         /// <summary>
@@ -185,6 +277,8 @@ namespace AdjustNamespace.Tests.Infrastructure
                     );
             }
 
+            AddUnionSupportTo(name);
+
             return this;
         }
 
@@ -215,6 +309,13 @@ namespace AdjustNamespace.Tests.Infrastructure
             )
         {
             var projectId = ProjectId.CreateNewId(name);
+
+            if (_unionSupport)
+            {
+                //the unions are a preview feature of the language, see WithUnionSupport
+                parseOptions = (parseOptions ?? new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions())
+                    .WithLanguageVersion(Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview);
+            }
 
             var projectInfo = ProjectInfo
                 .Create(
