@@ -1,5 +1,7 @@
-﻿using AdjustNamespace.Helper;
+﻿using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Namespace;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace AdjustNamespace.Adjusting.Adjuster
@@ -7,14 +9,15 @@ namespace AdjustNamespace.Adjusting.Adjuster
     /// <summary>
     /// Factory which creates a suitable <see cref="IAdjuster"/> for the given file:
     /// <see cref="XamlAdjuster"/> for a xaml file and <see cref="CsAdjuster"/> for a C# file.
-    /// It also determines the target namespace for that file and filters out the files
-    /// we are unable to process (a file outside of its project folder, a file of a project
-    /// without Roslyn support etc.).
+    ///
+    /// It decides nothing by itself: <see cref="AdjustPlanner"/> says whether the file is
+    /// a subject to change and what has to happen with it, and this factory builds the
+    /// adjuster which performs exactly that.
     /// </summary>
     public class AdjusterFactory
     {
-        private readonly VsServices _vss;
-        private readonly NamespaceReplaceRegex _replaceRegex;
+        private readonly AdjustContext _context;
+        private readonly AdjustPlanner _planner;
         private readonly bool _openFilesToEnableUndo;
         private readonly NamespaceCenter _namespaceCenter;
 
@@ -28,34 +31,36 @@ namespace AdjustNamespace.Adjusting.Adjuster
         /// Create a factory. Performs an expensive scan of the solution for xaml files,
         /// so it is intended to be created once per adjusting session.
         /// </summary>
-        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="context">Everything the adjusting session works with.</param>
         /// <param name="replaceRegex">User defined regex which additionally modifies the target namespace.</param>
         /// <param name="openFilesToEnableUndo">Open the changed files in the editor (this allows the user to undo the changes).</param>
         /// <param name="namespaceCenter">Namespace state container shared across the whole adjusting session.</param>
         public static async Task<AdjusterFactory> CreateAsync(
-            VsServices vss,
+            AdjustContext context,
             NamespaceReplaceRegex replaceRegex,
             bool openFilesToEnableUndo,
             NamespaceCenter namespaceCenter
             )
         {
-            if (replaceRegex is null)
+            if (context is null)
             {
-                throw new ArgumentNullException(nameof(replaceRegex));
-            }
-
-            if (namespaceCenter is null)
-            {
-                throw new ArgumentNullException(nameof(namespaceCenter));
+                throw new ArgumentNullException(nameof(context));
             }
 
             //get all xaml files in current solution
-            var filePaths = await SolutionHelper.GetAllFilesFromAsync();
-            var xamlFilePaths = filePaths.FindAll(fp => fp.EndsWith(".xaml"));
+            var filePaths = await context.Solution.GetAllFilePathsAsync();
+            var xamlFilePaths = new List<string>();
+            foreach (var filePath in filePaths)
+            {
+                if (filePath.EndsWith(".xaml"))
+                {
+                    xamlFilePaths.Add(filePath);
+                }
+            }
 
             return new AdjusterFactory(
-                vss,
-                replaceRegex,
+                context,
+                new AdjustPlanner(context, replaceRegex),
                 openFilesToEnableUndo,
                 namespaceCenter,
                 xamlFilePaths
@@ -64,18 +69,13 @@ namespace AdjustNamespace.Adjusting.Adjuster
         }
 
         private AdjusterFactory(
-            VsServices vss,
-            NamespaceReplaceRegex replaceRegex,
+            AdjustContext context,
+            AdjustPlanner planner,
             bool openFilesToEnableUndo,
             NamespaceCenter namespaceCenter,
             List<string> xamlFilePaths
             )
         {
-            if (replaceRegex is null)
-            {
-                throw new ArgumentNullException(nameof(replaceRegex));
-            }
-
             if (namespaceCenter is null)
             {
                 throw new ArgumentNullException(nameof(namespaceCenter));
@@ -86,8 +86,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 throw new ArgumentNullException(nameof(xamlFilePaths));
             }
 
-            _vss = vss;
-            _replaceRegex = replaceRegex;
+            _context = context;
+            _planner = planner;
             _openFilesToEnableUndo = openFilesToEnableUndo;
             _namespaceCenter = namespaceCenter;
             _xamlFilePaths = xamlFilePaths;
@@ -97,12 +97,14 @@ namespace AdjustNamespace.Adjusting.Adjuster
         /// Create an adjuster for the given file.
         /// </summary>
         /// <param name="subjectFilePath">Full path to the file to adjust.</param>
+        /// <param name="cancellationToken">Cancellation of the session.</param>
         /// <returns>
-        /// An adjuster, or <c>null</c> if the target namespace cannot be determined
-        /// or the file cannot be processed at all.
+        /// An adjuster, or <c>null</c> if the file is no subject to change,
+        /// see <see cref="AdjustPlanner.TryPlanAsync(string, CancellationToken)"/>.
         /// </returns>
         public async Task<IAdjuster?> CreateAsync(
-            string subjectFilePath
+            string subjectFilePath,
+            CancellationToken cancellationToken = default
             )
         {
             if (subjectFilePath is null)
@@ -110,55 +112,38 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 throw new ArgumentNullException(nameof(subjectFilePath));
             }
 
-            var pii = await SolutionHelper.TryGetProjectItemAsync(subjectFilePath);
-            if (!pii.HasValue)
+            var plan = await _planner.TryPlanAsync(subjectFilePath, cancellationToken);
+            if (!plan.HasValue)
             {
                 return null;
             }
 
-            var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
-                pii.Value.Project,
-                _vss,
-                _replaceRegex,
-                subjectFilePath
+            return Create(plan.Value);
+        }
+
+        /// <summary>
+        /// The adjuster which performs the given plan.
+        /// </summary>
+        public IAdjuster Create(
+            AdjustPlanItem plan
+            )
+        {
+            if (plan.IsXaml)
+            {
+                return new XamlAdjuster(
+                    _openFilesToEnableUndo,
+                    plan
+                    );
+            }
+
+            return new CsAdjuster(
+                _context.Workspace,
+                _context.DocumentOpener,
+                _openFilesToEnableUndo,
+                _namespaceCenter,
+                plan,
+                _xamlFilePaths
                 );
-            if (string.IsNullOrEmpty(targetNamespace))
-            {
-                return null;
-            }
-
-            if (subjectFilePath.EndsWith(".xaml"))
-            {
-                //it's a xaml
-
-                var xamlAdjuster = new XamlAdjuster(
-                    _vss,
-                    _openFilesToEnableUndo,
-                    subjectFilePath,
-                    targetNamespace!
-                    );
-                return xamlAdjuster;
-            }
-            else
-            {
-                //we can do nothing with not a C# documents
-                var subjectDocument = _vss.Workspace.GetDocument(subjectFilePath);
-                if (!subjectDocument.IsDocumentInScope())
-                {
-                    return null;
-                }
-
-                var csAdjuster = new CsAdjuster(
-                    _vss,
-                    _openFilesToEnableUndo,
-                    _namespaceCenter,
-                    subjectFilePath,
-                    targetNamespace!,
-                    _xamlFilePaths
-                    );
-
-                return csAdjuster;
-            }
         }
     }
 }

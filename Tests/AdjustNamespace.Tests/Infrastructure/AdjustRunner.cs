@@ -1,12 +1,23 @@
 using AdjustNamespace.Adjusting;
+using AdjustNamespace.Adjusting.Adjuster;
+using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Namespace;
+using AdjustNamespace.VisualStudio;
 using System.Linq;
 
 namespace AdjustNamespace.Tests.Infrastructure
 {
     /// <summary>
-    /// The steps the wizard performs over a solution, without the wizard itself:
-    /// the adjusting of a file (<see cref="CsAdjuster"/>) and the final cleanup
-    /// (<see cref="Cleanup"/>), see <c>PerformingViewModel</c>.
+    /// The steps of an adjusting session, driven one by one: the decision what to do with
+    /// a file (<see cref="AdjustPlanner"/>), the adjusting of it (<see cref="CsAdjuster"/>)
+    /// and the final cleanup (<see cref="Cleanup"/>).
+    ///
+    /// The target namespace is given by the test and is not derived from the folders of the
+    /// file, so the part of the planner which needs the solution tree is not involved here;
+    /// that part is covered by <c>TargetNamespaceCalculatorTests</c>. A session which decides
+    /// everything by itself, exactly as the wizard starts it, is
+    /// <see cref="AdjustNamespace.Adjusting.Session.AdjustSession"/> and is driven by
+    /// <c>AdjustSessionTests</c>.
     /// </summary>
     public static class AdjustRunner
     {
@@ -51,12 +62,24 @@ namespace AdjustNamespace.Tests.Infrastructure
             params string[] xamlFilePaths
             )
         {
+            var plan = await AdjustPlanner.TryPlanAsync(
+                solution.Workspace,
+                solution.PathOf(projectName, relativeFilePath),
+                targetNamespace
+                );
+            if (!plan.HasValue)
+            {
+                //the file is no subject to change at all, and the wizard creates
+                //no adjuster for it
+                return;
+            }
+
             var adjuster = new CsAdjuster(
-                solution.Services,
+                solution.Workspace,
+                new NullDocumentOpener(),
                 false,
                 namespaceCenter,
-                solution.PathOf(projectName, relativeFilePath),
-                targetNamespace,
+                plan.Value,
                 xamlFilePaths.ToList()
                 );
 
@@ -94,7 +117,7 @@ namespace AdjustNamespace.Tests.Infrastructure
             NamespaceCenter namespaceCenter
             )
         {
-            var cleanup = new Cleanup(solution.Services, namespaceCenter);
+            var cleanup = new Cleanup(solution.Workspace, namespaceCenter);
 
             foreach (var documentFilePath in solution.AllDocumentPaths())
             {

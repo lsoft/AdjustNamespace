@@ -1,4 +1,4 @@
-﻿using AdjustNamespace.Helper;
+﻿using AdjustNamespace.VisualStudio;
 using AdjustNamespace.Window;
 using EnvDTE;
 using Microsoft.VisualStudio.Shell;
@@ -99,11 +99,13 @@ namespace AdjustNamespace.Command
                 //this is possible if you click Adjust on xaml file (with cs behind)
                 var filePaths = new HashSet<string>();
 
-                var vss = await VsServices.CreateAsync(ServiceProvider);
+                var context = await AdjustContext.CreateAsync(ServiceProvider);
+
+                var dte = await ServiceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as EnvDTE80.DTE2;
 
                 //this command is bound to the solution explorer context menu only,
                 //so there is nothing to do if the command has been invoked from elsewhere
-                if (vss.Dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
+                if (dte != null && dte.ActiveWindow.Type == vsWindowType.vsWindowTypeSolutionExplorer)
                 {
                     var sew = await VS.Windows.GetSolutionExplorerWindowAsync();
                     if (sew != null)
@@ -124,7 +126,7 @@ namespace AdjustNamespace.Command
 
                 if (filePaths.Count > 0)
                 {
-                    var window = AdjustNamespaceWindow.Create(vss, filePaths);
+                    var window = AdjustNamespaceWindow.Create(context, filePaths);
                     window.ShowModal();
                 }
             }

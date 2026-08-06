@@ -197,8 +197,8 @@ namespace Other
         }
 
         /// <summary>
-        /// Every reference of a file is scheduled in a single
-        /// <see cref="AdjustNamespace.Adjusting.Fixer.QualifiedNameFixer"/> and all of them
+        /// Every reference of a file is scheduled as a separate
+        /// <see cref="AdjustNamespace.Adjusting.Edit.ReplaceTextEdit"/> and all of them
         /// are applied at once, so a file with several references has to be fixed completely.
         /// </summary>
         [Fact]

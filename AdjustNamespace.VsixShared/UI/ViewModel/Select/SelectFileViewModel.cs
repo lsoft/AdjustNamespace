@@ -1,4 +1,4 @@
-﻿using AdjustNamespace.Helper;
+﻿using AdjustNamespace.UI.ViewModel;
 using System;
 using System.Collections.Generic;
 using System.Text;

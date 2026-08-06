@@ -1,54 +1,43 @@
 ﻿using AdjustNamespace.Adjusting.Adjuster;
-using AdjustNamespace.Helper;
+using AdjustNamespace.Adjusting.Plan;
 using AdjustNamespace.Xaml;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AdjustNamespace.Adjusting
+namespace AdjustNamespace.Adjusting.Adjuster
 {
     /// <summary>
     /// Adjuster for xaml file.
     /// It changes the `x:Class` attribute of the root element only
     /// (the code behind file is adjusted separately by <see cref="CsAdjuster"/>).
+    ///
+    /// It works with the file system only: whether this file is a subject to change at all
+    /// has been decided by <see cref="AdjustPlanner"/> already.
     /// </summary>
     public class XamlAdjuster : IAdjuster
     {
-        private readonly VsServices _vss;
         private readonly string _subjectFilePath;
         private readonly string _targetNamespace;
         private readonly bool _openFilesToEnableUndo;
 
-        /// <param name="vss">Visual Studio services.</param>
         /// <param name="openFilesToEnableUndo">Open the changed file in the editor (this allows the user to undo the changes).</param>
-        /// <param name="subjectFilePath">Full path to the xaml file to adjust.</param>
-        /// <param name="targetNamespace">The namespace the root class of that xaml should be moved into.</param>
+        /// <param name="plan">What has to happen with the file.</param>
         public XamlAdjuster(
-            VsServices vss,
             bool openFilesToEnableUndo,
-            string subjectFilePath,
-            string targetNamespace
+            AdjustPlanItem plan
             )
         {
-            if (subjectFilePath is null)
-            {
-                throw new ArgumentNullException(nameof(subjectFilePath));
-            }
-
-            if (targetNamespace is null)
-            {
-                throw new ArgumentNullException(nameof(targetNamespace));
-            }
-
-            _vss = vss;
             _openFilesToEnableUndo = openFilesToEnableUndo;
-            _subjectFilePath = subjectFilePath;
-            _targetNamespace = targetNamespace;
+            _subjectFilePath = plan.FilePath;
+            _targetNamespace = plan.TargetNamespace;
         }
 
         /// <inheritdoc/>
-        public async Task<bool> AdjustAsync()
+        public async Task<bool> AdjustAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var (xamlDocument, modifiedDocument) = await TryModifyDocumentAsync();
             if (!modifiedDocument.HasValue)
             {
@@ -82,22 +71,12 @@ namespace AdjustNamespace.Adjusting
         private async Task<(XamlDocument, XamlDocument?)> TryModifyDocumentAsync(
             )
         {
-            var xamlEngine = new XamlEngine(
-                _vss
-                );
+            var xamlEngine = new XamlEngine();
 
             var xamlDocument = await xamlEngine.CreateDocumentAsync(
                 _openFilesToEnableUndo,
                 _subjectFilePath
                 );
-
-            //the `x:Class` of a xaml and the namespace of its code behind file are the two
-            //halves of one class. The code behind file is a usual C# file and is skipped when
-            //several projects compile it (see CsAdjuster), so this file has to be skipped too
-            if (_vss.Workspace.IsCompiledBySeveralProjects(_subjectFilePath + ".cs"))
-            {
-                return (xamlDocument, null);
-            }
 
             if (!xamlDocument.GetRootInfo(out var rootNamespace, out var rootName))
             {

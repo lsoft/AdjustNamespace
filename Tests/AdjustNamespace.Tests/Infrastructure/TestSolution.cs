@@ -1,4 +1,6 @@
+using AdjustNamespace.Namespace;
 using AdjustNamespace.Settings;
+using AdjustNamespace.VisualStudio;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
@@ -13,7 +15,7 @@ namespace AdjustNamespace.Tests.Infrastructure
     ///
     /// The core of the extension (the adjusters, the fixers and the cleanup) needs nothing
     /// but a Roslyn workspace, so it can be tested here without Visual Studio at all;
-    /// see <see cref="VsServices.CreateForTests"/>.
+    /// see <see cref="Context"/>.
     ///
     /// The C# documents live in the workspace only and are never written to the disk
     /// (their paths point into <see cref="SolutionFolder"/> but no file is created).
@@ -112,9 +114,128 @@ namespace AdjustNamespace.Tests.Infrastructure
         }
 
         /// <summary>
-        /// Visual Studio services over this solution (without any real Visual Studio behind).
+        /// Everything an adjusting session over this solution works with, without any real
+        /// Visual Studio behind: the workspace is the <see cref="AdhocWorkspace"/> of this
+        /// solution and the two Visual Studio bound members are the fakes of this folder.
+        ///
+        /// A fresh instance is built on every access, so a test may change
+        /// <see cref="Settings"/> (see <see cref="WithSkippedFolders"/>) before it asks for it.
         /// </summary>
-        public VsServices Services => VsServices.CreateForTests(Workspace, Settings);
+        public AdjustContext Context => new AdjustContext(
+            Workspace,
+            new FakeSolutionExplorer(this),
+            new TargetNamespaceResolver(
+                Settings,
+                new FakeProjectDefaultNamespaceProvider()
+                ),
+            new NullDocumentOpener()
+            );
+
+        /// <summary>
+        /// The project of every file of this solution, as the solution tree of Visual Studio
+        /// would report it: the documents of the workspace plus the xaml files on the disk.
+        ///
+        /// A file which several projects compile is reported with the first of them, exactly
+        /// as <c>SolutionHelper.GetAllProjectItemsAsync</c> does it. The projects of the target
+        /// frameworks of a multi target project are one project of the solution, so the name
+        /// of that project is reported and not the name Roslyn gives to every target.
+        /// </summary>
+        public Dictionary<string, ProjectRef> ProjectOfEveryFile()
+        {
+            var result = new Dictionary<string, ProjectRef>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var pair in _documents)
+            {
+                var project = Workspace.CurrentSolution.GetProject(pair.Value[0].ProjectId)!;
+
+                result[pair.Key] = new ProjectRef(
+                    SolutionLevelNameOf(project.Name),
+                    project.FilePath!
+                    );
+            }
+
+            //the xaml files are real files inside a project folder and are no documents
+            //of the workspace, see AddXamlFile
+            if (Directory.Exists(SolutionFolder))
+            {
+                foreach (var xamlFilePath in Directory.GetFiles(SolutionFolder, "*.xaml", SearchOption.AllDirectories))
+                {
+                    var owner = TryFindProjectOfFolderOf(xamlFilePath);
+                    if (owner.HasValue)
+                    {
+                        result[xamlFilePath] = owner.Value;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The project of the solution the given Roslyn project belongs to:
+        /// <c>MyApp (net48)</c> is a target framework of the project <c>MyApp</c>.
+        /// </summary>
+        private string SolutionLevelNameOf(string roslynProjectName)
+        {
+            foreach (var pair in _targetProjects)
+            {
+                if (pair.Value.Contains(roslynProjectName))
+                {
+                    return pair.Key;
+                }
+            }
+
+            return roslynProjectName;
+        }
+
+        /// <summary>
+        /// The project whose folder contains the given file. The innermost folder wins,
+        /// so a project inside the folder of another one is resolved correctly.
+        /// </summary>
+        private ProjectRef? TryFindProjectOfFolderOf(string filePath)
+        {
+            ProjectRef? result = null;
+            var bestLength = -1;
+
+            foreach (var pair in _folders)
+            {
+                var folder = pair.Value + Path.DirectorySeparatorChar;
+
+                if (!filePath.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (folder.Length <= bestLength)
+                {
+                    continue;
+                }
+
+                bestLength = folder.Length;
+                result = new ProjectRef(pair.Key, ProjectFilePathOf(pair.Key));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Full path to the project file. A shared project (.shproj) is no Roslyn project
+        /// at all, see <see cref="AddSharedProject"/>, so its path is built out of its name.
+        /// </summary>
+        private string ProjectFilePathOf(string projectName)
+        {
+            if (_projects.TryGetValue(projectName, out var projectId))
+            {
+                return Workspace.CurrentSolution.GetProject(projectId)!.FilePath!;
+            }
+
+            if (_targetProjects.TryGetValue(projectName, out var targetNames) && targetNames.Count > 0)
+            {
+                return Workspace.CurrentSolution.GetProject(_projects[targetNames[0]])!.FilePath!;
+            }
+
+            return Path.Combine(_folders[projectName], projectName + ".shproj");
+        }
 
         public TestSolution()
         {
@@ -492,7 +613,7 @@ namespace AdjustNamespace.Tests.Infrastructure
         /// document of that file.
         ///
         /// The extension changes such a file through a single one of its documents
-        /// (see <c>WorkspaceHelper.GetDocument</c>), and in Visual Studio that is enough:
+        /// (see <c>WorkspaceExtensions.GetDocument</c>), and in Visual Studio that is enough:
         /// there is one file on the disk and one text buffer for all of the documents.
         /// The <see cref="AdhocWorkspace"/> knows nothing about it, hence this explicit step.
         /// It is performed by <see cref="TextOf"/> and <see cref="CompilationErrorsAsync"/>,

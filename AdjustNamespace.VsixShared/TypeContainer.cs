@@ -1,4 +1,4 @@
-﻿using AdjustNamespace.Helper;
+﻿using AdjustNamespace.Roslyn;
 using Microsoft.CodeAnalysis;
 using Microsoft.VisualStudio.Threading;
 using System;
@@ -46,7 +46,7 @@ namespace AdjustNamespace
                 return;
             }
 
-            var key = symbol.ContainingNamespace.ToFullDisplayString();
+            var key = symbol.ContainingNamespace.ToDisplayString();
             if (!_dictByNamespace.TryGetValue(key, out var typeNames))
             {
                 typeNames = new HashSet<string>();

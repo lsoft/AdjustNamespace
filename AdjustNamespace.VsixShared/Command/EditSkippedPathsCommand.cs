@@ -95,10 +95,18 @@ namespace AdjustNamespace.Command
 
             try
             {
-                var vss = await VsServices.CreateAsync(ServiceProvider);
+                var context = await AdjustContext.CreateAsync(ServiceProvider);
+
+                //this window is about the settings file only, so it needs the solution folder
+                //and the settings and not the whole adjusting context
+                var solutionFolder = new System.IO.FileInfo(
+                    context.Workspace.CurrentSolution.FilePath
+                    ).Directory.FullName;
 
                 var w = new EditSkippedPathsWindow(
-                    vss
+                    solutionFolder,
+                    AdjustContext.ReadSettingsOf(solutionFolder),
+                    new Settings.SettingsReader(solutionFolder)
                     );
                 w.ShowDialog();
             }

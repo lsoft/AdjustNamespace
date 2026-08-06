@@ -1,13 +1,10 @@
-﻿using EnvDTE;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.IO;
-using System.Text;
 
-namespace AdjustNamespace.UI.ViewModel
+namespace AdjustNamespace.UI
 {
     /// <summary>
-    /// Extension for file from workspace.
+    /// A file of the solution as the file tree of the wizard shows it.
     /// </summary>
     public readonly struct FileEx
     {
@@ -26,14 +23,8 @@ namespace AdjustNamespace.UI.ViewModel
         /// </summary>
         public readonly string FilePath;
 
-        /// <summary>
-        /// Full path to the project the file belongs to.
-        /// </summary>
-        public readonly string ProjectPath;
-
         public FileEx(
-            string filePath,
-            string projectPath
+            string filePath
             )
         {
             if (filePath is null)
@@ -41,16 +32,10 @@ namespace AdjustNamespace.UI.ViewModel
                 throw new ArgumentNullException(nameof(filePath));
             }
 
-            if (projectPath is null)
-            {
-                throw new ArgumentNullException(nameof(projectPath));
-            }
-
             var fi = new FileInfo(filePath);
             FolderPath = fi.Directory.FullName;
             FileName = fi.Name;
             FilePath = filePath;
-            ProjectPath = projectPath;
         }
 
     }

@@ -58,9 +58,12 @@ Notes:
   adjusting result should assert `Assert.Empty(await solution.CompilationErrorsAsync())` and not
   the produced text only, otherwise a name which is written correctly but resolves to another
   type slips through.
-- The whole wizard, `SubjectFileCollector` and `NamespaceHelper.TryDetermineTargetNamespaceAsync`
-  need the real Visual Studio (DTE, the solution tree) and are covered by the manual procedure
-  only, see [Tests/README.md](Tests/README.md).
+- Everything the extension needs from Visual Studio is behind an interface of
+  `AdjustNamespace.VisualStudio` (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`,
+  `IDocumentOpener`), and `AdjustContext` carries them together with the Roslyn workspace.
+  Take the narrowest dependency a class really needs — most of the core needs a `Workspace`
+  and nothing else. The wizard itself is covered by the manual procedure only,
+  see [Tests/README.md](Tests/README.md).
 - The test project references a **newer Roslyn than `AdjustNamespace.2022`** (only that compiler
   understands the C# unions, see the note in [Tests/README.md](Tests/README.md)), so the code of
   `AdjustNamespace.VsixShared` has to compile against both versions: do not use an API which

@@ -19,11 +19,37 @@ dotnet test Tests/AdjustNamespace.Tests/AdjustNamespace.Tests.csproj
 The tests run without Visual Studio at all:
 
 - the xaml subsystem works with a plain string through `MemoryXamlBodyProvider`;
-- the core (`CsAdjuster`, the fixers, `Cleanup`) works over an `AdhocWorkspace` built by
-  `TestSolution`, and `VsServices.CreateForTests` binds it into a `VsServices` without any
-  Visual Studio service behind. Everything which needs DTE, the solution tree or the editor
-  (`SubjectFileCollector`, `NamespaceHelper.TryDetermineTargetNamespaceAsync`, the wizard) is
-  still covered by the manual test only.
+- the core (`CsAdjuster`, the appliers, `Cleanup`) works over an `AdhocWorkspace` built by
+  `TestSolution`, and everything the extension needs from Visual Studio is behind an interface
+  (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`, `IDocumentOpener`) with a fake of
+  `Infrastructure` behind it, bound together by `TestSolution.Context`. There is no half built
+  service object with `null` fields anymore, so a test which reaches for the IDE gets an answer
+  instead of a `NullReferenceException`. The window of the wizard itself is still covered by
+  the manual test only — its steps need WPF and the main thread of Visual Studio. What the
+  chain of the steps hands over is checked by the compiler instead: `IStepFactory<TParameters>`
+  names the parameters of every step, so a wrong wiring is a build error and not something
+  a test would have to catch.
+
+Whether a file is a subject to change at all is decided by `AdjustPlanner`, which both steps
+of the wizard ask, so that decision is covered here as one thing and not once per caller:
+`AdjustRunner` plans a file exactly as the wizard does it before it creates an adjuster.
+
+What has to be written into the files is decided the same way: the analysis fills an `EditSet`
+and `EditApplier` writes it afterwards. A test may therefore read the decision itself instead
+of the text it produces — which reference gives a new `using` clause and which one is rewritten
+in place is a question about an `EditSet` and needs no adjusting at all.
+
+A whole run over the chosen files is `AdjustSession` and no longer a part of the wizard, so
+what used to be observable in a running Visual Studio only — the order of the stages, the
+namespace state shared by all the files of one run, the progress and the cancellation — is
+covered here as well. `AdjustRunner` drives the steps of a session one by one instead and lets
+a test name the target namespace of a file explicitly.
+
+The rule which derives the target namespace from the location of a file is a computation over
+the paths and needs no Visual Studio at all, so it lives in `TargetNamespaceCalculator` and is
+covered here. The single step of it which really asks Visual Studio — the default namespace of
+the project — is behind `IProjectDefaultNamespaceProvider` and stays a subject of the manual
+test; the fallback for a project Visual Studio reports nothing about is covered here as well.
 
 Everything is green, see [known bugs](#known-bugs). What is covered:
 
@@ -40,10 +66,15 @@ Everything is green, see [known bugs](#known-bugs). What is covered:
 | The shared projects | `Adjusting\SharedProjectTests` (one file compiled by several projects: the ambiguous target namespace of a C# and of a xaml file, the references and the using clauses of every project, the file list of the solution, a namespace which several projects fill) |
 | The multi target projects | `Adjusting\MultiTargetTests` (one file compiled by every target framework: the references and the using clauses, a file of a single target framework, xaml, the conditional compilation, a shared project referenced by a multi target one) |
 | The namespaces | `Namespace\NamespaceTransitionContainerTests`, `NamespaceNodeSearchTests`, `NamespaceCenterTests`, `NamespaceHelperTests` |
-| The fixers | `Fixer\AddUsingFixerTests` |
-| The helpers | `Helper\RoslynHelperTests`, `PredicateTests` |
+| The target namespace of a file | `Namespace\TargetNamespaceCalculatorTests` (the folder chain, the skipped folders, a file outside of the project folder, the regex, the fallback of the default namespace) |
+| The decision what to write into the files | `Edit\EditSetTests` (the grouping by file, the duplicates), `Edit\RefProcessorTests` (which edit a reference gives, and that the analysis itself changes nothing) |
+| Writing the decision into the solution | `Edit\EditApplierTests` (the placement of a new using clause, an existing and an alias one, the order of the kinds inside a file, the intersecting replacements, the renaming of a namespace and the using clause of its old name) |
+| What is asked of Roslyn | `Roslyn\SyntaxExtensionsTests` (the walk over a syntax tree and the placement of a using clause), `ScopeTests` (which projects and documents may be processed at all) |
 | The settings | `Settings\SkippedFolderTests`, `NamespaceReplaceRegexTests` |
 | The name conflicts | `TypeContainerTests` |
+| The decision what to do with a file | `Adjusting\AdjustPlannerTests` (the transitions of the plan, a file of no project, a file which several projects compile, a file of a multi target project, the disagreeing target frameworks, a xaml and its code behind, the regex, the single walk through the solution tree) |
+| The file list of the wizard | `Adjusting\SubjectFileCollectorTests` (which files are offered to the user, the type name conflicts in the target namespace, the progress) |
+| A whole run over the chosen files | `Adjusting\AdjustSessionTests` (the stages and their order, a skipped file, the progress reports, the cancellation and the changes it leaves behind, the single walk through the solution tree) |
 
 A test may ask the compiler instead of comparing the strings only:
 `TestSolution.CompilationErrorsAsync()` returns the errors of the whole solution, so
@@ -71,8 +102,9 @@ described here and are fixed since then:
 | The error | How it is fixed |
 | --- | --- |
 | A rewritten name is a relative one: `X.Y.Class1` written inside the namespace `Some.X` resolves to `Some.X.Y.Class1` and does not compile. | `RefProcessor.IsGlobalPrefixRequired` asks the semantic model whether the first part of the target namespace is shadowed at that position and prefixes the name with `global::` if it is. |
-| A new using clause is added behind the last using of the file, and the using clauses inside a namespace declaration are visible in that namespace only: a file with several namespaces gets the clause into the wrong one. | `AddUsingFixer` looks at the using clauses of the compilation unit only and writes the new one among them: such a clause is visible in every namespace of the file and its name is resolved from the root namespace. |
+| A new using clause is added behind the last using of the file, and the using clauses inside a namespace declaration are visible in that namespace only: a file with several namespaces gets the clause into the wrong one. | `AddUsingApplier` looks at the using clauses of the compilation unit only and writes the new one among them: such a clause is visible in every namespace of the file and its name is resolved from the root namespace. |
 | `namespace A { namespace B { } }` plus `namespace A.B { }` in one file produce two different transitions of `A.B`, and the references are fixed with the wrong one of them. | A type is moved by the transition of the declaration it is written in (`NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf`) and not by a lookup of its namespace name. |
+| A file which lies outside of the folder of its project has no target namespace, but the folders were compared as plain strings: `c:\sln\MyApp.Tests\Sub` starts with `c:\sln\MyApp`, so a linked file of a sibling folder whose name merely begins with the name of the project folder got the whole sibling folder into its namespace (`MyApp.MyApp.Tests.Sub`). | `TargetNamespaceCalculator.IsSameFolderOrBelow` stops the comparison at the folder border: the character behind the root folder has to be a separator. |
 | A xaml class is referenced not only by a tag and by an `{x:Type}`/`{x:Static}` markup extension, but also by an attribute value (`TargetType="local:MyButton"`), by an attached property, by a custom markup extension and by `x:TypeArguments`. Such a reference is not moved and keeps pointing to the old namespace. | Everything which looks like an `alias:ClassName` pair and is not a part of an already recognized fragment becomes a `XamlTypeUsage`. A pair is rewritten only if its alias is a clr-namespace one which points to the namespace the class is moved out of, so the pairs which are no type references at all (`mc:Ignorable="d"`) cost nothing. |
 
 ### A note about the shared projects
@@ -80,7 +112,7 @@ described here and are fixed since then:
 A file which more than one project compiles is left as it is: whatever namespace is chosen for
 it, it is derived from one of these projects and does not match the other ones. Two cases which
 look the same in Roslyn (one file, several documents) are kept apart by
-`WorkspaceHelper.IsCompiledBySeveralProjects`:
+`WorkspaceExtensions.IsCompiledBySeveralProjects`:
 
 - a **shared project** referenced by several projects — the file belongs to several projects
   with **different project files**, there is no target namespace and the file is skipped;
@@ -90,7 +122,7 @@ look the same in Roslyn (one file, several documents) are kept apart by
 
 A shared project referenced by a single project is not ambiguous either and is adjusted, see
 `A_file_of_a_shared_project_of_a_single_project_is_adjusted`. The fallback of
-`NamespaceHelper.GetProjectDefaultNamespaceAsync` (the default namespace of a project of an
+`TargetNamespaceCalculator.DefaultNamespaceFallback` (the default namespace of a project of an
 unknown kind is its name without the last part, `MyApp.Shared` -> `MyApp`) serves exactly that
 case now.
 
@@ -100,7 +132,7 @@ The projects of the target frameworks of a multi target project are not copies o
 every one of them defines its own conditional compilation symbols and may compile its own files
 (`<Compile Condition="'$(TargetFramework)'=='net48'" />`). A file of such a project has one text
 and a syntax tree per target framework, so everything which reads it reads all of its documents
-(`WorkspaceHelper.GetDocuments`) and everything which writes it addresses a span of the text and
+(`WorkspaceExtensions.GetDocuments`) and everything which writes it addresses a span of the text and
 not a node of a tree — a name which is a name for one target framework is a part of a disabled
 text for another one.
 
@@ -240,6 +272,11 @@ rooted path and a path relative to the solution folder).
 5. Check the results: the adjusted solution has to be compiled successfully, and the namespaces
    of the adjusted files have to match their folders (except the folders excluded in the
    settings file).
+
+The chrome of the wizard has no automated test at all, so walk it through at least once per
+change of it: `Cancel` on the first and on the second step closes the window, `Back` on the
+second step returns to the first one with the same files, and `Cancel` during the adjusting
+stops it and leaves the already adjusted files as they are.
 
 `git status` is useless inside `Tests\Subject` (the folder is ignored), so compare it with
 `Tests\Standard` if you need to review what exactly has been changed.

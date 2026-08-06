@@ -1,4 +1,4 @@
-﻿using AdjustNamespace.Helper;
+﻿using AdjustNamespace.Roslyn;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.VisualStudio.LanguageServices;
@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace AdjustNamespace.Adjusting
+namespace AdjustNamespace.Namespace
 {
     /// <summary>
     /// Namespace state container. It accumulates a changes during adjusting.
@@ -242,7 +242,7 @@ namespace AdjustNamespace.Adjusting
         /// The generated files do not count either: the code behind of a xaml file is
         /// regenerated out of the <c>x:Class</c> the adjusting has just changed, so it
         /// follows the type into the target namespace instead of staying behind,
-        /// see <see cref="GeneratedCodeHelper"/>.
+        /// see <see cref="Roslyn.GeneratedCode"/>.
         /// </summary>
         private static bool IsDeclaredInSeveralFiles(ITypeSymbol type)
         {
@@ -250,7 +250,7 @@ namespace AdjustNamespace.Adjusting
 
             foreach (var reference in type.DeclaringSyntaxReferences)
             {
-                if (GeneratedCodeHelper.IsGeneratedFile(reference.SyntaxTree.FilePath))
+                if (GeneratedCode.IsGeneratedFile(reference.SyntaxTree.FilePath))
                 {
                     continue;
                 }

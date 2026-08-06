@@ -4,7 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using AdjustNamespace.Helper;
+using AdjustNamespace.Namespace;
+using AdjustNamespace.Roslyn;
 using System.Threading;
 
 namespace AdjustNamespace.Adjusting
@@ -15,22 +16,27 @@ namespace AdjustNamespace.Adjusting
     /// </summary>
     public class Cleanup
     {
-        private readonly VsServices _vss;
+        private readonly Workspace _workspace;
         private readonly NamespaceCenter _namespaceCenter;
 
-        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="workspace">Roslyn workspace to clean up.</param>
         /// <param name="namespaceCenter">Namespace state container which knows which namespaces became empty.</param>
         public Cleanup(
-            VsServices vss,
+            Workspace workspace,
             NamespaceCenter namespaceCenter
             )
         {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
+
             if (namespaceCenter is null)
             {
                 throw new ArgumentNullException(nameof(namespaceCenter));
             }
 
-            _vss = vss;
+            _workspace = workspace;
             _namespaceCenter = namespaceCenter;
         }
 
@@ -38,17 +44,22 @@ namespace AdjustNamespace.Adjusting
         /// Remove the using clauses of the emptied namespaces from the given document.
         /// </summary>
         /// <param name="documentFilePath">Full path to the document to clean up.</param>
+        /// <param name="cancellationToken">
+        /// Cancellation of the session. It is asked while the document is being read only:
+        /// the removal itself is never interrupted in the middle.
+        /// </param>
         public async Task RemoveEmptyUsingStatementsForAsync(
-            string documentFilePath
+            string documentFilePath,
+            CancellationToken cancellationToken = default
             )
         {
-            var workspace = _vss.Workspace;
+            var workspace = _workspace;
 
-            //see the comment in AddUsingFixer.FixAsync about this do-while
+            //see the comment in DocumentChanger about this do-while
             bool r = true;
             do
             {
-                var (document, syntaxRoot) = await workspace.GetDocumentAndSyntaxRootAsync(documentFilePath);
+                var (document, syntaxRoot) = await workspace.GetDocumentAndSyntaxRootAsync(documentFilePath, cancellationToken);
                 if (document == null || syntaxRoot == null)
                 {
                     //something went wrong
@@ -63,7 +74,7 @@ namespace AdjustNamespace.Adjusting
                 var compilations = new List<Compilation>();
                 foreach (var fileDocument in workspace.GetDocuments(documentFilePath))
                 {
-                    var compilation = await fileDocument.Project.GetCompilationAsync();
+                    var compilation = await fileDocument.Project.GetCompilationAsync(cancellationToken);
                     if (compilation != null)
                     {
                         compilations.Add(compilation);

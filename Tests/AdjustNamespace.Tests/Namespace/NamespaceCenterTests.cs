@@ -1,4 +1,4 @@
-using AdjustNamespace.Adjusting;
+using AdjustNamespace.Namespace;
 using AdjustNamespace.Tests.Infrastructure;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;

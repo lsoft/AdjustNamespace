@@ -1,7 +1,5 @@
 ﻿using AdjustNamespace.UI.Control;
 using System;
-using System.Collections.Generic;
-using System.Windows.Controls;
 using AdjustNamespace.UI.ViewModel;
 
 namespace AdjustNamespace.UI.StepFactory
@@ -10,21 +8,21 @@ namespace AdjustNamespace.UI.StepFactory
     /// Factory of the first wizard step: the solution compilation check
     /// (<see cref="PreparationStepViewModel"/>).
     /// </summary>
-    public class PreparationStepFactory : IStepFactory
+    public class PreparationStepFactory : IStepFactory<PreparationParameters>
     {
-        private readonly VsServices _vss;
-        private readonly ContentControl _targetControl;
-        private readonly IStepFactory _nextStepFactory;
+        private readonly AdjustContext _context;
+        private readonly IWizardHost _host;
+        private readonly IStepFactory<SelectedStepParameters> _nextStepFactory;
 
         public PreparationStepFactory(
-            VsServices vss,
-            ContentControl targetControl,
-            IStepFactory nextStepFactory
+            AdjustContext context,
+            IWizardHost host,
+            IStepFactory<SelectedStepParameters> nextStepFactory
             )
         {
-            if (targetControl is null)
+            if (host is null)
             {
-                throw new ArgumentNullException(nameof(targetControl));
+                throw new ArgumentNullException(nameof(host));
             }
 
             if (nextStepFactory is null)
@@ -32,27 +30,23 @@ namespace AdjustNamespace.UI.StepFactory
                 throw new ArgumentNullException(nameof(nextStepFactory));
             }
 
-            _vss = vss;
-            _targetControl = targetControl;
+            _context = context;
+            _host = host;
             _nextStepFactory = nextStepFactory;
         }
 
         /// <inheritdoc/>
-        /// <param name="argument">A <see cref="HashSet{T}"/> of the file paths chosen by the user.</param>
-        public async System.Threading.Tasks.Task CreateAsync(object argument)
+        public async System.Threading.Tasks.Task CreateAsync(PreparationParameters parameters)
         {
-            var v = new PreparationUserControl();
-
-            var vm  = new PreparationStepViewModel(
-                _vss,
-                _nextStepFactory,
-                (HashSet<string>)argument
+            await _host.ShowAsync(
+                new PreparationUserControl(),
+                new PreparationStepViewModel(
+                    _context,
+                    _host,
+                    _nextStepFactory,
+                    parameters
+                    )
                 );
-
-            v.DataContext = vm;
-            _targetControl.Content = v;
-
-            await vm!.StartAsync();
         }
 
     }

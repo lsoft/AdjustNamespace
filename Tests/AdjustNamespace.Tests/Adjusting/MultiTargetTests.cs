@@ -1,5 +1,7 @@
 using AdjustNamespace.Adjusting;
-using AdjustNamespace.Helper;
+using AdjustNamespace.Adjusting.Adjuster;
+using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Roslyn;
 using AdjustNamespace.Tests.Infrastructure;
 using System.Linq;
 using Xunit;
@@ -18,7 +20,7 @@ namespace AdjustNamespace.Tests.Adjusting
     /// every one of them defines the conditional compilation symbol of its target framework
     /// and may have its own files (<c>&lt;Compile Condition="'$(TargetFramework)'=='net48'" /&gt;</c>).
     /// The extension takes a single one of these documents
-    /// (<c>WorkspaceHelper.GetDocument</c> resolves the current context of the file) and looks
+    /// (<c>WorkspaceExtensions.GetDocument</c> resolves the current context of the file) and looks
     /// at the solution through it, so everything which exists in another target framework only
     /// is invisible to it.
     /// </summary>
@@ -203,8 +205,8 @@ namespace A.Other
                 ;
 
             var paths = solution.Workspace.EnumerateAllDocumentFilePaths(
-                Predicate.IsProjectInScope,
-                Predicate.IsDocumentInScope
+                Scope.IsProjectInScope,
+                Scope.IsDocumentInScope
                 );
 
             Assert.Equal(
@@ -243,7 +245,11 @@ namespace A.Other
     xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
 </Window>");
 
-            var adjuster = new XamlAdjuster(solution.Services, false, xamlFilePath, "X.Y");
+            var plan = await AdjustPlanner.TryPlanAsync(solution.Workspace, xamlFilePath, "X.Y");
+
+            Assert.NotNull(plan);
+
+            var adjuster = new XamlAdjuster(false, plan!.Value);
 
             Assert.True(await adjuster.IsChangesExistsAsync());
             Assert.True(await adjuster.AdjustAsync());
@@ -590,8 +596,8 @@ namespace Legacy.Core
                 ;
 
             var paths = solution.Workspace.EnumerateAllDocumentFilePaths(
-                Predicate.IsProjectInScope,
-                Predicate.IsDocumentInScope
+                Scope.IsProjectInScope,
+                Scope.IsDocumentInScope
                 );
 
             Assert.Equal(
@@ -672,7 +678,11 @@ namespace Legacy.Core
     xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
 </Window>");
 
-            var adjuster = new XamlAdjuster(solution.Services, false, xamlFilePath, "Common");
+            var plan = await AdjustPlanner.TryPlanAsync(solution.Workspace, xamlFilePath, "Common");
+
+            Assert.NotNull(plan);
+
+            var adjuster = new XamlAdjuster(false, plan!.Value);
 
             Assert.True(await adjuster.IsChangesExistsAsync());
             Assert.True(await adjuster.AdjustAsync());

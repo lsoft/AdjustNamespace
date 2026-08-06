@@ -1,10 +1,11 @@
-using AdjustNamespace.Helper;
+using AdjustNamespace.Adjusting.Adjuster;
+using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Roslyn;
 using AdjustNamespace.Namespace;
-using AdjustNamespace.UI.ViewModel;
+using AdjustNamespace.UI;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -12,26 +13,36 @@ namespace AdjustNamespace.Adjusting
 {
     /// <summary>
     /// Analyzer which filters the files chosen by the user and keeps only those
-    /// which are really the subject to change (its namespace differs from the target one).
-    /// It also detects the type name conflicts in the target namespaces in advance,
-    /// because such a conflict makes the adjusting impossible.
+    /// which are really the subject to change.
+    ///
+    /// Whether a file is a subject to change at all is decided by <see cref="AdjustPlanner"/>,
+    /// i.e. by the very same code the adjusting itself runs on. What is added here is what
+    /// only this step needs: the type name conflicts in the target namespaces, because such
+    /// a conflict makes the adjusting impossible and has to be reported before anything
+    /// has been changed.
+    ///
     /// Used by the second step of the wizard.
     /// </summary>
     public sealed class SubjectFileCollector
     {
-        private readonly VsServices _vss;
+        private readonly AdjustContext _context;
         private readonly HashSet<string> _subjectFilePaths;
         private readonly NamespaceReplaceRegex _replaceRegex;
 
-        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="context">Everything the adjusting session works with.</param>
         /// <param name="subjectFilePaths">Full paths of the files chosen by the user.</param>
         /// <param name="replaceRegex">User defined regex which additionally modifies the target namespace.</param>
         public SubjectFileCollector(
-            VsServices vss,
+            AdjustContext context,
             HashSet<string> subjectFilePaths,
             NamespaceReplaceRegex replaceRegex
             )
         {
+            if (context is null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
             if (subjectFilePaths is null)
             {
                 throw new ArgumentNullException(nameof(subjectFilePaths));
@@ -42,7 +53,7 @@ namespace AdjustNamespace.Adjusting
                 throw new ArgumentNullException(nameof(replaceRegex));
             }
 
-            _vss = vss;
+            _context = context;
             _subjectFilePaths = subjectFilePaths;
             _replaceRegex = replaceRegex;
         }
@@ -64,247 +75,157 @@ namespace AdjustNamespace.Adjusting
                 throw new ArgumentNullException(nameof(progressMessageAction));
             }
 
-            //try
-            //{
-
-
-            //extract project items (we need perform this in main thread)
-            var fileExtensions = await BuildFileExtensionAsync();
-
-            var foundFileExs = new List<FileEx>();
+            var planner = new AdjustPlanner(_context, _replaceRegex);
 
             // get all types in solution
             var typesInSolutionPerNamespace = await NamespaceTypeContainer.CreateForAsync(
-                _vss.Workspace
+                _context.Workspace
                 );
 
-            var total = fileExtensions.Count;
+            var subjectFilePaths = _subjectFilePaths.ToList();
+            var foundFileExs = new List<FileEx>();
+
+            var total = subjectFilePaths.Count;
             for (int i = 0; i < total; i++)
             {
-                FileExtension fileExtension = fileExtensions[i];
-                var subjectFilePath = fileExtension.FilePath;
-                var subjectProject = fileExtension.Project;
-                //var subjectProjectItem = fileExtension.ProjectItem;
+                var subjectFilePath = subjectFilePaths[i];
 
                 progressMessageAction(i + 1, total, subjectFilePath);
 
-                if (subjectFilePath.EndsWith(".xaml"))
+                var plan = await TryPlanAsync(planner, subjectFilePath);
+                if (!plan.HasValue)
                 {
-                    //TODO: unify create XamlAdjuster across the VSIX codebase
-                    var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
-                        subjectProject,
-                        _vss,
-                        _replaceRegex,
-                        subjectFilePath
-                        );
-                    if (!string.IsNullOrEmpty(targetNamespace))
-                    {
-                        var xamlAdjuster = new XamlAdjuster(
-                            _vss,
-                            false,
-                            subjectFilePath,
-                            targetNamespace!
-                            );
-                        if (await xamlAdjuster.IsChangesExistsAsync())
-                        {
-                            foundFileExs.Add(
-                                new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
-                                );
-                        }
-                    }
-
                     continue;
+                }
+
+                if (plan.Value.IsXaml)
+                {
+                    //a xaml file is planned as soon as it belongs to a project, and whether
+                    //its root class really moves is known after the document has been read
+                    var xamlAdjuster = new XamlAdjuster(false, plan.Value);
+                    if (!await xamlAdjuster.IsChangesExistsAsync())
+                    {
+                        continue;
+                    }
                 }
                 else
                 {
-                    var subjectDocument = _vss.Workspace.GetDocument(subjectFilePath);
-                    if (!subjectDocument.IsDocumentInScope())
-                    {
-                        continue;
-                    }
-
-                    if (_vss.Workspace.IsCompiledBySeveralProjects(subjectFilePath))
-                    {
-                        //a file of a shared project which is referenced by several projects:
-                        //there is no target namespace which suits all of them, see CsAdjuster
-                        continue;
-                    }
-
-                    var targetNamespace = await NamespaceHelper.TryDetermineTargetNamespaceAsync(
-                        subjectProject,
-                        _vss,
-                        _replaceRegex,
-                        subjectFilePath
-                        );
-                    if (string.IsNullOrEmpty(targetNamespace))
-                    {
-                        continue;
-                    }
-
-                    var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(
-                        await _vss.Workspace.GetSyntaxRootsAsync(subjectFilePath),
-                        targetNamespace!
-                        );
-                    if (ntc.IsEmpty)
-                    {
-                        continue;
-                    }
-
-                    var isContradictory = false;
-                    foreach (var transition in ntc.Transitions)
-                    {
-                        if (await _vss.Workspace.IsNamespaceStateContradictoryAsync(subjectFilePath, transition.OriginalName))
-                        {
-                            //the projects which compile this file do not agree whether the
-                            //namespace it is moved out of stays alive, see CsAdjuster
-                            isContradictory = true;
-                            break;
-                        }
-                    }
-
-                    if (isContradictory)
-                    {
-                        continue;
-                    }
-
-                    //check for same types already exists in the destination namespace
-                    //(every project which compiles the file is asked: a type declared under
-                    //a conditional compilation symbol exists in a part of them only)
-                    foreach (var fileDocument in _vss.Workspace.GetDocuments(subjectFilePath))
-                    {
-                        var semanticModel = await fileDocument.GetSemanticModelAsync();
-                        if (semanticModel == null)
-                        {
-                            continue;
-                        }
-
-                        var syntaxRoot = await fileDocument.GetSyntaxRootAsync();
-                        if (syntaxRoot == null)
-                        {
-                            continue;
-                        }
-
-                        foreach (var foundType in syntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
-                        {
-                            var symbolInfo = semanticModel.GetDeclaredSymbol(foundType);
-                            if (symbolInfo == null)
-                            {
-                                continue;
-                            }
-
-                            if (symbolInfo.ContainingType != null)
-                            {
-                                //a nested type moves together with its outer type
-                                //and never conflicts with a type of the target namespace
-                                continue;
-                            }
-
-                            var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
-                            if (symbolNamespace == targetNamespace)
-                            {
-                                continue;
-                            }
-
-                            if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
-                            {
-                                continue;
-                            }
-
-                            //the transition of the very declaration this type is written in,
-                            //exactly as CsAdjuster does it
-                            var transition = NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf(
-                                foundType,
-                                targetNamespace!
-                                );
-                            if (!transition.HasValue)
-                            {
-                                //there is no transition for this type: it is declared
-                                //outside of any namespace, for example. It is not moved at all.
-                                continue;
-                            }
-
-                            if (typesInSolutionPerNamespace.CheckForTypeExists(transition.Value.ModifiedName, symbolInfo.Name))
-                            {
-                                throw new FileProcessException(
-                                    $"'{targetNamespace}' already contains a type '{symbolInfo.Name}'",
-                                    subjectFilePath
-                                    );
-                            }
-                        }
-                    }
-
-                    foundFileExs.Add(
-                        new FileEx(fileExtension.FilePath, fileExtension.ProjectPath)
+                    await CheckForTypeNameConflictsAsync(
+                        plan.Value,
+                        typesInSolutionPerNamespace
                         );
                 }
+
+                foundFileExs.Add(
+                    new FileEx(subjectFilePath)
+                    );
             }
 
             return new SubjectCollectingResults(foundFileExs);
-
-            //}
-            //catch (Exception excp)
-            //{
-            //    await AddMessageAsync(
-            //        excp.Message
-            //        );
-            //    await AddMessageAsync(
-            //        excp.StackTrace
-            //        );
-
-            //    Logging.LogVS(excp);
-            //}
-
-            //return [];
         }
 
         /// <summary>
-        /// Bind the incoming file paths to their projects and project items.
-        /// DTE/solution objects are available from the main thread only, that's why
-        /// this is performed as a single separate step.
+        /// The decision of the planner for a single file, with a failure of it bound
+        /// to that file.
         /// </summary>
-        private async Task<List<FileExtension>> BuildFileExtensionAsync()
+        /// <exception cref="FileProcessException">The file cannot be processed at all.</exception>
+        private static async Task<AdjustPlanItem?> TryPlanAsync(
+            AdjustPlanner planner,
+            string subjectFilePath
+            )
         {
-            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-
-            var fileExtensions = new List<FileExtension>(
-                _subjectFilePaths.Count
-                );
-
-            var projectItems = await SolutionHelper.GetAllProjectItemsAsync(null);
-            foreach (var filePath in _subjectFilePaths)
+            try
             {
-                try
+                return await planner.TryPlanAsync(subjectFilePath);
+            }
+            catch (Exception ex)
+            {
+                throw new FileProcessException(subjectFilePath, ex);
+            }
+        }
+
+        /// <summary>
+        /// Check that no type of the file lands onto a type of the same name which exists
+        /// in the target namespace already: such a move breaks the solution and cannot be
+        /// undone by the adjusting itself.
+        /// </summary>
+        /// <exception cref="FileProcessException">There is such a type.</exception>
+        private async Task CheckForTypeNameConflictsAsync(
+            AdjustPlanItem plan,
+            NamespaceTypeContainer typesInSolutionPerNamespace
+            )
+        {
+            //every project which compiles the file is asked: a type declared under
+            //a conditional compilation symbol exists in a part of them only
+            foreach (var fileDocument in _context.Workspace.GetDocuments(plan.FilePath))
+            {
+                var semanticModel = await fileDocument.GetSemanticModelAsync();
+                if (semanticModel == null)
                 {
-                    if (!projectItems.TryGetValue(filePath, out var pii))
+                    continue;
+                }
+
+                var syntaxRoot = await fileDocument.GetSyntaxRootAsync();
+                if (syntaxRoot == null)
+                {
+                    continue;
+                }
+
+                foreach (var foundType in syntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                {
+                    var symbolInfo = semanticModel.GetDeclaredSymbol(foundType);
+                    if (symbolInfo == null)
                     {
                         continue;
                     }
 
-                    fileExtensions.Add(
-                        new FileExtension(
-                            filePath,
-                            pii.Project,
-                            pii.ProjectItem
-                            )
+                    if (symbolInfo.ContainingType != null)
+                    {
+                        //a nested type moves together with its outer type
+                        //and never conflicts with a type of the target namespace
+                        continue;
+                    }
+
+                    var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
+                    if (symbolNamespace == plan.TargetNamespace)
+                    {
+                        continue;
+                    }
+
+                    if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
+                    {
+                        continue;
+                    }
+
+                    //the transition of the very declaration this type is written in,
+                    //exactly as CsAdjuster does it
+                    var transition = NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf(
+                        foundType,
+                        plan.TargetNamespace
                         );
-                }
-                catch (Exception ex)
-                {
-                    throw new FileProcessException(filePath, ex);
+                    if (!transition.HasValue)
+                    {
+                        //there is no transition for this type: it is declared
+                        //outside of any namespace, for example. It is not moved at all.
+                        continue;
+                    }
+
+                    if (typesInSolutionPerNamespace.CheckForTypeExists(transition.Value.ModifiedName, symbolInfo.Name))
+                    {
+                        throw new FileProcessException(
+                            $"'{plan.TargetNamespace}' already contains a type '{symbolInfo.Name}'",
+                            plan.FilePath
+                            );
+                    }
                 }
             }
-
-            return fileExtensions;
         }
-
 
         /// <summary>
         /// Results of <see cref="AnalyzeAndCollectAsync"/>.
         /// </summary>
         public sealed class SubjectCollectingResults
         {
-            //public bool IsOk => string.IsNullOrEmpty(ErrorMessage);
-
             /// <summary>
             /// Files which are the subject to change.
             /// </summary>
@@ -312,24 +233,6 @@ namespace AdjustNamespace.Adjusting
             {
                 get;
             }
-
-            //public string? ErrorMessage
-            //{
-            //    get;
-            //}
-
-            //public SubjectCollectingResults(
-            //    string errorMessage
-            //    )
-            //{
-            //    if (errorMessage is null)
-            //    {
-            //        throw new ArgumentNullException(nameof(errorMessage));
-            //    }
-
-            //    CollectedFiles = [];
-            //    ErrorMessage = errorMessage;
-            //}
 
             public SubjectCollectingResults(
                 List<FileEx> collectedFiles
@@ -342,60 +245,6 @@ namespace AdjustNamespace.Adjusting
 
                 CollectedFiles = collectedFiles;
             }
-        }
-
-        /// <summary>
-        /// Extension for file from workspace.
-        /// </summary>
-        [DebuggerDisplay("{FilePath}")]
-        private readonly struct FileExtension
-        {
-            /// <summary>
-            /// Full path to the file.
-            /// </summary>
-            public readonly string FilePath;
-
-            /// <summary>
-            /// Project the file belongs to.
-            /// </summary>
-            public readonly SolutionItem Project;
-
-            /// <summary>
-            /// Full path to the project file.
-            /// </summary>
-            public readonly string ProjectPath;
-
-            /// <summary>
-            /// Project item of the file.
-            /// </summary>
-            public readonly SolutionItem ProjectItem;
-
-            public FileExtension(
-                string filePath,
-                SolutionItem project,
-                SolutionItem projectItem
-                )
-            {
-                if (project is null)
-                {
-                    throw new ArgumentNullException(nameof(project));
-                }
-
-                if (projectItem is null)
-                {
-                    throw new ArgumentNullException(nameof(projectItem));
-                }
-                if (filePath is null)
-                {
-                    throw new ArgumentNullException(nameof(filePath));
-                }
-
-                FilePath = filePath;
-                Project = project;
-                ProjectPath = project.FullPath!;
-                ProjectItem = projectItem;
-            }
-
         }
     }
 

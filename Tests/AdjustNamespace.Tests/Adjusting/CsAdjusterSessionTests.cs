@@ -39,8 +39,8 @@ namespace AdjustNamespace.Tests.Adjusting
 
         /// <summary>
         /// A file which references the moved type both by a fully qualified name and
-        /// through a using clause needs two different fixers at once
-        /// (see <c>FixerContainer</c>), and both of them have to be applied.
+        /// through a using clause needs two different kinds of edit at once
+        /// (see <c>EditSet</c>), and both of them have to be applied.
         /// </summary>
         [Fact]
         public async Task Both_kinds_of_the_references_of_one_file_are_fixed()
@@ -202,18 +202,13 @@ namespace Other
 ")
                 ;
 
-            var namespaceCenter = await AdjustNamespace.Adjusting.NamespaceCenter.CreateForAsync(solution.Workspace);
-
-            var adjuster = new AdjustNamespace.Adjusting.CsAdjuster(
-                solution.Services,
-                false,
-                namespaceCenter,
+            var plan = await AdjustNamespace.Adjusting.Plan.AdjustPlanner.TryPlanAsync(
+                solution.Workspace,
                 solution.PathOf("MyApp", "NotHere.cs"),
-                "X.Y",
-                new System.Collections.Generic.List<string>()
+                "X.Y"
                 );
 
-            Assert.False(await adjuster.AdjustAsync());
+            Assert.Null(plan);
         }
 
         /// <summary>

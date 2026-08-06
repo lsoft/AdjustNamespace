@@ -1,5 +1,5 @@
-﻿using AdjustNamespace.Adjusting.Fixer;
-using AdjustNamespace.Helper;
+﻿using AdjustNamespace.Adjusting.Edit;
+using AdjustNamespace.Roslyn;
 using AdjustNamespace.Namespace;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.VisualStudio.Language.CodeCleanUp;
@@ -18,46 +19,53 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 {
     /// <summary>
     /// Processor of the references to a type which is being moved into another namespace.
-    /// For every found reference it creates a fixer:
+    /// For every found reference it schedules an edit:
     /// <list type="bullet">
     /// <item>a fully qualified name (<c>Some.Old.Namespace.Class1</c>) is rewritten in place
-    /// with <see cref="QualifiedNameFixer"/>;</item>
-    /// <item>in all the other cases a new `using` clause is added with <see cref="AddUsingFixer"/>.</item>
+    /// with a <see cref="ReplaceTextEdit"/>;</item>
+    /// <item>in all the other cases a new `using` clause is added with an <see cref="AddUsingEdit"/>.</item>
     /// </list>
-    /// The fixers are not applied here, they are accumulated in the <see cref="FixerContainer"/>
+    /// Nothing is changed here: the edits are accumulated in the <see cref="EditSet"/>
     /// and applied later all at once.
     /// </summary>
     public readonly struct RefProcessor
     {
-        private readonly VsServices _vss;
-        private readonly FixerContainer _fixerContainer;
+        private readonly Workspace _workspace;
+        private readonly EditSet _edits;
         private readonly NamespaceTransition _targetNamespaceInfo;
 
-        /// <param name="vss">Visual Studio services.</param>
-        /// <param name="fixerContainer">Container the created fixers are placed into.</param>
+        /// <param name="workspace">Roslyn workspace to search the references in.</param>
+        /// <param name="edits">Set the scheduled edits are placed into.</param>
         /// <param name="targetNamespaceInfo">Transition (old namespace -> new namespace) of the processed type.</param>
         public RefProcessor(
-            VsServices vss,
-            FixerContainer fixerContainer,
+            Workspace workspace,
+            EditSet edits,
             NamespaceTransition targetNamespaceInfo
             )
         {
-            if (fixerContainer is null)
+            if (workspace is null)
             {
-                throw new ArgumentNullException(nameof(fixerContainer));
+                throw new ArgumentNullException(nameof(workspace));
             }
 
-            _vss = vss;
-            _fixerContainer = fixerContainer;
+            if (edits is null)
+            {
+                throw new ArgumentNullException(nameof(edits));
+            }
+
+            _workspace = workspace;
+            _edits = edits;
             _targetNamespaceInfo = targetNamespaceInfo;
         }
 
         /// <summary>
-        /// Find all the references to the given type across the solution and create a fixer for each of them.
+        /// Find all the references to the given type across the solution and schedule an edit for each of them.
         /// </summary>
         /// <param name="symbolInfo">The type which is being moved into another namespace.</param>
+        /// <param name="cancellationToken">Cancellation of the session.</param>
         public async Task ProcessRefsAsync(
-            INamedTypeSymbol symbolInfo
+            INamedTypeSymbol symbolInfo,
+            CancellationToken cancellationToken = default
             )
         {
             if (symbolInfo is null)
@@ -65,7 +73,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 throw new ArgumentNullException(nameof(symbolInfo));
             }
 
-            var foundReferences = await FindReferencesForAsync(_vss.Workspace, symbolInfo);
+            var foundReferences = await FindReferencesForAsync(_workspace, symbolInfo, cancellationToken);
 
             //a file which several projects compile produces a separate symbol per project,
             //and Roslyn cascades the search to all of them: the very same location is reported
@@ -94,17 +102,18 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                         continue;
                     }
 
-                    await ProcessLocationAsync(location);
+                    await ProcessLocationAsync(location, cancellationToken);
                 }
             }
         }
 
         /// <summary>
-        /// Determine the kind of the syntax at the reference location and create a suitable fixer for it.
+        /// Determine the kind of the syntax at the reference location and schedule a suitable edit for it.
         /// A location we are unable to understand is skipped silently.
         /// </summary>
         private async Task ProcessLocationAsync(
-            ReferenceLocation location
+            ReferenceLocation location,
+            CancellationToken cancellationToken
             )
         {
             if (location.Document.FilePath == null)
@@ -130,7 +139,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             //for one project which compiles the file and a disabled text for another one)
             var document = location.Document;
 
-            var root = await document.GetSyntaxRootAsync();
+            var root = await document.GetSyntaxRootAsync(cancellationToken);
             if (root == null)
             {
                 //skip this location
@@ -171,7 +180,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 syntax = ps.Type;
             }
 
-            var semanticModel = await document.GetSemanticModelAsync();
+            var semanticModel = await document.GetSemanticModelAsync(cancellationToken);
             if (semanticModel == null)
             {
                 return;
@@ -213,9 +222,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 }
 
                 //add a new using clause
-                _fixerContainer
-                    .Fixer<AddUsingFixer>(location.Document.FilePath)
-                    .AddSubject(_targetNamespaceInfo.ModifiedName);
+                _edits.AddUsing(location.Document.FilePath, _targetNamespaceInfo.ModifiedName);
             }
         }
 
@@ -259,9 +266,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                     return;
                 }
 
-                _fixerContainer
-                    .Fixer<AddUsingFixer>(location.Document.FilePath!)
-                    .AddSubject(_targetNamespaceInfo.ModifiedName);
+                _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
 
                 return;
             }
@@ -272,18 +277,13 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             //replace QualifiedNameSyntax
             var mqns = uqns
                 .WithLeft(SyntaxFactory.ParseName((isGlobal ? "global::" : "") + _targetNamespaceInfo.ModifiedName))
-                .WithLeadingTrivia(uqns.GetLeadingTrivia())
-                .WithTrailingTrivia(uqns.GetTrailingTrivia())
                 ;
 
-            _fixerContainer
-                .Fixer<QualifiedNameFixer>(location.Document.FilePath!)
-                .AddSubject(
-                    new QualifiedNameFixer.QualifiedNameFixerArgument(
-                        uqns.Span,
-                        mqns
-                        )
-                    );
+            _edits.ReplaceText(
+                location.Document.FilePath!,
+                uqns.Span,
+                mqns.ToString()
+                );
         }
 
         /// <summary>
@@ -302,9 +302,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         {
             if (!symbol.Kind.NotIn(SymbolKind.Property, SymbolKind.Field, SymbolKind.Method))
             {
-                _fixerContainer
-                    .Fixer<AddUsingFixer>(location.Document.FilePath!)
-                    .AddSubject(_targetNamespaceInfo.ModifiedName);
+                _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
 
                 return;
             }
@@ -329,9 +327,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 || (typeIndex == 0 && !IsShadowedByTargetNamespace(semanticModel, maes.SpanStart, symbol.Name))
                 )
             {
-                _fixerContainer
-                    .Fixer<AddUsingFixer>(location.Document.FilePath!)
-                    .AddSubject(_targetNamespaceInfo.ModifiedName);
+                _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
 
                 return;
             }
@@ -342,14 +338,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 (isGlobal ? "global::" : "") + _targetNamespaceInfo.ModifiedName + "." + withoutNamespacesText
                 );
 
-            _fixerContainer
-                .Fixer<QualifiedNameFixer>(location.Document.FilePath!)
-                .AddSubject(
-                    new QualifiedNameFixer.QualifiedNameFixerArgument(
-                        maes.Span,
-                        modifiedMaesr
-                        )
-                    );
+            _edits.ReplaceText(
+                location.Document.FilePath!,
+                maes.Span,
+                modifiedMaesr.ToString()
+                );
         }
 
         /// <summary>
@@ -390,14 +383,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 (isGlobal ? "global::" : "") + _targetNamespaceInfo.ModifiedName + "." + nodeToReplace.ToString()
                 );
 
-            _fixerContainer
-                .Fixer<QualifiedNameFixer>(location.Document.FilePath!)
-                .AddSubject(
-                    new QualifiedNameFixer.QualifiedNameFixerArgument(
-                        nodeToReplace.Span,
-                        modified
-                        )
-                    );
+            _edits.ReplaceText(
+                location.Document.FilePath!,
+                nodeToReplace.Span,
+                modified.ToString()
+                );
 
             return true;
         }
@@ -542,10 +532,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         /// </summary>
         private static async Task<List<ReferencedSymbol>> FindReferencesForAsync(
             Workspace workspace,
-            INamedTypeSymbol symbolInfo
+            INamedTypeSymbol symbolInfo,
+            CancellationToken cancellationToken
             )
         {
-            var refs = await SymbolFinder.FindReferencesAsync(symbolInfo, workspace.CurrentSolution);
+            var refs = await SymbolFinder.FindReferencesAsync(symbolInfo, workspace.CurrentSolution, cancellationToken);
             var foundReferences = refs.ToList();
 
             if (symbolInfo.TypeKind == TypeKind.Class && symbolInfo.IsStatic)
@@ -562,7 +553,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
                 foreach (var extensionMethodSymbol in extensionMethodSymbols)
                 {
-                    var methodFoundReferences = await SymbolFinder.FindReferencesAsync(extensionMethodSymbol, workspace.CurrentSolution);
+                    var methodFoundReferences = await SymbolFinder.FindReferencesAsync(
+                        extensionMethodSymbol,
+                        workspace.CurrentSolution,
+                        cancellationToken
+                        );
                     foundReferences.AddRange(
                         methodFoundReferences
                         );

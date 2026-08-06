@@ -1,5 +1,4 @@
-﻿using AdjustNamespace.Helper;
-using AdjustNamespace.Window;
+﻿using AdjustNamespace.Window;
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.Collections.Generic;
@@ -96,17 +95,17 @@ namespace AdjustNamespace.Command
 
             try
             {
-                var vss = await VsServices.CreateAsync(ServiceProvider);
+                var context = await AdjustContext.CreateAsync(ServiceProvider);
 
                 //HashSet is needed to remove duplicates paths
                 //this is possible if you click Adjust on xaml file (with cs behind)
                 var filePaths = new HashSet<string>(
-                    await SolutionHelper.GetAllFilesFromAsync()
+                    await context.Solution.GetAllFilePathsAsync()
                     );
 
                 if (filePaths.Count > 0)
                 {
-                    var window = AdjustNamespaceWindow.Create(vss, filePaths);
+                    var window = AdjustNamespaceWindow.Create(context, filePaths);
                     window.ShowModal();
                 }
             }

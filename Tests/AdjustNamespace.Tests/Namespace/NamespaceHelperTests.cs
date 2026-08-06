@@ -1,4 +1,4 @@
-using AdjustNamespace.Helper;
+using AdjustNamespace.Namespace;
 using Xunit;
 
 namespace AdjustNamespace.Tests.Namespace

@@ -1,8 +1,7 @@
 ﻿using AdjustNamespace.UI.Control;
-using System;
-using System.Collections.Generic;
-using System.Windows.Controls;
 using AdjustNamespace.UI.ViewModel;
+using AdjustNamespace.UI.ViewModel.Select;
+using System;
 
 namespace AdjustNamespace.UI.StepFactory
 {
@@ -10,32 +9,36 @@ namespace AdjustNamespace.UI.StepFactory
     /// Factory of the second wizard step: the file selection and the target namespace regex
     /// (<see cref="SelectedStepViewModel"/>).
     /// </summary>
-    public class SelectedStepFactory : IStepFactory
+    public class SelectedStepFactory : IStepFactory<SelectedStepParameters>
     {
-        private readonly VsServices _vss;
-        private readonly ContentControl _targetControl;
-        private readonly IStepFactory _nextStepFactory;
+        private readonly AdjustContext _context;
+        private readonly IWizardHost _host;
 
         /// <summary>
         /// Factory of the previous step (this step allows to go back).
-        /// It is a property (not a constructor parameter) because the steps reference
-        /// each other and hence cannot be constructed in a single pass.
+        /// It is asked for at the moment the step is created and not at the moment this
+        /// factory is: the first two steps reference each other, so one of them is
+        /// necessarily built after the other, see <see cref="WizardChain"/>.
         /// </summary>
-        public PreparationStepFactory? PreviousStepFactory
-        {
-            get;
-            set;
-        }
+        private readonly Func<IStepFactory<PreparationParameters>> _previousStepFactory;
+
+        private readonly IStepFactory<PerformingParameters> _nextStepFactory;
 
         public SelectedStepFactory(
-            VsServices vss,
-            ContentControl targetControl,
-            IStepFactory nextStepFactory
+            AdjustContext context,
+            IWizardHost host,
+            Func<IStepFactory<PreparationParameters>> previousStepFactory,
+            IStepFactory<PerformingParameters> nextStepFactory
             )
         {
-            if (targetControl is null)
+            if (host is null)
             {
-                throw new ArgumentNullException(nameof(targetControl));
+                throw new ArgumentNullException(nameof(host));
+            }
+
+            if (previousStepFactory is null)
+            {
+                throw new ArgumentNullException(nameof(previousStepFactory));
             }
 
             if (nextStepFactory is null)
@@ -43,39 +46,25 @@ namespace AdjustNamespace.UI.StepFactory
                 throw new ArgumentNullException(nameof(nextStepFactory));
             }
 
-            _vss = vss;
-            _targetControl = targetControl;
+            _context = context;
+            _host = host;
+            _previousStepFactory = previousStepFactory;
             _nextStepFactory = nextStepFactory;
         }
 
         /// <inheritdoc/>
-        /// <param name="argument">A <see cref="SelectedStepParameters"/> instance.</param>
-        public async System.Threading.Tasks.Task CreateAsync(object argument)
+        public async System.Threading.Tasks.Task CreateAsync(SelectedStepParameters parameters)
         {
-            var a = (SelectedStepParameters)argument;
-
-            var v = new SelectedUserControl();
-
-            var vm = new SelectedStepViewModel(
-                _vss,
-                PreviousStepFactory!,
-                _nextStepFactory,
-                a
+            await _host.ShowAsync(
+                new SelectedUserControl(),
+                new SelectedStepViewModel(
+                    _context,
+                    _host,
+                    _previousStepFactory(),
+                    _nextStepFactory,
+                    parameters
+                    )
                 );
-
-            v.DataContext = vm;
-            _targetControl.Content = v;
-
-            try
-            {
-                await vm!.StartAsync();
-            }
-            catch (Exception excp)
-            {
-                _targetControl.Content = excp.Message + Environment.NewLine + excp.StackTrace;
-                _targetControl.Foreground = System.Windows.Media.Brushes.Red;
-                Logging.LogVS(excp);
-            }
         }
     }
 }

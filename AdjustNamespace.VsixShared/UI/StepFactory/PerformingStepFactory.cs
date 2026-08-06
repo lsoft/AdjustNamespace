@@ -1,8 +1,6 @@
 ﻿using AdjustNamespace.UI.Control;
 using System;
-using System.Windows.Controls;
 using AdjustNamespace.UI.ViewModel;
-using Microsoft.VisualStudio.PlatformUI;
 
 namespace AdjustNamespace.UI.StepFactory
 {
@@ -10,60 +8,37 @@ namespace AdjustNamespace.UI.StepFactory
     /// Factory of the third (last) wizard step: the adjusting itself
     /// (<see cref="PerformingViewModel"/>).
     /// </summary>
-    public class PerformingStepFactory : IStepFactory
+    public class PerformingStepFactory : IStepFactory<PerformingParameters>
     {
-        private readonly VsServices _vss;
-        private readonly DialogWindow _window;
-        private readonly ContentControl _targetControl;
+        private readonly AdjustContext _context;
+        private readonly IWizardHost _host;
 
         public PerformingStepFactory(
-            VsServices vss,
-            DialogWindow window,
-            ContentControl targetControl
+            AdjustContext context,
+            IWizardHost host
             )
         {
-            if (window is null)
+            if (host is null)
             {
-                throw new ArgumentNullException(nameof(window));
+                throw new ArgumentNullException(nameof(host));
             }
 
-            if (targetControl is null)
-            {
-                throw new ArgumentNullException(nameof(targetControl));
-            }
-
-            _vss = vss;
-            _window = window;
-            _targetControl = targetControl;
+            _context = context;
+            _host = host;
         }
 
         /// <inheritdoc/>
-        /// <param name="argument">A <see cref="PerformingParameters"/> instance.</param>
-        public async System.Threading.Tasks.Task CreateAsync(object argument)
+        public async System.Threading.Tasks.Task CreateAsync(PerformingParameters parameters)
         {
-            var v = new PerformingUserControl();
-
-            var vm = new PerformingViewModel(
-                _vss,
-                () => _window.Close(),
-                (PerformingParameters)argument
+            await _host.ShowAsync(
+                new PerformingUserControl(),
+                new PerformingViewModel(
+                    _context,
+                    _host,
+                    parameters
+                    )
                 );
-
-            v.DataContext = vm;
-            _targetControl.Content = v;
-
-            try
-            {
-                await vm!.StartAsync();
-            }
-            catch (Exception excp)
-            {
-                _targetControl.Content = excp.Message + Environment.NewLine + excp.StackTrace;
-                _targetControl.Foreground = System.Windows.Media.Brushes.Red;
-                Logging.LogVS(excp);
-            }
         }
 
     }
 }
-

@@ -1,5 +1,4 @@
-﻿using AdjustNamespace.Helper;
-using Microsoft.VisualStudio.PlatformUI;
+﻿using AdjustNamespace.UI.ViewModel;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -7,12 +6,11 @@ using System.Windows.Input;
 using System.Windows.Media;
 using AdjustNamespace.UI.StepFactory;
 using Microsoft.CodeAnalysis;
-using AdjustNamespace.UI.ViewModel.Select;
 using AdjustNamespace.Adjusting;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 
-namespace AdjustNamespace.UI.ViewModel
+namespace AdjustNamespace.UI.ViewModel.Select
 {
     /// <summary>
     /// Viewmodel of the second wizard step.
@@ -28,9 +26,10 @@ namespace AdjustNamespace.UI.ViewModel
         /// </summary>
         public const int MaxFilesAllowedToOpen = 15;
 
-        private readonly VsServices _vss;
-        private readonly IStepFactory _previousStepFactory;
-        private readonly IStepFactory _nextStepFactory;
+        private readonly AdjustContext _context;
+        private readonly IWizardHost _host;
+        private readonly IStepFactory<PreparationParameters> _previousStepFactory;
+        private readonly IStepFactory<PerformingParameters> _nextStepFactory;
         private readonly HashSet<string> _filePaths;
 
         //private readonly List<FileEx> _filteredFileExs;
@@ -179,11 +178,9 @@ namespace AdjustNamespace.UI.ViewModel
                     _closeCommand = new RelayCommand(
                         a =>
                         {
-                            if (a is DialogWindow w)
-                            {
-                                Cleanup();
-                                w.Close();
-                            }
+                            Cleanup();
+
+                            _host.Close();
                         }
                         );
                 }
@@ -205,7 +202,7 @@ namespace AdjustNamespace.UI.ViewModel
                         async a =>
                         {
                             await _previousStepFactory.CreateAsync(
-                                _filePaths
+                                new PreparationParameters(_filePaths)
                                 );
                         }
                         );
@@ -302,17 +299,24 @@ namespace AdjustNamespace.UI.ViewModel
         }
 
 
-        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="context">Everything the adjusting session works with.</param>
+        /// <param name="host">The window this step is shown in.</param>
         /// <param name="previousStepFactory">Factory of the previous wizard step.</param>
         /// <param name="nextStepFactory">Factory of the next wizard step.</param>
         /// <param name="parameters">Parameters of this step.</param>
         public SelectedStepViewModel(
-            VsServices vss,
-            IStepFactory previousStepFactory,
-            IStepFactory nextStepFactory,
+            AdjustContext context,
+            IWizardHost host,
+            IStepFactory<PreparationParameters> previousStepFactory,
+            IStepFactory<PerformingParameters> nextStepFactory,
             SelectedStepParameters parameters
             )
         {
+            if (host is null)
+            {
+                throw new ArgumentNullException(nameof(host));
+            }
+
             if (previousStepFactory is null)
             {
                 throw new ArgumentNullException(nameof(previousStepFactory));
@@ -323,7 +327,8 @@ namespace AdjustNamespace.UI.ViewModel
                 throw new ArgumentNullException(nameof(nextStepFactory));
             }
 
-            _vss = vss;
+            _context = context;
+            _host = host;
             _previousStepFactory = previousStepFactory;
             _nextStepFactory = nextStepFactory;
             _filePaths = parameters.FilePaths;
@@ -400,7 +405,7 @@ namespace AdjustNamespace.UI.ViewModel
                 var replaceRegex = CreateNamespaceReplaceRegex();
 
                 var sfc = new SubjectFileCollector(
-                    _vss,
+                    _context,
                     _filePaths,
                     replaceRegex
                     );

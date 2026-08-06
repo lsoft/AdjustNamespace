@@ -1,5 +1,4 @@
-﻿using AdjustNamespace.Helper;
-using AdjustNamespace.Xaml.BodyProvider;
+﻿using AdjustNamespace.Xaml.BodyProvider;
 using EnvDTE;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -15,16 +14,6 @@ namespace AdjustNamespace.Xaml
     /// </summary>
     public class XamlEngine
     {
-        private readonly VsServices _vss;
-
-        /// <param name="vss">Visual Studio services.</param>
-        public XamlEngine(
-            VsServices vss
-            )
-        {
-            _vss = vss;
-        }
-
         /// <summary>
         /// Read the xaml file and parse its structure.
         /// </summary>
@@ -56,7 +45,7 @@ namespace AdjustNamespace.Xaml
             IXamlBodyProvider bodyProvider;
             if (openFilesToEnableUndo)
             {
-                var obp = new OpenedXamlBodyProvider(_vss, xamlFilePath);
+                var obp = new OpenedXamlBodyProvider(xamlFilePath);
                 await obp.OpenAsync();
 
                 bodyProvider = obp;

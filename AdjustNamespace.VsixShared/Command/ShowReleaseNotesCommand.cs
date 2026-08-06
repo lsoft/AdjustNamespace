@@ -1,5 +1,4 @@
-﻿using AdjustNamespace.Helper;
-using AdjustNamespace.Window;
+﻿using AdjustNamespace.Window;
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.ComponentModel.Design;

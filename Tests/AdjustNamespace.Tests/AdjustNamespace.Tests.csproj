@@ -24,7 +24,8 @@
     <IsPackable>false</IsPackable>
     <!--
       Microsoft.VisualStudio.LanguageServices is built against an older Roslyn than the one
-      resolved here (see the package references below), and WorkspaceHelper reflects into it,
+      resolved here (see the package references below), and the shared code loads it
+      (AdjustContext asks the MEF composition for the VisualStudioWorkspace),
       so the assembly of it has to be bound to the Roslyn we really load.
     -->
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

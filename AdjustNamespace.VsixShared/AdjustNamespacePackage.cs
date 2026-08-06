@@ -3,7 +3,7 @@ global using Microsoft.VisualStudio.Shell;
 global using System;
 global using Task = System.Threading.Tasks.Task;
 using AdjustNamespace.Command;
-using AdjustNamespace.Helper;
+using AdjustNamespace.UI;
 using AdjustNamespace.InfoBar;
 using AdjustNamespace.Options;
 using EnvDTE80;

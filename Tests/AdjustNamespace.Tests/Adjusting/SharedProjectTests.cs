@@ -1,5 +1,7 @@
 using AdjustNamespace.Adjusting;
-using AdjustNamespace.Helper;
+using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Namespace;
+using AdjustNamespace.Roslyn;
 using AdjustNamespace.Tests.Infrastructure;
 using Xunit;
 using static AdjustNamespace.Tests.Infrastructure.AdjustRunner;
@@ -384,8 +386,8 @@ namespace Common.Core
                 ;
 
             var paths = solution.Workspace.EnumerateAllDocumentFilePaths(
-                Predicate.IsProjectInScope,
-                Predicate.IsDocumentInScope
+                Scope.IsProjectInScope,
+                Scope.IsDocumentInScope
                 );
 
             Assert.Equal(
@@ -412,8 +414,8 @@ namespace Common.Core
                 ;
 
             var paths = solution.Workspace.EnumerateAllDocumentFilePaths(
-                Predicate.IsProjectInScope,
-                Predicate.IsDocumentInScope
+                Scope.IsProjectInScope,
+                Scope.IsDocumentInScope
                 );
 
             Assert.Equal(
@@ -428,7 +430,7 @@ namespace Common.Core
 
         /// <summary>
         /// The adjusted file always gets the using clause of its own old namespace
-        /// (see <see cref="AdjustNamespace.Adjusting.Fixer.Specific.NamespaceFixer"/>:
+        /// (see <see cref="AdjustNamespace.Adjusting.Edit.MoveNamespaceEdit"/>:
         /// the types which stay there may be referenced from it), and the cleanup removes
         /// that clause again if the namespace has been emptied.
         ///
@@ -577,10 +579,9 @@ namespace A
 
             var xamlFilePath = solution.AddXamlFile("Common", "MainWindow.xaml", Body);
 
-            var adjuster = new XamlAdjuster(solution.Services, false, xamlFilePath, "Common");
+            var plan = await AdjustPlanner.TryPlanAsync(solution.Workspace, xamlFilePath, "Common");
 
-            Assert.False(await adjuster.IsChangesExistsAsync());
-            Assert.False(await adjuster.AdjustAsync());
+            Assert.Null(plan);
             Assert.Equal(Body, solution.XamlTextOf("Common", "MainWindow.xaml"));
         }
 

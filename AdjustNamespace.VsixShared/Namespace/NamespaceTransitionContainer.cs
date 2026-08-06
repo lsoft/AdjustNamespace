@@ -1,5 +1,4 @@
-﻿using AdjustNamespace.Helper;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
@@ -127,7 +126,7 @@ namespace AdjustNamespace.Namespace
         /// The same for all the syntax trees of a single file: a file which is compiled by
         /// several projects has a tree per project, and a namespace declaration which is
         /// guarded by a conditional compilation symbol exists in a part of them only,
-        /// see <see cref="Helper.WorkspaceHelper.GetDocuments"/>.
+        /// see <see cref="Roslyn.WorkspaceExtensions.GetDocuments"/>.
         /// </summary>
         /// <param name="nodes">Syntax roots of all the documents of the file.</param>
         /// <param name="root">Target namespace for that file.</param>

@@ -6,7 +6,7 @@ namespace AdjustNamespace.Tests.Adjusting
 {
     /// <summary>
     /// A new using clause is inserted behind the using clauses of the file itself
-    /// (see <see cref="AdjustNamespace.Adjusting.Fixer.AddUsingFixer"/>), and the files are
+    /// (see <see cref="AdjustNamespace.Adjusting.Edit.Apply.AddUsingApplier"/>), and the files are
     /// written by the users: the clauses may be placed inside a namespace declaration,
     /// inside a region or may be absent at all.
     /// </summary>

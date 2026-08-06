@@ -3,6 +3,7 @@ using AdjustNamespace.Tests.Infrastructure;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
+using static AdjustNamespace.Tests.Infrastructure.AdjustRunner;
 
 namespace AdjustNamespace.Tests.Adjusting
 {
@@ -326,7 +327,7 @@ namespace A.B
         /// <summary>
         /// The same namespace may be declared twice in a single file. It produces a single
         /// transition (see the NamespaceTransitionContainer tests), and
-        /// <see cref="AdjustNamespace.Adjusting.Fixer.Specific.NamespaceFixer"/> has to fix
+        /// <see cref="AdjustNamespace.Adjusting.Edit.Apply.MoveNamespaceApplier"/> has to fix
         /// every declaration of that namespace within that single transition.
         /// </summary>
         [Fact]
@@ -355,58 +356,5 @@ namespace A.B
             Assert.Equal(2, CountOf(text, "namespace X.Y"));
         }
 
-        private static async System.Threading.Tasks.Task<NamespaceCenter> AdjustAsync(
-            TestSolution solution,
-            string projectName,
-            string relativeFilePath,
-            string targetNamespace,
-            params string[] xamlFilePaths
-            )
-        {
-            var namespaceCenter = await NamespaceCenter.CreateForAsync(solution.Workspace);
-
-            var adjuster = new CsAdjuster(
-                solution.Services,
-                false,
-                namespaceCenter,
-                solution.PathOf(projectName, relativeFilePath),
-                targetNamespace,
-                xamlFilePaths.ToList()
-                );
-
-            await adjuster.AdjustAsync();
-
-            return namespaceCenter;
-        }
-
-        /// <summary>
-        /// The final stage of the wizard: remove the using clauses of the emptied namespaces
-        /// from every document of the solution (see <c>PerformingViewModel</c>).
-        /// </summary>
-        private static async Task CleanupAsync(
-            TestSolution solution,
-            NamespaceCenter namespaceCenter
-            )
-        {
-            var cleanup = new Cleanup(solution.Services, namespaceCenter);
-
-            foreach (var documentFilePath in solution.AllDocumentPaths())
-            {
-                await cleanup.RemoveEmptyUsingStatementsForAsync(documentFilePath);
-            }
-        }
-
-        private static int CountOf(string text, string substring)
-        {
-            var result = 0;
-            var index = text.IndexOf(substring, StringComparison.Ordinal);
-            while (index >= 0)
-            {
-                result++;
-                index = text.IndexOf(substring, index + substring.Length, StringComparison.Ordinal);
-            }
-
-            return result;
-        }
     }
 }

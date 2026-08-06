@@ -205,7 +205,6 @@
                 Padding="10,5,10,5"
                 HorizontalAlignment="Left"
                 Command="{Binding CloseCommand}"
-                CommandParameter="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}}"
                 Content="Cancel"
                 />
 

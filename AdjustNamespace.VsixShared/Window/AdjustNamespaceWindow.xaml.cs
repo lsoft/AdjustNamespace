@@ -1,5 +1,7 @@
 ﻿using AdjustNamespace.Options;
+using AdjustNamespace.UI;
 using AdjustNamespace.UI.StepFactory;
+using AdjustNamespace.UI.ViewModel;
 using Microsoft.VisualStudio.PlatformUI;
 using System;
 using System.Collections.Generic;
@@ -11,8 +13,9 @@ namespace AdjustNamespace.Window
     /// <summary>
     /// Interaction logic for AdjustNamespaceWindow.xaml
     ///
-    /// The modal wizard window. It hosts the steps one by one in its content control,
-    /// see <see cref="Create"/> and the <c>AdjustNamespace.UI.StepFactory</c> namespace.
+    /// The modal wizard window. It hosts the steps one by one in its content control
+    /// (see <see cref="WizardHost"/>); the steps themselves are wired by
+    /// <see cref="WizardChain"/>.
     /// </summary>
     public partial class AdjustNamespaceWindow : DialogWindow
     {
@@ -82,37 +85,24 @@ namespace AdjustNamespace.Window
         /// Build the wizard window with its chain of steps:
         /// preparation -> selection -> performing.
         /// </summary>
-        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="context">Everything the adjusting session works with.</param>
         /// <param name="filePaths">Full paths of the files chosen by the user.</param>
         public static AdjustNamespaceWindow Create(
-            VsServices vss,
+            AdjustContext context,
             HashSet<string> filePaths
             )
         {
             var window = new AdjustNamespaceWindow(
                 async anw =>
                 {
-                    var perfsf = new PerformingStepFactory(
-                        vss,
-                        anw,
-                        anw.CenterContentControl
+                    var chain = new WizardChain(
+                        context,
+                        new WizardHost(anw, anw.CenterContentControl)
                         );
 
-                    var selsf = new SelectedStepFactory(
-                        vss,
-                        anw.CenterContentControl,
-                        perfsf
+                    await chain.StartAsync(
+                        new PreparationParameters(filePaths)
                         );
-
-                    var prepsf = new PreparationStepFactory(
-                        vss,
-                        anw.CenterContentControl,
-                        selsf
-                        );
-
-                    selsf.PreviousStepFactory = prepsf;
-
-                    await prepsf.CreateAsync(filePaths);
                 }
                 );
 

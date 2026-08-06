@@ -1,4 +1,5 @@
-﻿using AdjustNamespace.Helper;
+﻿using AdjustNamespace.UI.ViewModel;
+using AdjustNamespace.Settings;
 using Microsoft.VisualStudio.PlatformUI;
 using System.IO;
 using System.Windows;
@@ -15,20 +16,41 @@ namespace AdjustNamespace.Window
     /// </summary>
     public partial class EditSkippedPathsWindow : DialogWindow
     {
-        private readonly VsServices _vss;
+        private readonly AdjustNamespaceSettings2 _settings;
+        private readonly SettingsReader _settingsReader;
         private readonly string _solutionFolder;
 
-        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="solutionFolder">Folder of the currently opened solution.</param>
+        /// <param name="settings">Settings of that solution.</param>
+        /// <param name="settingsReader">Writer of the settings file.</param>
         public EditSkippedPathsWindow(
-            VsServices vss
+            string solutionFolder,
+            AdjustNamespaceSettings2 settings,
+            SettingsReader settingsReader
             )
         {
-            _vss = vss;
-            _solutionFolder = new FileInfo(_vss.Workspace.CurrentSolution.FilePath).Directory.FullName;
+            if (solutionFolder is null)
+            {
+                throw new ArgumentNullException(nameof(solutionFolder));
+            }
+
+            if (settings is null)
+            {
+                throw new ArgumentNullException(nameof(settings));
+            }
+
+            if (settingsReader is null)
+            {
+                throw new ArgumentNullException(nameof(settingsReader));
+            }
+
+            _settings = settings;
+            _settingsReader = settingsReader;
+            _solutionFolder = solutionFolder;
 
             InitializeComponent();
 
-            foreach (var skipped in _vss.Settings.Settings.SkippedFolderSuffixes)
+            foreach (var skipped in _settings.Settings.SkippedFolderSuffixes)
             {
                 this.PathList.Items.Add(
                     new ItemViewModel(Path.IsPathRooted(skipped), skipped)
@@ -153,15 +175,15 @@ namespace AdjustNamespace.Window
         /// </summary>
         public void Save_Click(object sender, RoutedEventArgs e)
         {
-            _vss.Settings.Settings.SkippedFolderSuffixes.Clear();
+            _settings.Settings.SkippedFolderSuffixes.Clear();
             foreach (ItemViewModel skipped in this.PathList.Items)
             {
-                _vss.Settings.Settings.SkippedFolderSuffixes.Add(
+                _settings.Settings.SkippedFolderSuffixes.Add(
                     skipped.Suffix
                     );
             }
 
-            _vss.SettingsReader.Save(_vss.Settings.Settings);
+            _settingsReader.Save(_settings.Settings);
 
             this.Close();
         }

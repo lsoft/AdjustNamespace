@@ -1,34 +1,30 @@
-﻿using AdjustNamespace.Adjusting;
-using AdjustNamespace.Adjusting.Adjuster;
-using AdjustNamespace.Helper;
+﻿using AdjustNamespace.Adjusting.Session;
 using AdjustNamespace.Options;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Input;
 
 namespace AdjustNamespace.UI.ViewModel
 {
     /// <summary>
     /// Viewmodel of the third (last) wizard step: the adjusting itself.
-    /// It processes the chosen files one by one (see <see cref="AdjusterFactory"/>),
-    /// then removes the using clauses of the emptied namespaces (see <see cref="Cleanup"/>)
-    /// and closes the wizard window.
+    ///
+    /// The adjusting is performed by <see cref="AdjustSession"/>; what is left here is what
+    /// the wizard is responsible for: showing the progress, cancelling the session and
+    /// closing the window when it is over.
     /// </summary>
     public class PerformingViewModel : ChainViewModel
     {
         private readonly CancellationTokenSource _cts = new();
 
-        private readonly VsServices _vss;
-        private readonly Action _formCloser;
+        private readonly AdjustContext _context;
+        private readonly IWizardHost _host;
         private readonly List<string> _subjectFilePaths;
         private readonly NamespaceReplaceRegex _replaceRegex;
         private readonly bool _openFilesToEnableUndo;
 
         private RelayCommand? _cancelCommand;
-        private System.Threading.Tasks.Task? _task;
+        private System.Threading.Tasks.Task<AdjustSessionOutcome>? _task;
 
         private string _progressMessage;
 
@@ -70,22 +66,22 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
-        /// <param name="vss">Visual Studio services.</param>
-        /// <param name="formCloser">Callback which closes the wizard window.</param>
+        /// <param name="context">Everything the adjusting session works with.</param>
+        /// <param name="host">The window this step is shown in.</param>
         /// <param name="parameters">Parameters of this step.</param>
         public PerformingViewModel(
-            VsServices vss,
-            Action formCloser,
+            AdjustContext context,
+            IWizardHost host,
             PerformingParameters parameters
             )
         {
-            if (formCloser is null)
+            if (host is null)
             {
-                throw new ArgumentNullException(nameof(formCloser));
+                throw new ArgumentNullException(nameof(host));
             }
 
-            _vss = vss;
-            _formCloser = formCloser;
+            _context = context;
+            _host = host;
             _subjectFilePaths = parameters.SubjectFilePaths;
             _replaceRegex = parameters.ReplaceRegex;
             _openFilesToEnableUndo = parameters.OpenFilesToEnableUndo;
@@ -97,7 +93,7 @@ namespace AdjustNamespace.UI.ViewModel
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            //var undoManager = (await _vss.ServiceProvider.GetServiceAsync(typeof(SVsLinkedUndoTransactionManager))) as IVsLinkedUndoTransactionManager;
+            //var undoManager = (await the service provider.GetServiceAsync(typeof(SVsLinkedUndoTransactionManager))) as IVsLinkedUndoTransactionManager;
             //ErrorHandler.ThrowOnFailure(
             //    undoManager!.OpenLinkedUndo((uint)LinkedTransactionFlagsEnum.Global, "Adjusting Namespaces")
             //    );
@@ -107,99 +103,33 @@ namespace AdjustNamespace.UI.ViewModel
             //    undoManager.CountOpenTransactions(ref transactionCount)
             //    );
 
-            _task = PerformAdjustingAsync(_cts.Token);
-            await _task;
+            _task = new AdjustSession(_context, _replaceRegex, _openFilesToEnableUndo)
+                .RunAsync(
+                    _subjectFilePaths,
+                    //this Progress is built on the main thread (see the switch above) and
+                    //therefore marshals the reports of the session back to it: the binding
+                    //of the progress line is never touched from a background thread
+                    new Progress<AdjustProgress>(p => ProgressMessage = p.Message),
+                    _cts.Token
+                    );
+
+            var outcome = await _task;
 
             //ErrorHandler.ThrowOnFailure(undoManager.CloseLinkedUndo());
 
-            if (_cts.IsCancellationRequested)
-            {
-                ProgressMessage = $"Cancelled";
-            }
-            else
-            {
-                ProgressMessage = $"Completed";
-            }
+            ProgressMessage = outcome == AdjustSessionOutcome.Cancelled
+                ? "Cancelled"
+                : "Completed"
+                ;
 
             await System.Threading.Tasks.Task.Delay(750);
 
             General.Instance.FilesAdjusted += _subjectFilePaths.Count;
 
             _cts.Dispose();
-            _formCloser();
-        }
 
-        /// <summary>
-        /// The whole adjusting session: the files first, the cleanup then.
-        /// </summary>
-        private async System.Threading.Tasks.Task PerformAdjustingAsync(CancellationToken cancellationToken)
-        {
-            var namespaceCenter = await NamespaceCenter.CreateForAsync(_vss.Workspace);
-            var adjusterFactory = await AdjusterFactory.CreateAsync(
-                _vss,
-                _replaceRegex,
-                _openFilesToEnableUndo,
-                namespaceCenter
-                );
-            
-            //process file by file
-            cancellationToken = await AdjustAsync(adjusterFactory, cancellationToken);
-
-            //cleanup
-            await CleanupAsync(namespaceCenter, cancellationToken);
-        }
-
-        /// <summary>
-        /// Adjust the chosen files one by one until the user cancels the process.
-        /// </summary>
-        private async Task<CancellationToken> AdjustAsync(AdjusterFactory adjusterFactory, CancellationToken cancellationToken)
-            {
-            var total = _subjectFilePaths.Count;
-            for (var i = 0; i < total; i++)
-                {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
-                var subjectFilePath = _subjectFilePaths[i];
-
-                ProgressMessage = $"{i + 1}/{total}: {subjectFilePath}";
-                Debug.WriteLine($"----------------------------> {i} Adjust {subjectFilePath}");
-
-                var adjuster = await adjusterFactory.CreateAsync(subjectFilePath);
-                if (adjuster is not null)
-                {
-                    await adjuster.AdjustAsync();
-                }
-            }
-
-            return cancellationToken;
-        }
-
-        /// <summary>
-        /// Walk through every C# document of the solution and remove the using clauses
-        /// of the namespaces which became empty during the adjusting.
-        /// </summary>
-        private async Task CleanupAsync(NamespaceCenter namespaceCenter, CancellationToken cancellationToken)
-        {
-            var cleanupDocuments = _vss.Workspace.EnumerateAllDocumentFilePaths(Predicate.IsProjectInScope, Predicate.IsDocumentInScope).ToList();
-            var total = cleanupDocuments.Count;
-            var c = new Cleanup(_vss, namespaceCenter);
-            for (int i = 0; i < total; i++)
-            {
-                string documentFilePath = cleanupDocuments[i];
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    break;
-                }
-
-                ProgressMessage = $"{i + 1}/{total} Performing cleanup {documentFilePath}";
-                Debug.WriteLine($"----------------------------> {i} Cleanup {documentFilePath}");
-
-                await c.RemoveEmptyUsingStatementsForAsync(documentFilePath);
-            }
+            _host.Close();
         }
     }
-    
+
 }

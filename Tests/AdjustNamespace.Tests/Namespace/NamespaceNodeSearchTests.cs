@@ -1,4 +1,5 @@
-using AdjustNamespace.Helper;
+using AdjustNamespace.Namespace;
+using AdjustNamespace.Roslyn;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Linq;
 using Xunit;
@@ -8,7 +9,7 @@ namespace AdjustNamespace.Tests.Namespace
     /// <summary>
     /// Tests of <see cref="NamespaceHelper.TryFindNamespaceNodesFor"/>: the search of the
     /// namespace declarations to be renamed by
-    /// <see cref="AdjustNamespace.Adjusting.Fixer.Specific.NamespaceFixer"/>.
+    /// <see cref="AdjustNamespace.Adjusting.Edit.Apply.MoveNamespaceApplier"/>.
     /// </summary>
     public class NamespaceNodeSearchTests
     {

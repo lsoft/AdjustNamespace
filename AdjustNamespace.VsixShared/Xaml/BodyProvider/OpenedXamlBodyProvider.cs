@@ -1,4 +1,4 @@
-﻿using AdjustNamespace.Helper;
+﻿using AdjustNamespace.VisualStudio;
 using Community.VisualStudio.Toolkit;
 using EnvDTE;
 using Microsoft.VisualStudio.Threading;
@@ -18,8 +18,6 @@ namespace AdjustNamespace.Xaml.BodyProvider
     /// </summary>
     public sealed class OpenedXamlBodyProvider : IXamlBodyProvider
     {
-        private readonly VsServices _vss;
-
         /// <summary>
         /// The opened document. <c>null</c> until <see cref="OpenAsync"/> has been called.
         /// </summary>
@@ -33,7 +31,6 @@ namespace AdjustNamespace.Xaml.BodyProvider
 
 
         public OpenedXamlBodyProvider(
-            VsServices vss,
             string xamlFilePath
             )
         {
@@ -41,7 +38,7 @@ namespace AdjustNamespace.Xaml.BodyProvider
             {
                 throw new ArgumentNullException(nameof(xamlFilePath));
             }
-            _vss = vss;
+
             XamlFilePath = xamlFilePath;
         }
 

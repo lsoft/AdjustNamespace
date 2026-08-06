@@ -1,4 +1,4 @@
-﻿using AdjustNamespace.Helper;
+﻿using AdjustNamespace.Roslyn;
 using AdjustNamespace.Xaml;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -6,63 +6,70 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using AdjustNamespace.Adjusting.Fixer;
-using AdjustNamespace.Adjusting.Adjuster;
+using AdjustNamespace.Adjusting.Edit;
+using AdjustNamespace.Adjusting.Edit.Apply;
 using AdjustNamespace.Namespace;
-using AdjustNamespace.Adjusting.Fixer.Specific;
 using AdjustNamespace.Adjusting.Adjuster.Cs;
+using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.VisualStudio;
 
-namespace AdjustNamespace.Adjusting
+namespace AdjustNamespace.Adjusting.Adjuster
 {
     /// <summary>
     /// Adjuster for cs file.
     ///
     /// The workflow is:
-    /// 1) determine the namespace transitions (old namespace -> new namespace) for the file;
-    /// 2) find every reference to the types declared in this file and schedule a fix for each
+    /// 1) find every reference to the types declared in this file and schedule an edit for each
     ///    of them (a new using clause or an edited fully qualified name), see <see cref="RefProcessor"/>;
-    /// 3) schedule the fix of the namespace clauses of the file itself;
-    /// 4) apply all the scheduled fixes at once, see <see cref="FixerContainer"/>;
-    /// 5) fix the references to the moved types in the xaml files of the solution.
+    /// 2) schedule the move of the namespace declarations of the file itself;
+    /// 3) apply all the scheduled edits at once, see <see cref="EditApplier"/>;
+    /// 4) fix the references to the moved types in the xaml files of the solution.
+    ///
+    /// Whether this file is a subject to change at all and which namespace transitions
+    /// (old namespace -> new namespace) it has, has been decided by <see cref="AdjustPlanner"/>
+    /// already: this class performs the plan and does not question it.
     /// </summary>
     public class CsAdjuster : IAdjuster
     {
-        private readonly VsServices _vss;
+        private readonly Workspace _workspace;
+        private readonly IDocumentOpener _documentOpener;
         private readonly bool _openFilesToEnableUndo;
         private readonly NamespaceCenter _namespaceCenter;
         private readonly string _subjectFilePath;
         private readonly string _targetNamespace;
+        private readonly NamespaceTransitionContainer _transitions;
         private readonly List<string> _xamlFilePaths;
 
-        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="workspace">Roslyn workspace of the solution.</param>
+        /// <param name="documentOpener">Opener of the changed files in the editor.</param>
         /// <param name="openFilesToEnableUndo">Open the changed files in the editor (this allows the user to undo the changes).</param>
         /// <param name="namespaceCenter">Namespace state container shared across the whole adjusting session.</param>
-        /// <param name="subjectFilePath">Full path to the C# file to adjust.</param>
-        /// <param name="targetNamespace">The namespace the types of that file should be moved into.</param>
+        /// <param name="plan">What has to happen with the file.</param>
         /// <param name="xamlFilePaths">All the xaml files of the solution (they may reference the moved types).</param>
         public CsAdjuster(
-            VsServices vss,
+            Workspace workspace,
+            IDocumentOpener documentOpener,
             bool openFilesToEnableUndo,
             NamespaceCenter namespaceCenter,
-            string subjectFilePath,
-            string targetNamespace,
+            AdjustPlanItem plan,
             List<string> xamlFilePaths
             )
         {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
+
+            if (documentOpener is null)
+            {
+                throw new ArgumentNullException(nameof(documentOpener));
+            }
+
             if (namespaceCenter is null)
             {
                 throw new ArgumentNullException(nameof(namespaceCenter));
-            }
-
-            if (subjectFilePath is null)
-            {
-                throw new ArgumentNullException(nameof(subjectFilePath));
-            }
-
-            if (targetNamespace is null)
-            {
-                throw new ArgumentNullException(nameof(targetNamespace));
             }
 
             if (xamlFilePaths is null)
@@ -70,59 +77,31 @@ namespace AdjustNamespace.Adjusting
                 throw new ArgumentNullException(nameof(xamlFilePaths));
             }
 
-            _vss = vss;
+            _workspace = workspace;
+            _documentOpener = documentOpener;
             _openFilesToEnableUndo = openFilesToEnableUndo;
             _namespaceCenter = namespaceCenter;
-            _subjectFilePath = subjectFilePath;
-            _targetNamespace = targetNamespace;
+            _subjectFilePath = plan.FilePath;
+            _targetNamespace = plan.TargetNamespace;
+            _transitions = plan.Transitions;
             _xamlFilePaths = xamlFilePaths;
         }
 
         /// <inheritdoc/>
-        public async Task<bool> AdjustAsync()
+        public async Task<bool> AdjustAsync(CancellationToken cancellationToken = default)
         {
-            if (_vss.Workspace.IsCompiledBySeveralProjects(_subjectFilePath))
-            {
-                //a file of a shared project which is referenced by several projects:
-                //there is no target namespace which suits all of them
-                //skip this document
-                return false;
-            }
-
             //a file may be compiled by several projects (the target frameworks of a multi target
             //project), and every one of them parses it with its own conditional compilation
             //symbols: a type which is declared under such a symbol exists in a part of these
             //trees only, so all of them are taken into account
-            var subjectTrees = await GetSubjectTreesAsync();
+            var subjectTrees = await GetSubjectTreesAsync(cancellationToken);
             if (subjectTrees.Count == 0)
             {
-                //skip this document
+                //there is no semantic model for this file, so there is nothing we can do
                 return false;
             }
 
-            var ntc = NamespaceTransitionContainer.GetNamespaceTransitionsFor(
-                subjectTrees.ConvertAll(t => t.SyntaxRoot),
-                _targetNamespace
-                );
-            if (ntc.IsEmpty)
-            {
-                //skip this document
-                return false;
-            }
-
-            foreach (var transition in ntc.Transitions)
-            {
-                if (await _vss.Workspace.IsNamespaceStateContradictoryAsync(_subjectFilePath, transition.OriginalName))
-                {
-                    //the projects which compile this file do not agree whether the namespace
-                    //it is moved out of stays alive, and there is a single text for all of them:
-                    //whatever we do with the using clauses, one of these projects breaks
-                    //skip this document
-                    return false;
-                }
-            }
-
-            var fixerContainer = new FixerContainer(_vss, _openFilesToEnableUndo);
+            var edits = new EditSet();
 
             var processedTypes = new Dictionary<INamedTypeSymbol, NamespaceTransition>(SymbolEqualityComparer.Default);
 
@@ -130,18 +109,24 @@ namespace AdjustNamespace.Adjusting
             await FixReferencesAsync(
                 processedTypes,
                 subjectTrees,
-                fixerContainer
+                edits,
+                cancellationToken
                 );
 
-            //fix namespaces of the current file
-            fixerContainer.Fixer<NamespaceFixer>(_subjectFilePath)
-                .AddSubject(ntc)
-                ;
+            //move the namespaces of the current file; only the root ones are moved, the nested
+            //ones follow them automatically because their full name contains the root one
+            foreach (var transition in _transitions.Transitions.Where(t => t.IsRoot))
+            {
+                edits.MoveNamespace(_subjectFilePath, transition);
+            }
 
-            //perform fixing
-            await fixerContainer.FixAllAsync();
+            //perform the changes. The cancellation is not asked anymore: the edits of one file
+            //describe a single consistent change of the solution and a half of them is a broken
+            //file, so the writing is never interrupted
+            await new EditApplier(_workspace, _documentOpener, _openFilesToEnableUndo)
+                .ApplyAsync(edits);
 
-            //TODO: switch to IFixer infrastructure, and put above fixerContainer.FixAllAsync() clause
+            //TODO: describe these changes as the edits of the set above
             await FixReferenceInXamlFilesAsync(
                 processedTypes
                 );
@@ -151,22 +136,24 @@ namespace AdjustNamespace.Adjusting
 
         /// <summary>
         /// The documents the subject file is compiled as, with their syntax trees and semantic
-        /// models: one per project which compiles it, see <see cref="WorkspaceHelper.GetDocuments"/>.
+        /// models: one per project which compiles it, see <see cref="Roslyn.WorkspaceExtensions.GetDocuments"/>.
         /// </summary>
-        private async Task<List<SubjectTree>> GetSubjectTreesAsync()
+        private async Task<List<SubjectTree>> GetSubjectTreesAsync(
+            CancellationToken cancellationToken
+            )
         {
             var result = new List<SubjectTree>();
 
-            foreach (var document in _vss.Workspace.GetDocuments(_subjectFilePath))
+            foreach (var document in _workspace.GetDocuments(_subjectFilePath))
             {
-                var syntaxRoot = await document.GetSyntaxRootAsync();
+                var syntaxRoot = await document.GetSyntaxRootAsync(cancellationToken);
                 if (syntaxRoot == null)
                 {
                     //skip this document
                     continue;
                 }
 
-                var semanticModel = await document.GetSemanticModelAsync();
+                var semanticModel = await document.GetSemanticModelAsync(cancellationToken);
                 if (semanticModel == null)
                 {
                     //skip this document
@@ -180,18 +167,20 @@ namespace AdjustNamespace.Adjusting
         }
 
         /// <summary>
-        /// Create the fixers for every reference to every type declared in the subject file.
+        /// Schedule the edits for every reference to every type declared in the subject file.
         /// </summary>
         /// <param name="processedTypes">
         /// (in/out) The types which have been moved, with the transition of each of them.
         /// It is filled here and reused later to fix the references in the xaml files.
         /// </param>
         /// <param name="subjectTrees">The syntax trees of the subject file, one per project which compiles it.</param>
-        /// <param name="fixerContainer">(out) Container the created fixers are placed into.</param>
+        /// <param name="edits">(out) Set the scheduled edits are placed into.</param>
+        /// <param name="cancellationToken">Cancellation of the session.</param>
         private async Task FixReferencesAsync(
             Dictionary<INamedTypeSymbol, NamespaceTransition> processedTypes,
             List<SubjectTree> subjectTrees,
-            FixerContainer fixerContainer
+            EditSet edits,
+            CancellationToken cancellationToken
             )
         {
             //the same type is a separate symbol in every project which compiles the file,
@@ -209,6 +198,10 @@ namespace AdjustNamespace.Adjusting
 
                 foreach (var foundTypeSyntax in foundSyntaxes)
                 {
+                    //the reference search of the types below is the longest part of the whole
+                    //session, so a cancel is answered between the types and not after the file
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     var symbolInfo = (INamedTypeSymbol?)subjectTree.SemanticModel.GetDeclaredSymbol(foundTypeSyntax);
                     if (symbolInfo == null)
                     {
@@ -255,9 +248,9 @@ namespace AdjustNamespace.Adjusting
                         continue;
                     }
 
-                    //create fixers for all references
-                    var refProcessor = new RefProcessor(_vss, fixerContainer, targetNamespaceInfo);
-                    await refProcessor.ProcessRefsAsync(symbolInfo);
+                    //schedule the edits for all references
+                    var refProcessor = new RefProcessor(_workspace, edits, targetNamespaceInfo);
+                    await refProcessor.ProcessRefsAsync(symbolInfo, cancellationToken);
 
                     processedTypes[symbolInfo] = targetNamespaceInfo;
                     _namespaceCenter.TypeRemoved(symbolInfo);
@@ -307,7 +300,7 @@ namespace AdjustNamespace.Adjusting
                     continue;
                 }
 
-                var xamlEngine = new XamlEngine(_vss);
+                var xamlEngine = new XamlEngine();
 
                 var testDocument = await xamlEngine.CreateDocumentAsync(false, xamlFilePath);
 

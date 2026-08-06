@@ -1,6 +1,4 @@
-﻿using AdjustNamespace.Helper;
-using Microsoft.VisualStudio.PlatformUI;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows.Input;
@@ -20,8 +18,9 @@ namespace AdjustNamespace.UI.ViewModel
     /// </summary>
     public class PreparationStepViewModel : ChainViewModel
     {
-        private readonly VsServices _vss;
-        private readonly IStepFactory _nextStepFactory;
+        private readonly AdjustContext _context;
+        private readonly IWizardHost _host;
+        private readonly IStepFactory<SelectedStepParameters> _nextStepFactory;
         private readonly HashSet<string> _filePaths;
 
         private string _mainMessage;
@@ -66,10 +65,7 @@ namespace AdjustNamespace.UI.ViewModel
                     _closeCommand = new RelayCommand(
                         a =>
                         {
-                            if (a is DialogWindow w)
-                            {
-                                w.Close();
-                            }
+                            _host.Close();
                         },
                         r => !_isInProgress
                         );
@@ -129,28 +125,31 @@ namespace AdjustNamespace.UI.ViewModel
             }
         }
 
-        /// <param name="vss">Visual Studio services.</param>
+        /// <param name="context">Everything the adjusting session works with.</param>
+        /// <param name="host">The window this step is shown in.</param>
         /// <param name="nextStepFactory">Factory of the next wizard step.</param>
-        /// <param name="filePaths">Full paths of the files chosen by the user.</param>
+        /// <param name="parameters">Parameters of this step.</param>
         public PreparationStepViewModel(
-            VsServices vss,
-            IStepFactory nextStepFactory,
-            HashSet<string> filePaths
+            AdjustContext context,
+            IWizardHost host,
+            IStepFactory<SelectedStepParameters> nextStepFactory,
+            PreparationParameters parameters
             )
         {
+            if (host is null)
+            {
+                throw new ArgumentNullException(nameof(host));
+            }
+
             if (nextStepFactory is null)
             {
                 throw new ArgumentNullException(nameof(nextStepFactory));
             }
 
-            if (filePaths is null)
-            {
-                throw new ArgumentNullException(nameof(filePaths));
-            }
-
-            _vss = vss;
+            _context = context;
+            _host = host;
             _nextStepFactory = nextStepFactory;
-            _filePaths = filePaths;
+            _filePaths = parameters.FilePaths;
 
             _mainMessage = "Scanning solution...";
 
@@ -260,8 +259,8 @@ namespace AdjustNamespace.UI.ViewModel
             var errorFound = false;
 
             var index = 1;
-            var total = _vss.Workspace.CurrentSolution.Projects.Count();
-            foreach (var project in _vss.Workspace.CurrentSolution.Projects)
+            var total = _context.Workspace.CurrentSolution.Projects.Count();
+            foreach (var project in _context.Workspace.CurrentSolution.Projects)
             {
                 try
                 {
