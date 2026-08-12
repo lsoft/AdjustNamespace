@@ -12,6 +12,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)AdjustContext.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\AdjusterFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\Cs\RefProcessor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\Cs\SelfReferenceFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\CsAdjuster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\IAdjuster.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\XamlAdjuster.cs" />

@@ -33,6 +33,9 @@ My others extensions lives [here](https://marketplace.visualstudio.com/publisher
 - The files which more than one project compiles are not adjusted anymore: there is no target namespace which suits all of them.
 - Multi target projects: every target framework of a file is taken into account now.
 - Added the support of the C# unions (`public union Pet(Cat, Dog);`): a case type which is moved into another namespace was silently left behind and the union stopped compiling.
+- Fixed the references an adjusted file itself makes to the types of its old enclosing namespace: such a reference relies on the file being nested inside that namespace and was left dangling once the file was moved out of it.
+- Fixed the references written in the documentation comments (`<see cref="Class1"/>`): such a reference was skipped silently, so it kept pointing to the old namespace while the `using` clause it resolved through was removed.
+- Added the logging of the adjusting (the searched types, the found references and the scheduled changes) and of the Roslyn version in use.
 - Added the documentation of the internals.
 
 ## 0.4.0

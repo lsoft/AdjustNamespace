@@ -562,6 +562,46 @@ namespace Other
         }
 
         /// <summary>
+        /// The adjusted file itself may reference another type without a <c>using</c>
+        /// clause, relying on being nested inside that type's namespace
+        /// (<c>Some.A.B</c> sees <c>Some.A</c> unqualified). Moving the file out of that
+        /// namespace loses the reference: found in a real-world solution, see
+        /// https://github.com/lsoft/AdjustNamespace, where a file moved from
+        /// <c>NLOutline.Tree.Builder</c> into <c>Nlo.NLOutline.Tree.Builder</c> (a sibling
+        /// namespace, not nested under <c>NLOutline.Tree</c> anymore) stopped compiling:
+        /// its unqualified use of <c>OutlineNode</c>, declared in <c>NLOutline.Tree</c>,
+        /// was left untouched and no <c>using NLOutline.Tree;</c> was added for it.
+        /// </summary>
+        [Fact]
+        public async Task The_adjusted_file_keeps_seeing_a_type_of_its_old_enclosing_namespace()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "OutlineNode.cs",
+@"namespace NLOutline.Tree
+{
+    public class OutlineNode { }
+}
+")
+                .AddDocument("MyApp", "TreeBuilder.cs",
+@"namespace NLOutline.Tree.Builder
+{
+    public class TreeBuilder
+    {
+        public OutlineNode Build() => new OutlineNode();
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            await AdjustAsync(solution, "MyApp", "TreeBuilder.cs", "Nlo.NLOutline.Tree.Builder");
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
+
+        /// <summary>
         /// A type of the same namespace which lives in another (not adjusted) file
         /// keeps that namespace, so the using clause of it must not be removed
         /// from the consumers.
@@ -606,5 +646,135 @@ namespace Other
             Assert.Contains("using A.B;", text);
             Assert.Contains("using X.Y;", text);
         }
+
+        /// <summary>
+        /// A <c>cref</c> of a documentation comment (<c>&lt;see cref="Class1"/&gt;</c>) is a
+        /// reference to the type just like any other one: Roslyn reports it and the compiler
+        /// binds it, so it stops resolving (CS1574) once the type is moved away and the
+        /// cleanup removes the using clause it resolved through.
+        ///
+        /// A documentation comment is a trivia of the node it is attached to, and
+        /// <c>SyntaxNode.FindNode</c> does not descend into the trivia unless it is asked to,
+        /// so such a reference used to be skipped silently: the node found for it was the
+        /// declaration the comment is written in front of, and no symbol of it matched.
+        ///
+        /// Found in a real-world solution, see https://github.com/lsoft/AdjustNamespace:
+        /// <c>&lt;see cref="VisualStudioMcpServerProxy"/&gt;</c> of a moved type left behind.
+        /// </summary>
+        [Fact]
+        public async Task A_cref_of_a_documentation_comment_is_processed()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Class1.cs",
+@"namespace A.B
+{
+    public class Class1 { }
+}
+")
+                .AddDocument("MyApp", "Consumer.cs",
+@"using A.B;
+
+namespace Other
+{
+    public class Consumer
+    {
+        /// <summary>
+        /// Creates a <see cref=""Class1""/>.
+        /// </summary>
+        public Class1 Create() => new Class1();
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.UnresolvedCrefsAsync());
+
+            var namespaceCenter = await AdjustAsync(solution, "MyApp", "Class1.cs", "X.Y");
+            await CleanupAsync(solution, namespaceCenter);
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+            Assert.Empty(await solution.UnresolvedCrefsAsync());
+        }
+
+        /// <summary>
+        /// The same, with the cref as the only reference the file makes to the moved type:
+        /// nothing else asks for the using clause of the target namespace, so the whole fix
+        /// of the file depends on the cref being processed.
+        /// </summary>
+        [Fact]
+        public async Task A_cref_is_the_only_reference_of_the_file()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Class1.cs",
+@"namespace A.B
+{
+    public class Class1 { }
+}
+")
+                .AddDocument("MyApp", "Consumer.cs",
+@"using A.B;
+
+namespace Other
+{
+    /// <summary>
+    /// A companion of <see cref=""Class1""/>.
+    /// </summary>
+    public class Consumer
+    {
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.UnresolvedCrefsAsync());
+
+            var namespaceCenter = await AdjustAsync(solution, "MyApp", "Class1.cs", "X.Y");
+            await CleanupAsync(solution, namespaceCenter);
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+            Assert.Empty(await solution.UnresolvedCrefsAsync());
+        }
+
+        /// <summary>
+        /// A cref which spells the namespace out is rewritten in place, exactly as
+        /// a fully qualified name in the code is.
+        /// </summary>
+        [Fact]
+        public async Task A_fully_qualified_cref_is_rewritten()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Class1.cs",
+@"namespace A.B
+{
+    public class Class1 { }
+}
+")
+                .AddDocument("MyApp", "Consumer.cs",
+@"namespace Other
+{
+    /// <summary>
+    /// A companion of <see cref=""A.B.Class1""/>.
+    /// </summary>
+    public class Consumer
+    {
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.UnresolvedCrefsAsync());
+
+            var namespaceCenter = await AdjustAsync(solution, "MyApp", "Class1.cs", "X.Y");
+            await CleanupAsync(solution, namespaceCenter);
+
+            Assert.Contains("cref=\"X.Y.Class1\"", solution.TextOf("MyApp", "Consumer.cs"));
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+            Assert.Empty(await solution.UnresolvedCrefsAsync());
+        }
+
     }
 }

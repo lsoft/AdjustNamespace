@@ -5,6 +5,8 @@ using Microsoft.VisualStudio.LanguageServices;
 using Microsoft.VisualStudio.Threading;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -122,9 +124,13 @@ namespace AdjustNamespace.Namespace
             {
                 if (compilation.TryFindNamespace(namespaceName) != null)
                 {
+                    Debug.WriteLine($"[Adjust] NamespaceCenter: {namespaceName} is still filled for {compilation.AssemblyName}, using clause kept");
+
                     return false;
                 }
             }
+
+            Debug.WriteLine($"[Adjust] NamespaceCenter: {namespaceName} is gone for {string.Join(", ", compilations.Select(c => c.AssemblyName))}, using clause removed");
 
             return true;
         }
@@ -193,6 +199,8 @@ namespace AdjustNamespace.Namespace
 
             if (set.Count == 0)
             {
+                Debug.WriteLine($"[Adjust] NamespaceCenter: {cnn} is now empty, its using clauses will be removed");
+
                 _namespacesToRemove.Add(cnn);
             }
         }
@@ -215,7 +223,10 @@ namespace AdjustNamespace.Namespace
 
             set.Add(BuildNameIn(type, targetNamespace));
 
-            _namespacesToRemove.Remove(targetNamespace);
+            if (_namespacesToRemove.Remove(targetNamespace))
+            {
+                Debug.WriteLine($"[Adjust] NamespaceCenter: {targetNamespace} is filled again, its using clauses will be kept");
+            }
         }
 
         /// <summary>

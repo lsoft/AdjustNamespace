@@ -1,6 +1,7 @@
 ﻿using AdjustNamespace.Adjusting.Adjuster;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Roslyn;
+using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -73,6 +74,10 @@ namespace AdjustNamespace.Adjusting.Session
                 throw new ArgumentNullException(nameof(subjectFilePaths));
             }
 
+            LogRoslynVersion();
+
+            Debug.WriteLine($"[Adjust] Session started, {subjectFilePaths.Count} subject file(s)");
+
             try
             {
                 //the state of the namespaces is shared by all the files of the session:
@@ -92,10 +97,31 @@ namespace AdjustNamespace.Adjusting.Session
             }
             catch (OperationCanceledException)
             {
+                Debug.WriteLine("[Adjust] Session cancelled");
+
                 return AdjustSessionOutcome.Cancelled;
             }
 
+            Debug.WriteLine("[Adjust] Session completed");
+
             return AdjustSessionOutcome.Completed;
+        }
+
+        /// <summary>
+        /// Logs the version of the Roslyn assemblies the session runs against: the extension
+        /// (<c>AdjustNamespace.2022</c>) and the test suite reference different Roslyn versions,
+        /// see the note in CLAUDE.md, and this is the only way to tell which one is in effect
+        /// when a bug is reported from a running Visual Studio.
+        /// </summary>
+        private static void LogRoslynVersion()
+        {
+            var workspacesAssembly = typeof(Workspace).Assembly.GetName();
+            var csharpAssembly = typeof(Microsoft.CodeAnalysis.CSharp.SyntaxFactory).Assembly.GetName();
+
+            Debug.WriteLine(
+                $"[Adjust] Roslyn: Microsoft.CodeAnalysis.Workspaces={workspacesAssembly.Version}, "
+                + $"Microsoft.CodeAnalysis.CSharp={csharpAssembly.Version}"
+                );
         }
 
         /// <summary>
@@ -121,7 +147,7 @@ namespace AdjustNamespace.Adjusting.Session
                 progress?.Report(
                     new AdjustProgress(AdjustStage.Adjusting, i + 1, total, subjectFilePath)
                     );
-                Debug.WriteLine($"----------------------------> {i} Adjust {subjectFilePath}");
+                Debug.WriteLine($"[Adjust] ----------------------------> {i} Adjust {subjectFilePath}");
 
                 var adjuster = await adjusterFactory.CreateAsync(subjectFilePath, cancellationToken);
                 if (adjuster is not null)
@@ -159,7 +185,7 @@ namespace AdjustNamespace.Adjusting.Session
                 progress?.Report(
                     new AdjustProgress(AdjustStage.Cleanup, i + 1, total, documentFilePath)
                     );
-                Debug.WriteLine($"----------------------------> {i} Cleanup {documentFilePath}");
+                Debug.WriteLine($"[Adjust] ----------------------------> {i} Cleanup {documentFilePath}");
 
                 await cleanup.RemoveEmptyUsingStatementsForAsync(documentFilePath, cancellationToken);
             }

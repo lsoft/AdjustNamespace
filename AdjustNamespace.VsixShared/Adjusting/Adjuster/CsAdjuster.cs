@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -90,6 +91,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
         /// <inheritdoc/>
         public async Task<bool> AdjustAsync(CancellationToken cancellationToken = default)
         {
+            Debug.WriteLine($"[Adjust] CsAdjuster: {_subjectFilePath} -> {_targetNamespace}");
+
             //a file may be compiled by several projects (the target frameworks of a multi target
             //project), and every one of them parses it with its own conditional compilation
             //symbols: a type which is declared under such a symbol exists in a part of these
@@ -97,9 +100,13 @@ namespace AdjustNamespace.Adjusting.Adjuster
             var subjectTrees = await GetSubjectTreesAsync(cancellationToken);
             if (subjectTrees.Count == 0)
             {
+                Debug.WriteLine($"[Adjust] CsAdjuster: {_subjectFilePath} has no semantic model, skipped ({subjectTrees.Count} tree(s))");
+
                 //there is no semantic model for this file, so there is nothing we can do
                 return false;
             }
+
+            Debug.WriteLine($"[Adjust] CsAdjuster: {_subjectFilePath} compiled by {subjectTrees.Count} project(s)");
 
             var edits = new EditSet();
 
@@ -111,6 +118,12 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 subjectTrees,
                 edits,
                 cancellationToken
+                );
+
+            //fix the references the file itself makes to types of its old enclosing namespace
+            FixSelfReferences(
+                subjectTrees,
+                edits
                 );
 
             //move the namespaces of the current file; only the root ones are moved, the nested
@@ -218,11 +231,13 @@ namespace AdjustNamespace.Adjusting.Adjuster
                     var symbolNamespace = symbolInfo.ContainingNamespace.ToDisplayString();
                     if (symbolNamespace == _targetNamespace)
                     {
+                        Debug.WriteLine($"[Adjust] Type {symbolInfo.ToDisplayString()}: already in target namespace {_targetNamespace}, skipped");
                         continue;
                     }
 
                     if (NamespaceHelper.IsSpecialNamespace(symbolNamespace))
                     {
+                        Debug.WriteLine($"[Adjust] Type {symbolInfo.ToDisplayString()}: namespace {symbolNamespace} is special, skipped");
                         continue;
                     }
 
@@ -235,6 +250,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
                         );
                     if (!transition.HasValue)
                     {
+                        Debug.WriteLine($"[Adjust] Type {symbolInfo.ToDisplayString()}: no namespace transition found, skipped");
+
                         //there is no transition for this type: it is declared outside of any
                         //namespace, for example. Nothing to move.
                         continue;
@@ -248,6 +265,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
                         continue;
                     }
 
+                    Debug.WriteLine($"[Adjust] Type {symbolInfo.ToDisplayString()}: {symbolNamespace} -> {targetNamespaceInfo.ModifiedName}, searching references");
+
                     //schedule the edits for all references
                     var refProcessor = new RefProcessor(_workspace, edits, targetNamespaceInfo);
                     await refProcessor.ProcessRefsAsync(symbolInfo, cancellationToken);
@@ -256,6 +275,23 @@ namespace AdjustNamespace.Adjusting.Adjuster
                     _namespaceCenter.TypeRemoved(symbolInfo);
                     _namespaceCenter.TypeAdded(symbolInfo, targetNamespaceInfo.ModifiedName);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Schedule a <c>using</c> clause for every reference the subject file makes to a type
+        /// of its old enclosing namespace, see <see cref="SelfReferenceFixer"/>.
+        /// </summary>
+        private void FixSelfReferences(
+            List<SubjectTree> subjectTrees,
+            EditSet edits
+            )
+        {
+            var fixer = new SelfReferenceFixer(edits, _subjectFilePath, _targetNamespace);
+
+            foreach (var subjectTree in subjectTrees)
+            {
+                fixer.Fix(subjectTree.SyntaxRoot, subjectTree.SemanticModel);
             }
         }
 

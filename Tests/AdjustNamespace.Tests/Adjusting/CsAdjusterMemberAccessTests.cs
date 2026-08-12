@@ -204,6 +204,114 @@ namespace AdjustNamespace.Tests.Adjusting
         }
 
         /// <summary>
+        /// An extension method called in its instance syntax (<c>excp.LogIt()</c>) resolves
+        /// through a plain <c>using</c> clause of the extension's namespace, not through a
+        /// qualified name, so <c>RefProcessor</c> has to see it as a member access
+        /// with no namespace written in front of it and add the new <c>using</c> clause for it.
+        ///
+        /// Found in a real-world solution, see https://github.com/lsoft/AdjustNamespace:
+        /// <c>ActivityLogHelper</c> (a static class with the extension method
+        /// <c>ActivityLogException(this Exception, ...)</c>) moved from <c>FreeAIr.Helper</c>
+        /// into <c>FreeAIr.Shared.Helper</c>; every caller of <c>excp.ActivityLogException()</c>
+        /// had a plain <c>using FreeAIr.Helper;</c> for it (no relation to any enclosing
+        /// namespace), and after the move that <c>using</c> was removed by the cleanup (the
+        /// namespace became empty) while no <c>using FreeAIr.Shared.Helper;</c> replaced it,
+        /// leaving the call unresolved (CS1061).
+        /// </summary>
+        [Fact]
+        public async Task An_extension_method_called_in_its_instance_syntax_is_kept_resolvable()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Ext.cs",
+@"namespace A.B
+{
+    public static class Ext
+    {
+        public static int Twice(this int value) => value * 2;
+    }
+}
+")
+                .AddDocument("MyApp", "Consumer.cs",
+@"using A.B;
+
+namespace Other
+{
+    public class Consumer
+    {
+        public int Get() => 21.Twice();
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            var namespaceCenter = await AdjustAsync(solution, "MyApp", "Ext.cs", "X.Y");
+            await CleanupAsync(solution, namespaceCenter);
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
+
+        /// <summary>
+        /// The real-world case is cross-project: the extension method lives in a "Shared"
+        /// project (<c>Lib</c>) referenced by both a project which keeps other members of
+        /// the old namespace (<c>Sibling</c>, unrelated to <c>Consumer</c>) and one which
+        /// doesn't (<c>Consumer</c>). The namespace is alive for the solution (<c>Sibling</c>
+        /// still fills it) but empty for <c>Consumer</c>'s own compilation (it does not
+        /// reference <c>Sibling</c>), so the cleanup removes <c>Consumer</c>'s <c>using</c>
+        /// clause of it regardless — exactly as
+        /// <see cref="SharedProjectTests.The_using_of_a_namespace_which_only_another_project_fills_is_removed"/>
+        /// describes for an ordinary type. The new <c>using</c> clause of the moved
+        /// namespace has to replace it just the same for an extension method.
+        /// </summary>
+        [Fact]
+        public async Task An_extension_method_called_across_projects_is_kept_resolvable()
+        {
+            using var solution = new TestSolution()
+                .AddProject("Lib")
+                .AddProject("Sibling")
+                .AddProject("Consumer")
+                .AddProjectReference("Sibling", "Lib")
+                .AddProjectReference("Consumer", "Lib")
+                .AddDocument("Lib", "Ext.cs",
+@"namespace A.B
+{
+    public static class Ext
+    {
+        public static int Twice(this int value) => value * 2;
+    }
+}
+")
+                //keeps A.B alive for the solution, but Consumer does not reference Sibling
+                .AddDocument("Sibling", "Other.cs",
+@"namespace A.B
+{
+    public class Other { }
+}
+")
+                .AddDocument("Consumer", "Consumer.cs",
+@"using A.B;
+
+namespace ConsumerNs
+{
+    public class Consumer
+    {
+        public int Get() => 21.Twice();
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            var namespaceCenter = await AdjustAsync(solution, "Lib", "Ext.cs", "X.Y");
+            await CleanupAsync(solution, namespaceCenter);
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
+
+        /// <summary>
         /// The arguments of the call are not a part of the member access expression
         /// of the moved type and have to stay untouched.
         /// </summary>

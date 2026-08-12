@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -73,7 +74,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 throw new ArgumentNullException(nameof(symbolInfo));
             }
 
+            Debug.WriteLine($"[Adjust] RefProcessor: searching references of {symbolInfo.ToDisplayString()} (target namespace {_targetNamespaceInfo.ModifiedName})");
+
             var foundReferences = await FindReferencesForAsync(_workspace, symbolInfo, cancellationToken);
+
+            Debug.WriteLine($"[Adjust] RefProcessor: {symbolInfo.ToDisplayString()} -> {foundReferences.Count} referenced symbol(s)");
 
             //a file which several projects compile produces a separate symbol per project,
             //and Roslyn cascades the search to all of them: the very same location is reported
@@ -82,11 +87,17 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
             foreach (var foundReference in foundReferences)
             {
+                var locationCount = foundReference.Locations.Count();
+
                 if (foundReference.Definition.ContainingNamespace.ToDisplayString() == _targetNamespaceInfo.ModifiedName)
                 {
+                    Debug.WriteLine($"[Adjust] RefProcessor: {foundReference.Definition.ToDisplayString()} already in target namespace, {locationCount} location(s) skipped");
+
                     //referenced symbols is in target namespace already
                     continue;
                 }
+
+                Debug.WriteLine($"[Adjust] RefProcessor: {foundReference.Definition.ToDisplayString()} ({foundReference.Definition.Kind}) has {locationCount} location(s)");
 
                 foreach (var location in foundReference.Locations)
                 {
@@ -101,6 +112,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                         //this location has been reported by another project already
                         continue;
                     }
+
+                    Debug.WriteLine($"[Adjust] RefProcessor: reference at {location.Document.FilePath}@{location.Location.SourceSpan}");
 
                     await ProcessLocationAsync(location, cancellationToken);
                 }
@@ -142,13 +155,21 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             var root = await document.GetSyntaxRootAsync(cancellationToken);
             if (root == null)
             {
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}@{location.Location.SourceSpan}: no syntax root, skipped");
+
                 //skip this location
                 return;
             }
 
-            var syntax = root.FindNode(location.Location.SourceSpan);
+            //`findInsideTrivia: true`, otherwise a reference written in a documentation
+            //comment (`<see cref="Class1"/>`) is not found at all: such a comment is a trivia
+            //of the declaration it is attached to, and the default search stops at that
+            //declaration, whose symbol has nothing to do with the reference
+            var syntax = root.FindNode(location.Location.SourceSpan, findInsideTrivia: true);
             if (syntax == null)
             {
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}@{location.Location.SourceSpan}: FindNode returned null, skipped");
+
                 //skip this location
                 return;
             }
@@ -183,22 +204,52 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             var semanticModel = await document.GetSemanticModelAsync(cancellationToken);
             if (semanticModel == null)
             {
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}@{syntax.Span}: no semantic model, skipped");
+
                 return;
             }
 
             var symbol = semanticModel.GetSymbolInfo(syntax).Symbol;
             if (symbol == null)
             {
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}@{syntax.Span} ('{syntax}'): GetSymbolInfo returned null, skipped");
+
+                return;
+            }
+
+            //a cref writes the namespace of the type in its own syntax and not in a qualified
+            //name: `<see cref="A.B.Class1"/>` is a QualifiedCrefSyntax whose container is the
+            //namespace and whose member is the type. The reference of such a cref is reported
+            //as the whole cref and not as the name of the type inside it.
+            var qcs = syntax as QualifiedCrefSyntax;
+            if (qcs == null
+                && syntax.Parent is QualifiedCrefSyntax parentCref
+                && ReferenceEquals(parentCref.Member, syntax)
+                )
+            {
+                qcs = parentCref;
+            }
+
+            if (qcs != null)
+            {
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}@{syntax.Span}: '{syntax}' is the cref '{qcs}'");
+
+                ProcessQualifiedCref(location, semanticModel, qcs);
+
                 return;
             }
 
             if (syntax.Parent is QualifiedNameSyntax qns)
             {
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}@{syntax.Span}: '{syntax}' is a part of the qualified name '{qns}'");
+
                 ProcessQualifiedName(location, semanticModel, syntax, symbol.Name, qns);
             }
             else if (syntax.Parent is MemberAccessExpressionSyntax maes)
             {
                 var maesr = maes.ToUpperSyntax<MemberAccessExpressionSyntax>()!;
+
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}@{syntax.Span}: '{syntax}' is a part of the member access '{maesr}' (symbol kind {symbol.Kind})");
 
                 ProcessMemberAccessExpression(
                     location,
@@ -212,6 +263,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             {
                 //i don't know why we are here
 
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}@{syntax.Span}: '{syntax}' has an unrecognized parent ({syntax.Parent?.GetType().Name})");
+
                 if (syntax is SimpleNameSyntax sns
                     && sns.Identifier.ValueText == symbol.Name
                     && TryFixShadowedReference(location, semanticModel, sns, symbol.Name)
@@ -220,6 +273,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                     //a using clause would not help here, the name has been qualified instead
                     return;
                 }
+
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: add using {_targetNamespaceInfo.ModifiedName} (fallback branch)");
 
                 //add a new using clause
                 _edits.AddUsing(location.Document.FilePath, _targetNamespaceInfo.ModifiedName);
@@ -251,6 +306,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 //(because these is no guarantee that namespace in THIS file
                 //will be fixed, THIS file can be excluded from adjusting by the user)
 
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: '{qns}' has no upper qualified name");
+
                 if (ReferenceEquals(qns.Left, syntax)
                     && syntax is SimpleNameSyntax sns
                     && sns.Identifier.ValueText == typeName
@@ -266,6 +323,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                     return;
                 }
 
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: add using {_targetNamespaceInfo.ModifiedName} (qualified name, no upper name)");
+
                 _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
 
                 return;
@@ -279,10 +338,50 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 .WithLeft(SyntaxFactory.ParseName((isGlobal ? "global::" : "") + _targetNamespaceInfo.ModifiedName))
                 ;
 
+            Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: replace '{uqns}' with '{mqns}'");
+
             _edits.ReplaceText(
                 location.Document.FilePath!,
                 uqns.Span,
                 mqns.ToString()
+                );
+        }
+
+        /// <summary>
+        /// Process a reference which is the member of a qualified cref of a documentation
+        /// comment (<c>&lt;see cref="Some.Old.Namespace.Class1"/&gt;</c>).
+        ///
+        /// The container of such a cref is the whole name written in front of the type, so
+        /// it is replaced with the target namespace as a whole. A container which is a type
+        /// and not a namespace (<c>&lt;see cref="Outer.Nested"/&gt;</c>) names no namespace
+        /// at all and is fixed with a using clause instead.
+        /// </summary>
+        private void ProcessQualifiedCref(
+            ReferenceLocation location,
+            SemanticModel semanticModel,
+            QualifiedCrefSyntax qcs
+            )
+        {
+            if (!(semanticModel.GetSymbolInfo(qcs.Container).Symbol is INamespaceSymbol))
+            {
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: cref container '{qcs.Container}' is not a namespace -> add using {_targetNamespaceInfo.ModifiedName}");
+
+                _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
+
+                return;
+            }
+
+            var isGlobal = qcs.Container.IsGlobal()
+                || IsGlobalPrefixRequired(semanticModel, qcs.SpanStart, _targetNamespaceInfo.ModifiedName);
+
+            var modified = (isGlobal ? "global::" : "") + _targetNamespaceInfo.ModifiedName;
+
+            Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: replace cref container '{qcs.Container}' with '{modified}'");
+
+            _edits.ReplaceText(
+                location.Document.FilePath!,
+                qcs.Container.Span,
+                modified
                 );
         }
 
@@ -302,6 +401,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         {
             if (!symbol.Kind.NotIn(SymbolKind.Property, SymbolKind.Field, SymbolKind.Method))
             {
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: '{maes}' member is {symbol.Kind} -> add using {_targetNamespaceInfo.ModifiedName}");
+
                 _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
 
                 return;
@@ -327,6 +428,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 || (typeIndex == 0 && !IsShadowedByTargetNamespace(semanticModel, maes.SpanStart, symbol.Name))
                 )
             {
+                Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: '{maes}' typeIndex={typeIndex} -> add using {_targetNamespaceInfo.ModifiedName}");
+
                 _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
 
                 return;
@@ -337,6 +440,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             var modifiedMaesr = SyntaxFactory.ParseExpression(
                 (isGlobal ? "global::" : "") + _targetNamespaceInfo.ModifiedName + "." + withoutNamespacesText
                 );
+
+            Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: replace '{maes}' with '{modifiedMaesr}' (typeIndex={typeIndex})");
 
             _edits.ReplaceText(
                 location.Document.FilePath!,
@@ -369,6 +474,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             {
                 return false;
             }
+
+            Debug.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: '{nodeToReplace}' is shadowed by the target namespace {_targetNamespaceInfo.ModifiedName}, qualifying instead of using");
 
             //`global::Class1` is a name of the root namespace already: the target namespace
             //is written after that alias and not in front of it
@@ -539,6 +646,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             var refs = await SymbolFinder.FindReferencesAsync(symbolInfo, workspace.CurrentSolution, cancellationToken);
             var foundReferences = refs.ToList();
 
+            Debug.WriteLine($"[Adjust] RefProcessor: SymbolFinder.FindReferencesAsync({symbolInfo.ToDisplayString()}) -> {foundReferences.Count} symbol(s)");
+
             if (symbolInfo.TypeKind == TypeKind.Class && symbolInfo.IsStatic)
             {
                 var extensionMethodSymbols = (
@@ -551,6 +660,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                     )
                     .ToList();
 
+                Debug.WriteLine(
+                    $"[Adjust] RefProcessor: {symbolInfo.ToDisplayString()} is a static class with "
+                    + $"{extensionMethodSymbols.Count} extension method(s): "
+                    + string.Join(", ", extensionMethodSymbols.Select(m => m.Name))
+                    );
+
                 foreach (var extensionMethodSymbol in extensionMethodSymbols)
                 {
                     var methodFoundReferences = await SymbolFinder.FindReferencesAsync(
@@ -558,8 +673,16 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                         workspace.CurrentSolution,
                         cancellationToken
                         );
+                    var methodFoundReferencesList = methodFoundReferences.ToList();
+
+                    Debug.WriteLine(
+                        $"[Adjust] RefProcessor: SymbolFinder.FindReferencesAsync({extensionMethodSymbol.ToDisplayString()}) "
+                        + $"-> {methodFoundReferencesList.Count} symbol(s), "
+                        + $"{methodFoundReferencesList.Sum(r => r.Locations.Count())} location(s) total"
+                        );
+
                     foundReferences.AddRange(
-                        methodFoundReferences
+                        methodFoundReferencesList
                         );
                 }
             }

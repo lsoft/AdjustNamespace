@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace AdjustNamespace.Adjusting.Edit
 {
@@ -71,9 +72,13 @@ namespace AdjustNamespace.Adjusting.Edit
 
             if (!_known.Add(edit))
             {
+                Debug.WriteLine($"[Adjust] EditSet: {edit} already scheduled, skipped");
+
                 //this edit is scheduled already
                 return;
             }
+
+            Debug.WriteLine($"[Adjust] EditSet: scheduled {edit}");
 
             if (!_edits.TryGetValue(edit.FilePath, out var fileEdits))
             {

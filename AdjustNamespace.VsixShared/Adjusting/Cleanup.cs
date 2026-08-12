@@ -2,6 +2,8 @@
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AdjustNamespace.Namespace;
@@ -86,6 +88,11 @@ namespace AdjustNamespace.Adjusting
                 {
                     continue;
                 }
+
+                Debug.WriteLine(
+                    $"[Adjust] Cleanup: {documentFilePath}: removing using(s) of "
+                    + string.Join(", ", toRemove.OfType<UsingDirectiveSyntax>().Select(u => u.Name?.ToString() ?? "<unnamed>"))
+                    );
 
                 syntaxRoot = syntaxRoot.RemoveNodes(toRemove, SyntaxRemoveOptions.KeepNoTrivia);
                 if (syntaxRoot != null)

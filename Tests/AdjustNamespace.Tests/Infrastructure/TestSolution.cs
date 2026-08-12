@@ -809,6 +809,65 @@ namespace AdjustNamespace.Tests.Infrastructure
         }
 
         /// <summary>
+        /// The unresolved <c>cref</c> references of the whole solution
+        /// (<c>&lt;see cref="Class1"/&gt;</c> which does not point to anything anymore).
+        ///
+        /// Such a reference is a warning (CS1574) and not an error, and only when the project
+        /// generates the documentation file: the parse options of a project decide whether the
+        /// compiler binds the crefs at all, and the default one does not
+        /// (<see cref="DocumentationMode.Parse"/>). The projects are therefore re-parsed here
+        /// with <see cref="DocumentationMode.Diagnose"/>, on a copy of the solution which is
+        /// not applied to the workspace, so this check costs nothing to the tests which do not
+        /// ask for it.
+        /// </summary>
+        public async System.Threading.Tasks.Task<List<string>> UnresolvedCrefsAsync()
+        {
+            SyncLinkedDocuments();
+
+            var solution = Workspace.CurrentSolution;
+
+            foreach (var projectId in _projects.Values)
+            {
+                var parseOptions =
+                    (Microsoft.CodeAnalysis.CSharp.CSharpParseOptions)
+                    (solution.GetProject(projectId)!.ParseOptions
+                        ?? new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions());
+
+                solution = solution.WithProjectParseOptions(
+                    projectId,
+                    parseOptions.WithDocumentationMode(DocumentationMode.Diagnose)
+                    );
+            }
+
+            var result = new List<string>();
+
+            foreach (var projectId in _projects.Values)
+            {
+                var project = solution.GetProject(projectId)!;
+
+                var compilation = await project.GetCompilationAsync();
+                if (compilation == null)
+                {
+                    continue;
+                }
+
+                foreach (var diagnostic in compilation.GetDiagnostics())
+                {
+                    //CS1574: the cref points to nothing, CS1580/CS1581/CS1584: it points
+                    //to a member which does not exist or is written incorrectly
+                    if (diagnostic.Id.NotIn("CS1574", "CS1580", "CS1581", "CS1584"))
+                    {
+                        continue;
+                    }
+
+                    result.Add($"{project.Name}: {diagnostic}");
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// All the C# file paths of the solution.
         /// </summary>
         public List<string> AllDocumentPaths()
