@@ -24,7 +24,20 @@
             <RowDefinition Height="auto" />
             <RowDefinition Height="2*" />
             <RowDefinition Height="auto" />
-            <RowDefinition Height="*" MinHeight="60" />
+            <RowDefinition>
+                <RowDefinition.Style>
+                    <Style TargetType="RowDefinition">
+                        <Setter Property="Height" Value="*" />
+                        <Setter Property="MinHeight" Value="60" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasBlockedItems}" Value="False">
+                                <Setter Property="Height" Value="0" />
+                                <Setter Property="MinHeight" Value="0" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </RowDefinition.Style>
+            </RowDefinition>
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
