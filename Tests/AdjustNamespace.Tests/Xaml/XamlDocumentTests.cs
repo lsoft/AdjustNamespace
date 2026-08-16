@@ -558,6 +558,69 @@ namespace AdjustNamespace.Tests.Xaml
             Assert.Contains(@"x:Class=""X.Y.MyControl""", MemoryXamlBodyProvider.MoveObject(body, "A.B", "MyControl", "X.Y"));
         }
 
+        /// <summary>
+        /// MAUI pages use the 2009 xaml language uri and their own default xmlns; the root
+        /// class must still move, and a <c>clr-namespace</c> mapping of a custom control too.
+        /// </summary>
+        [Fact]
+        public void A_maui_page_moves_its_root_class_and_a_clr_namespace_control()
+        {
+            var body =
+@"<ContentPage x:Class=""A.B.MainPage""
+    xmlns=""http://schemas.microsoft.com/dotnet/2021/maui""
+    xmlns:x=""http://schemas.microsoft.com/winfx/2009/xaml""
+    xmlns:local=""clr-namespace:A.B"">
+    <local:MyButton />
+</ContentPage>";
+
+            var result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MyButton", "X.Y");
+
+            Assert.Contains(@"clr-namespace:X.Y", result);
+            Assert.DoesNotContain("<local:MyButton", result);
+
+            result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MainPage", "X.Y");
+            Assert.Contains(@"x:Class=""X.Y.MainPage""", result);
+        }
+
+        /// <summary>
+        /// Avalonia prefers <c>xmlns:local="using:…"</c>. The mapping has to be rewritten
+        /// in the same form, not as a WPF <c>clr-namespace</c>.
+        /// </summary>
+        [Fact]
+        public void An_avalonia_using_xmlns_is_rewritten_as_using()
+        {
+            var body =
+@"<Window x:Class=""A.B.MainWindow""
+    xmlns=""https://github.com/avaloniaui""
+    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+    xmlns:local=""using:A.B"">
+    <local:MyButton />
+</Window>";
+
+            var result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MyButton", "X.Y");
+
+            Assert.Contains(@"using:X.Y", result);
+            Assert.DoesNotContain("clr-namespace:", result);
+            Assert.DoesNotContain("<local:MyButton", result);
+        }
+
+        /// <summary>
+        /// Avalonia's root class uses the same <c>x:Class</c> attribute as WPF.
+        /// </summary>
+        [Fact]
+        public void An_avalonia_window_root_class_is_moved()
+        {
+            var body =
+@"<Window x:Class=""A.B.MainWindow""
+    xmlns=""https://github.com/avaloniaui""
+    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
+</Window>";
+
+            var result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MainWindow", "X.Y");
+
+            Assert.Contains(@"x:Class=""X.Y.MainWindow""", result);
+        }
+
         private static int CountOf(string text, string substring)
         {
             var result = 0;

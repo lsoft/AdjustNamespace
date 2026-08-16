@@ -59,6 +59,8 @@
 
   <ItemGroup>
     <Compile Include="**\*.cs" Exclude="bin\**\*.cs;obj\**\*.cs" />
+    <!-- PathFilter is pure and shared with no CLI dependency; cover it here. -->
+    <Compile Include="..\..\AdjustNamespace.Cli\PathFilter.cs" Link="Cli\PathFilter.cs" />
   </ItemGroup>
 
   <ItemGroup>

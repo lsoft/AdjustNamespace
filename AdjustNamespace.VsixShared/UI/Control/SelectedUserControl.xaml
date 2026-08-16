@@ -14,11 +14,17 @@
     mc:Ignorable="d"
     >
 
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
-            <RowDefinition />
+            <RowDefinition Height="2*" />
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="*" MinHeight="60" />
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
@@ -90,8 +96,43 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <CheckBox
+        <TextBlock
             Grid.Row="3"
+            Margin="0,8,0,0"
+            HorizontalAlignment="Left"
+            Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
+            Text="Cannot be adjusted:"
+            Visibility="{Binding HasBlockedItems, Converter={StaticResource BoolToVis}}"
+            />
+
+        <ListView
+            Grid.Row="4"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            ItemsSource="{Binding BlockedItems}"
+            Visibility="{Binding HasBlockedItems, Converter={StaticResource BoolToVis}}"
+            >
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Margin="0,2">
+                        <TextBlock
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
+                            Text="{Binding FileName}"
+                            ToolTip="{Binding FilePath}"
+                            />
+                        <TextBlock
+                            Foreground="{DynamicResource {x:Static vsshell:VsBrushes.ToolWindowTextKey}}"
+                            Text="{Binding Message}"
+                            TextWrapping="Wrap"
+                            />
+                    </StackPanel>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <CheckBox
+            Grid.Row="5"
             HorizontalAlignment="Right"
             Content="{Binding OpenFileCheckBoxText}"
             IsChecked="{Binding OpenFilesToEnableUndo}"
@@ -100,7 +141,7 @@
 
         <Grid
             Name="RegexGrid"
-            Grid.Row="4"
+            Grid.Row="6"
             Margin="0,10,0,0"
             HorizontalAlignment="Stretch"
             >
@@ -148,7 +189,7 @@
         </Grid>
 
         <ListView
-            Grid.Row="5"
+            Grid.Row="7"
             HorizontalAlignment="Stretch"
             ItemsSource="{Binding KnownRegexes}"
             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -188,7 +229,7 @@
 
         <Grid
             Name="ButtonGrid"
-            Grid.Row="6"
+            Grid.Row="8"
             Margin="0,10,0,0"
             HorizontalAlignment="Stretch"
             >

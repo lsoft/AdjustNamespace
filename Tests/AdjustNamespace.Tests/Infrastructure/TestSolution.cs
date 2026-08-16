@@ -160,7 +160,7 @@ namespace AdjustNamespace.Tests.Infrastructure
             //of the workspace, see AddXamlFile
             if (Directory.Exists(SolutionFolder))
             {
-                foreach (var xamlFilePath in Directory.GetFiles(SolutionFolder, "*.xaml", SearchOption.AllDirectories))
+                foreach (var xamlFilePath in AdjustNamespace.Xaml.XamlPathHelper.EnumerateXamlFiles(SolutionFolder))
                 {
                     var owner = TryFindProjectOfFolderOf(xamlFilePath);
                     if (owner.HasValue)
@@ -512,6 +512,25 @@ namespace AdjustNamespace.Tests.Infrastructure
             AddDocument(PathOf(projectName, relativeFilePath), body, new[] { projectName });
 
             return this;
+        }
+
+        /// <summary>
+        /// Add a file which the project compiles but which lies outside of the project folder
+        /// (a linked file). Such a file has no target namespace derived from folders.
+        /// </summary>
+        /// <param name="projectName">Project which compiles the file.</param>
+        /// <param name="relativePathFromSolution">Path relative to the solution folder.</param>
+        /// <param name="body">Content of the file.</param>
+        /// <returns>Full path to the linked file.</returns>
+        public string AddLinkedDocument(
+            string projectName,
+            string relativePathFromSolution,
+            string body
+            )
+        {
+            var filePath = Path.Combine(SolutionFolder, relativePathFromSolution);
+            AddDocument(filePath, body, ExpandTargets(projectName).ToArray());
+            return filePath;
         }
 
         /// <summary>

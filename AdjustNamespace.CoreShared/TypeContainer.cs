@@ -56,6 +56,36 @@ namespace AdjustNamespace
         }
 
         /// <summary>
+        /// Reserve a type name in a namespace as if the type were already there.
+        /// Used while collecting the subject files: two files which both move a type of
+        /// the same name into the same target must conflict with each other and not only
+        /// with the types which exist in the solution already.
+        /// </summary>
+        public void Reserve(
+            string namespaceName,
+            string typeName
+            )
+        {
+            if (namespaceName is null)
+            {
+                throw new ArgumentNullException(nameof(namespaceName));
+            }
+
+            if (typeName is null)
+            {
+                throw new ArgumentNullException(nameof(typeName));
+            }
+
+            if (!_dictByNamespace.TryGetValue(namespaceName, out var typeNames))
+            {
+                typeNames = new HashSet<string>();
+                _dictByNamespace[namespaceName] = typeNames;
+            }
+
+            typeNames.Add(typeName);
+        }
+
+        /// <summary>
         /// Check if the given namespace contains a type with the given name.
         /// This is how the name conflicts are detected before the adjusting starts.
         /// </summary>

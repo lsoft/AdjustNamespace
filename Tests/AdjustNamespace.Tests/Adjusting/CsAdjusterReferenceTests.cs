@@ -602,6 +602,47 @@ namespace Other
         }
 
         /// <summary>
+        /// An extension method of the old enclosing namespace is visible without a
+        /// <c>using</c> clause for the same reason a type is: the name is looked up
+        /// in every enclosing namespace. Moving the caller out of that namespace loses
+        /// the call (<c>CS1061</c>) unless a <c>using</c> of the extension method's
+        /// namespace is added. The call is written as a member access
+        /// (<c>value.Twice()</c>), so it must not be skipped as "already qualified".
+        /// </summary>
+        [Fact]
+        public async Task The_adjusted_file_keeps_seeing_an_extension_method_of_its_old_enclosing_namespace()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Ext.cs",
+@"namespace NLOutline.Tree
+{
+    public static class Ext
+    {
+        public static int Twice(this int value) => value * 2;
+    }
+}
+")
+                .AddDocument("MyApp", "TreeBuilder.cs",
+@"namespace NLOutline.Tree.Builder
+{
+    public class TreeBuilder
+    {
+        public int Build() => 21.Twice();
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            await AdjustAsync(solution, "MyApp", "TreeBuilder.cs", "Nlo.NLOutline.Tree.Builder");
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+            Assert.Contains("using NLOutline.Tree;", solution.TextOf("MyApp", "TreeBuilder.cs"));
+        }
+
+        /// <summary>
         /// A type of the same namespace which lives in another (not adjusted) file
         /// keeps that namespace, so the using clause of it must not be removed
         /// from the consumers.

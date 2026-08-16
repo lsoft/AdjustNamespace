@@ -66,7 +66,8 @@ namespace AdjustNamespace.Namespace
             //collect the folder names from the file folder up to the project folder
             var names = new List<string>();
             var dir = new DirectoryInfo(documentFolderPath);
-            while (dir.FullName != projectFolderPath && dir.FullName.Length > projectFolderPath.Length)
+            while (!string.Equals(dir.FullName, projectFolderPath, StringComparison.OrdinalIgnoreCase)
+                && dir.FullName.Length > projectFolderPath.Length)
             {
                 if (!settings.IsSkippedFolder(dir.FullName))
                 {
@@ -89,6 +90,9 @@ namespace AdjustNamespace.Namespace
         /// (<c>...\MyApp.Tests\Sub</c> starts with <c>...\MyApp</c>), and a linked file of
         /// such a folder would get the whole sibling folder into its namespace
         /// (<c>MyApp.MyApp.Tests.Sub</c>) instead of being left alone.
+        ///
+        /// The comparison is case insensitive: Windows paths are, and Roslyn and the IDE
+        /// may hand the same folder over in a different case.
         /// </summary>
         private static bool IsSameFolderOrBelow(
             string folderPath,
@@ -100,7 +104,7 @@ namespace AdjustNamespace.Namespace
                 return false;
             }
 
-            if (!folderPath.StartsWith(rootFolderPath))
+            if (!folderPath.StartsWith(rootFolderPath, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }

@@ -70,6 +70,38 @@ namespace MyApp
             Assert.Equal(1, CountOf(text, "using X.Y;"));
         }
 
+        /// <summary>
+        /// A using clause may be written with the <c>global::</c> prefix. It already
+        /// imports the namespace, so a plain <c>using X.Y;</c> must not be added on top
+        /// of it (CS0105). Cleanup normalizes the prefix; the applier has to as well.
+        /// </summary>
+        [Fact]
+        public async Task An_existing_global_using_is_not_duplicated()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Class1.cs",
+@"using System;
+using global::X.Y;
+
+namespace MyApp
+{
+    public class Class1 { }
+}
+")
+                ;
+
+            var edits = new EditSet();
+            edits.AddUsing(solution.PathOf("MyApp", "Class1.cs"), "X.Y");
+
+            await ApplyAsync(solution, edits);
+
+            var text = solution.TextOf("MyApp", "Class1.cs");
+
+            Assert.DoesNotContain("using X.Y;", text);
+            Assert.Equal(1, CountOf(text, "using global::X.Y;"));
+        }
+
         [Fact]
         public async Task The_using_is_added_into_a_file_without_any_using()
         {

@@ -78,13 +78,13 @@ C# files:
 - the usages of the extension methods declared in the moved static classes;
 - the using clauses which point to the namespaces emptied by the adjusting are removed.
 
-XAML files:
+XAML files (`.xaml` and Avalonia `.axaml`):
 
 - the `x:Class` attribute;
 - the tags which reference a moved class through an xmlns alias;
 - the `{x:Type}` and `{x:Static}` markup extensions;
 - the other places where a class is referenced through an xmlns alias: an attribute value (`TargetType="local:MyButton"`), an attached property (`local:Helper.IsEnabled="True"`), a custom markup extension (`{local:UpperCase}`) and `x:TypeArguments`;
-- the `xmlns:...="clr-namespace:..."` clauses: a clause for the target namespace is created when required and the clauses which became unused are removed.
+- the `xmlns:…="clr-namespace:…"` and `xmlns:…="using:…"` clauses: a clause for the target namespace is created when required (in the same form as the source) and the clauses which became unused are removed.
 
 ## Undo
 
@@ -136,13 +136,16 @@ A few things which differ from the extension:
 
 ## Remarks
 
-I test it against plain C# code, WPF Xaml, and C# code from `sqlproj`. I encourage you test against your codebase and report bugs (with minimal repro) to https://github.com/lsoft/AdjustNamespace/issues.
+I test it against plain C# code, WPF Xaml, MAUI Xaml, Avalonia (`.axaml` / `using:` xmlns),
+and C# code from `sqlproj`. I encourage you test against your codebase and report bugs
+(with minimal repro) to https://github.com/lsoft/AdjustNamespace/issues.
 
 A few things which are worth to know:
 
 - make sure your solution is compiled successfully before the adjusting, otherwise the results may be incorrect;
 - the `System*` and `Microsoft*` namespaces are never touched;
-- the xaml files are processed as a plain text (with a set of regexes) to keep your formatting untouched, so an exotic markup may be missed;
+- the xaml files (including Avalonia `.axaml`) are processed as a plain text (with a set of regexes) to keep your formatting untouched, so an exotic markup may be missed;
+- both `clr-namespace:` and `using:` xmlns forms are rewritten; a new mapping keeps the form of the source one;
 - the whole adjusting is a bunch of separate edits, there is no single `undo` transaction for it.
 
 ## Requirements

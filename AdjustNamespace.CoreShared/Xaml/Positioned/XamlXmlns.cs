@@ -1,13 +1,24 @@
 ﻿using System;
-using System.Linq;
 
 namespace AdjustNamespace.Xaml.Positioned
 {
     /// <summary>
-    /// A clr-namespace declaration: <c>xmlns:alias="clr-namespace:A.B.C;assembly=D"</c>.
+    /// A CLR namespace mapping in a xaml document:
+    /// <c>xmlns:alias="clr-namespace:A.B.C;assembly=D"</c> (WPF / classic)
+    /// or <c>xmlns:alias="using:A.B.C"</c> (Avalonia / UWP-style, preferred in Avalonia).
     /// </summary>
     public class XamlXmlns : IXamlPositioned
     {
+        /// <summary>
+        /// The WPF-style form of the attribute value.
+        /// </summary>
+        public const string ClrNamespaceForm = "clr-namespace";
+
+        /// <summary>
+        /// The UWP / Avalonia style form of the attribute value.
+        /// </summary>
+        public const string UsingForm = "using";
+
         /// <inheritdoc/>
         /// <remarks>
         /// Meaningful for the declarations read from the document only
@@ -60,9 +71,25 @@ namespace AdjustNamespace.Xaml.Positioned
         }
 
         /// <summary>
+        /// <see cref="ClrNamespaceForm"/> or <see cref="UsingForm"/>: the syntax the
+        /// declaration was written with (and the one a newly created sibling keeps).
+        /// </summary>
+        public string Form
+        {
+            get;
+        }
+
+        /// <summary>
         /// Create a declaration which has been read from the document body.
         /// </summary>
-        public XamlXmlns(int index, int length, string alias, string @namespace, string suffix)
+        public XamlXmlns(
+            int index,
+            int length,
+            string alias,
+            string @namespace,
+            string suffix,
+            string form = ClrNamespaceForm
+            )
         {
             Index = index;
             Length = length;
@@ -70,11 +97,12 @@ namespace AdjustNamespace.Xaml.Positioned
             Namespace = @namespace;
             Saved = true;
             Suffix = suffix;
+            Form = form;
         }
 
         /// <summary>
         /// Create a new declaration for the target namespace, based on the declaration
-        /// of the source namespace (to inherit its <see cref="Suffix"/>).
+        /// of the source namespace (to inherit its <see cref="Suffix"/> and <see cref="Form"/>).
         /// The alias is generated from the last part of the namespace plus a part of a guid
         /// to prevent a collision with the existing aliases.
         /// </summary>
@@ -91,6 +119,7 @@ namespace AdjustNamespace.Xaml.Positioned
             Namespace = targetNamespace;
             Saved = false;
             Suffix = xmlns.Suffix;
+            Form = xmlns.Form;
         }
 
         /// <summary>
@@ -100,7 +129,7 @@ namespace AdjustNamespace.Xaml.Positioned
         /// <param name="indexToInsert">(in/out) Position to insert at; it is moved behind the inserted text.</param>
         internal void SaveTo(ref string xaml, ref int indexToInsert)
         {
-            var s = $@" xmlns:{Alias}=""clr-namespace:{Namespace}{Suffix}""";
+            var s = $@" xmlns:{Alias}=""{Form}:{Namespace}{Suffix}""";
             xaml = xaml.Insert(indexToInsert, s);
             indexToInsert += s.Length;
         }
@@ -118,7 +147,7 @@ namespace AdjustNamespace.Xaml.Positioned
         /// </summary>
         private string GetLastWord(string s)
         {
-            if (s.Contains('.'))
+            if (s.Contains("."))
             {
                 return s.Substring(s.LastIndexOf('.') + 1);
             }

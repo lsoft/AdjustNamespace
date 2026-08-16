@@ -1,5 +1,6 @@
 using AdjustNamespace;
 using AdjustNamespace.Adjusting;
+using AdjustNamespace.Adjusting.Plan;
 using AdjustNamespace.Adjusting.Session;
 using AdjustNamespace.Cli.CommandLine;
 using AdjustNamespace.Cli.MsBuild;
@@ -101,30 +102,60 @@ namespace AdjustNamespace.Cli
 
             var context = CreateContext(workspace, solutionFolder);
 
-            var subjectFilePaths = await CollectAsync(context, solutionFolder, cancellationToken);
-            if (subjectFilePaths is null)
+            var collect = await CollectAsync(context, solutionFolder, cancellationToken);
+            if (collect is null)
             {
                 return ExitCode.Error;
             }
 
-            if (subjectFilePaths.Count == 0)
+            ReportBlocked(collect.Blocked, solutionFolder);
+
+            if (collect.SubjectFilePaths.Count > 0)
+            {
+                ReportPlan(collect.SubjectFilePaths, solutionFolder);
+            }
+            else if (collect.Blocked.Count == 0)
             {
                 _output.WriteLine("Every namespace is in accordance with the location of its file, nothing to do.");
-
-                return ExitCode.Success;
             }
-
-            ReportPlan(subjectFilePaths, solutionFolder);
 
             if (_options.DryRun || _options.Check)
             {
+                if (collect.Blocked.Count > 0)
+                {
+                    return ExitCode.Error;
+                }
+
+                if (collect.SubjectFilePaths.Count == 0)
+                {
+                    return ExitCode.Success;
+                }
+
                 return _options.Check
                     ? ExitCode.AdjustmentRequired
                     : ExitCode.Success
                     ;
             }
 
-            return await AdjustAsync(context, subjectFilePaths, solutionFolder, cancellationToken);
+            if (collect.SubjectFilePaths.Count > 0)
+            {
+                var adjustExit = await AdjustAsync(
+                    context,
+                    collect.SubjectFilePaths,
+                    solutionFolder,
+                    cancellationToken
+                    );
+
+                if (adjustExit != ExitCode.Success)
+                {
+                    return adjustExit;
+                }
+            }
+
+            return collect.Blocked.Count > 0
+                ? ExitCode.Error
+                : ExitCode.Success
+                ;
         }
 
         /// <summary>
@@ -154,10 +185,10 @@ namespace AdjustNamespace.Cli
         }
 
         /// <summary>
-        /// The files which are really the subject to change, or <c>null</c> if the collecting
-        /// itself has failed (a type name conflict in a target namespace, for example).
+        /// The files which are really the subject to change and the ones which cannot be
+        /// adjusted, or <c>null</c> if the collecting itself has failed unexpectedly.
         /// </summary>
-        private async Task<IReadOnlyList<string>?> CollectAsync(
+        private async Task<CollectResult?> CollectAsync(
             AdjustContext context,
             string solutionFolder,
             CancellationToken cancellationToken
@@ -178,7 +209,10 @@ namespace AdjustNamespace.Cli
 
             if (candidates.Count == 0)
             {
-                return candidates;
+                return new CollectResult(
+                    new List<string>(),
+                    Array.Empty<AdjustBlock>()
+                    );
             }
 
             _output.WriteLine($"Scanning {candidates.Count} file(s)");
@@ -204,7 +238,10 @@ namespace AdjustNamespace.Cli
                         }
                     });
 
-                return results.CollectedFiles.ConvertAll(f => f.FilePath);
+                return new CollectResult(
+                    results.CollectedFiles.ConvertAll(f => f.FilePath),
+                    results.Blocked
+                    );
             }
             catch (FileProcessException exception)
             {
@@ -213,6 +250,44 @@ namespace AdjustNamespace.Cli
                     );
 
                 return null;
+            }
+        }
+
+        private void ReportBlocked(
+            IReadOnlyList<AdjustBlock> blocked,
+            string solutionFolder
+            )
+        {
+            foreach (var block in blocked)
+            {
+                _error.WriteLine(
+                    $"error: {block.Message} ({RelativePath.Of(block.FilePath, solutionFolder)})"
+                    );
+            }
+        }
+
+        /// <summary>
+        /// The adjustable files and the blocked ones of one collect step.
+        /// </summary>
+        private sealed class CollectResult
+        {
+            public IReadOnlyList<string> SubjectFilePaths
+            {
+                get;
+            }
+
+            public IReadOnlyList<AdjustBlock> Blocked
+            {
+                get;
+            }
+
+            public CollectResult(
+                IReadOnlyList<string> subjectFilePaths,
+                IReadOnlyList<AdjustBlock> blocked
+                )
+            {
+                SubjectFilePaths = subjectFilePaths;
+                Blocked = blocked;
             }
         }
 

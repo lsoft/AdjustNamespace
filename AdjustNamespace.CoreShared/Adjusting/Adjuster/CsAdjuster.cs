@@ -341,7 +341,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
             foreach (var xamlFilePath in _xamlFilePaths)
             {
-                if (!xamlFilePath.EndsWith(".xaml"))
+                if (!XamlPathHelper.IsXamlFile(xamlFilePath))
                 {
                     continue;
                 }

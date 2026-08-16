@@ -52,6 +52,41 @@ namespace AdjustNamespace.Namespace
         }
 
         /// <summary>
+        /// The name of a using clause, as the namespaces are named here.
+        /// The clause is taken from the document as it is written by the user, and it may
+        /// contain the whitespace between the parts of the name (<c>using A . B;</c>)
+        /// and the <c>global::</c> alias (<c>using global::A.B;</c>).
+        /// </summary>
+        public static string NormalizeUsingName(
+            string name
+            )
+        {
+            if (name is null)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
+            var builder = new System.Text.StringBuilder(name.Length);
+            foreach (var c in name)
+            {
+                if (!char.IsWhiteSpace(c))
+                {
+                    builder.Append(c);
+                }
+            }
+
+            var result = builder.ToString();
+
+            const string GlobalPrefix = "global::";
+            if (result.StartsWith(GlobalPrefix, StringComparison.Ordinal))
+            {
+                result = result.Substring(GlobalPrefix.Length);
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// Find all the declarations of the given namespace in the document.
         /// </summary>
         /// <param name="syntaxRoot">Syntax root of the document.</param>
@@ -86,14 +121,41 @@ namespace AdjustNamespace.Namespace
 
             foreach (var foundNamespaceSyntax in allFoundNamespaceSyntaxes)
             {
-                var fnn = foundNamespaceSyntax.Name.ToString();
-                if (fnn == namespaceName)
+                //the full name and not the written fragment: a nested `namespace A` inside
+                //`Wrapping` is `Wrapping.A`, and renaming a root `A` must not touch it
+                if (FullNameOf(foundNamespaceSyntax) == namespaceName)
                 {
                     result.Add(foundNamespaceSyntax);
                 }
             }
 
             return result.Count > 0;
+        }
+
+        /// <summary>
+        /// The full name of a namespace declaration, including the names of the enclosing
+        /// ones for a nested classic declaration.
+        /// </summary>
+        private static string FullNameOf(
+            BaseNamespaceDeclarationSyntax declaration
+            )
+        {
+            var parts = new List<string>();
+
+            SyntaxNode? node = declaration;
+            while (node != null)
+            {
+                if (node is BaseNamespaceDeclarationSyntax ns)
+                {
+                    parts.Add(ns.Name.ToString());
+                }
+
+                node = node.Parent;
+            }
+
+            parts.Reverse();
+
+            return string.Join(".", parts);
         }
     }
 }

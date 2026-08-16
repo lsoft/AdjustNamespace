@@ -18,6 +18,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
     /// enclosing namespace, and such a reference is not among the ones <see cref="RefProcessor"/>
     /// fixes: that class only follows the references TO the types declared in the file being
     /// moved, never the references the file itself makes to types declared elsewhere.
+    ///
+    /// The same lookup applies to extension methods of the enclosing namespace
+    /// (<c>value.Twice()</c>): the call is written as a member access, so it looks
+    /// "already qualified", but the method itself is found only because the enclosing
+    /// namespace is searched.
     /// </summary>
     public readonly struct SelfReferenceFixer
     {
@@ -77,31 +82,22 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
             foreach (var nameSyntax in syntaxRoot.DescendantNodes().OfType<SimpleNameSyntax>())
             {
-                if (IsAlreadyQualified(nameSyntax))
-                {
-                    //this name spells its namespace out already and does not depend
-                    //on the enclosing namespace at all
-                    continue;
-                }
-
-                if (!(semanticModel.GetSymbolInfo(nameSyntax).Symbol is INamedTypeSymbol symbol))
+                if (!TryGetImportedNamespace(nameSyntax, semanticModel, out var symbolNamespace, out var declaredInSubjectFile))
                 {
                     continue;
                 }
 
-                if (IsDeclaredInSubjectFile(symbol))
+                if (declaredInSubjectFile)
                 {
-                    //this type moves together with the file, no using is needed for it
+                    //this type (or the class of this extension method) moves together
+                    //with the file, no using is needed for it
                     continue;
                 }
 
-                var containingNamespace = symbol.ContainingNamespace;
-                if (containingNamespace == null || containingNamespace.IsGlobalNamespace)
+                if (string.IsNullOrEmpty(symbolNamespace))
                 {
                     continue;
                 }
-
-                var symbolNamespace = containingNamespace.ToDisplayString();
 
                 var transition = NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf(
                     nameSyntax,
@@ -136,9 +132,81 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         }
 
         /// <summary>
+        /// The namespace a simple name relies on to resolve, if any: a bare type name, or
+        /// an extension method invoked as a member access (<c>receiver.Method()</c>).
+        /// </summary>
+        private bool TryGetImportedNamespace(
+            SimpleNameSyntax nameSyntax,
+            SemanticModel semanticModel,
+            out string symbolNamespace,
+            out bool declaredInSubjectFile
+            )
+        {
+            symbolNamespace = string.Empty;
+            declaredInSubjectFile = false;
+
+            var symbol = semanticModel.GetSymbolInfo(nameSyntax).Symbol;
+
+            if (symbol is INamedTypeSymbol typeSymbol)
+            {
+                if (IsAlreadyQualified(nameSyntax))
+                {
+                    //this name spells its namespace out already and does not depend
+                    //on the enclosing namespace at all
+                    return false;
+                }
+
+                return TryFromType(typeSymbol, out symbolNamespace, out declaredInSubjectFile);
+            }
+
+            //an extension method call is written as a member access (`value.Twice()`):
+            //the name looks qualified, but the method is found only because the enclosing
+            //namespaces are searched for extension methods
+            if (symbol is IMethodSymbol methodSymbol
+                && IsMemberAccessName(nameSyntax)
+                )
+            {
+                var extensionMethod = methodSymbol.ReducedFrom ?? methodSymbol;
+                if (!extensionMethod.IsExtensionMethod)
+                {
+                    return false;
+                }
+
+                var containingType = extensionMethod.ContainingType;
+                if (containingType == null)
+                {
+                    return false;
+                }
+
+                return TryFromType(containingType, out symbolNamespace, out declaredInSubjectFile);
+            }
+
+            return false;
+        }
+
+        private bool TryFromType(
+            INamedTypeSymbol typeSymbol,
+            out string symbolNamespace,
+            out bool declaredInSubjectFile
+            )
+        {
+            declaredInSubjectFile = IsDeclaredInSubjectFile(typeSymbol);
+
+            var containingNamespace = typeSymbol.ContainingNamespace;
+            if (containingNamespace == null || containingNamespace.IsGlobalNamespace)
+            {
+                symbolNamespace = string.Empty;
+                return false;
+            }
+
+            symbolNamespace = containingNamespace.ToDisplayString();
+            return true;
+        }
+
+        /// <summary>
         /// A qualified name (<c>A.B.Class1</c>) or a member access (<c>A.B.Class1.Member</c>)
         /// already spells its namespace out, so only the head of such a chain (or a name
-        /// written on its own) is a candidate for the enclosing-namespace lookup.
+        /// written on its own) is a candidate for the enclosing-namespace lookup of a type.
         /// </summary>
         private static bool IsAlreadyQualified(
             SimpleNameSyntax nameSyntax
@@ -151,14 +219,16 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 return true;
             }
 
-            if (nameSyntax.Parent is MemberAccessExpressionSyntax maes
-                && ReferenceEquals(maes.Name, nameSyntax)
-                )
-            {
-                return true;
-            }
+            return IsMemberAccessName(nameSyntax);
+        }
 
-            return false;
+        private static bool IsMemberAccessName(
+            SimpleNameSyntax nameSyntax
+            )
+        {
+            return nameSyntax.Parent is MemberAccessExpressionSyntax maes
+                && ReferenceEquals(maes.Name, nameSyntax)
+                ;
         }
 
         private bool IsDeclaredInSubjectFile(
@@ -168,7 +238,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             var subjectFilePath = _subjectFilePath;
 
             return symbol.DeclaringSyntaxReferences
-                .Any(r => r.SyntaxTree.FilePath == subjectFilePath);
+                .Any(r => string.Equals(
+                    r.SyntaxTree.FilePath,
+                    subjectFilePath,
+                    StringComparison.OrdinalIgnoreCase
+                    ));
         }
 
         /// <summary>

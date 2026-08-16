@@ -160,8 +160,8 @@ namespace AdjustNamespace.Cli.MsBuild
                 return Enumerable.Empty<string>();
             }
 
-            return Directory
-                .EnumerateFiles(projectFolder, "*.xaml", SearchOption.AllDirectories)
+            return AdjustNamespace.Xaml.XamlPathHelper
+                .EnumerateXamlFiles(projectFolder)
                 .Where(filePath => !IsBuildOutput(filePath, projectFolder))
                 ;
         }
@@ -171,9 +171,12 @@ namespace AdjustNamespace.Cli.MsBuild
             string? projectFolder
             )
         {
-            //a file linked into the project from the outside is not an output of its build
+            //a file linked into the project from the outside is not an output of its build.
+            //the comparison stops at the folder border: otherwise a sibling folder whose
+            //name merely begins with the project folder (`MyApp.Tests`) would look like
+            //it belongs here, and a linked file under its `obj` would be skipped.
             if (string.IsNullOrEmpty(projectFolder)
-                || !filePath.StartsWith(projectFolder!, StringComparison.OrdinalIgnoreCase))
+                || !IsSameFolderOrBelow(filePath, projectFolder!))
             {
                 return false;
             }
@@ -188,6 +191,43 @@ namespace AdjustNamespace.Cli.MsBuild
                     string.Equals(folder, "bin", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(folder, "obj", StringComparison.OrdinalIgnoreCase)
                 );
+        }
+
+        /// <summary>
+        /// The path is the given folder or lies inside it. Stops at the folder border,
+        /// see <see cref="Namespace.TargetNamespaceCalculator"/>.
+        /// </summary>
+        private static bool IsSameFolderOrBelow(
+            string path,
+            string rootFolder
+            )
+        {
+            if (path.Length < rootFolder.Length)
+            {
+                return false;
+            }
+
+            if (!path.StartsWith(rootFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (path.Length == rootFolder.Length)
+            {
+                return true;
+            }
+
+            if (IsSeparator(rootFolder[rootFolder.Length - 1]))
+            {
+                return true;
+            }
+
+            return IsSeparator(path[rootFolder.Length]);
+        }
+
+        private static bool IsSeparator(char c)
+        {
+            return c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar;
         }
 
         /// <summary>

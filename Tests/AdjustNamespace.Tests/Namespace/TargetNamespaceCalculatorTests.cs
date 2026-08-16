@@ -118,6 +118,24 @@ namespace AdjustNamespace.Tests.Namespace
             Assert.Null(chain);
         }
 
+        /// <summary>
+        /// Windows paths are case insensitive. Roslyn and the IDE may hand the same
+        /// folder over in a different case (<c>c:\solution\MyApp</c> vs
+        /// <c>C:\solution\MyApp\Sub</c>), and a case-sensitive comparison would treat
+        /// a file inside the project folder as a linked one outside of it.
+        /// </summary>
+        [Fact]
+        public void The_case_of_the_path_does_not_matter()
+        {
+            var chain = TargetNamespaceCalculator.TryGetFolderChain(
+                @"c:\solution\MyApp\MyApp.csproj",
+                @"C:\solution\MyApp\Sub\Class1.cs",
+                SettingsWith()
+                );
+
+            Assert.Equal(new[] { "Sub" }, chain!);
+        }
+
         #endregion
 
         #region composing the name

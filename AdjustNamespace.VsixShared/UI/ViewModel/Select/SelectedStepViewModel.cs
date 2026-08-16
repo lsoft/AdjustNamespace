@@ -1,4 +1,5 @@
 ﻿using AdjustNamespace.UI.ViewModel;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Windows.Media;
 using AdjustNamespace.UI.StepFactory;
 using Microsoft.CodeAnalysis;
 using AdjustNamespace.Adjusting;
+using AdjustNamespace.Adjusting.Plan;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 
@@ -18,6 +20,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
     /// which are really the subject to change (grouped by their physical folder) and allows
     /// the user to uncheck some of them, to tune the target namespace with a regex and
     /// to decide whether the changed files should be opened in the editor.
+    /// Files which cannot be adjusted are listed separately with a reason.
     /// </summary>
     public class SelectedStepViewModel : ChainViewModel
     {
@@ -32,10 +35,9 @@ namespace AdjustNamespace.UI.ViewModel.Select
         private readonly IStepFactory<PerformingParameters> _nextStepFactory;
         private readonly HashSet<string> _filePaths;
 
-        //private readonly List<FileEx> _filteredFileExs;
-
         /// <summary>
-        /// The scan has been finished successfully, so the user is allowed to move next.
+        /// The scan has been finished successfully, so the user is allowed to move next
+        /// when at least one adjustable file is checked.
         /// </summary>
         private bool _statusOk = false;
 
@@ -74,6 +76,20 @@ namespace AdjustNamespace.UI.ViewModel.Select
             get;
             private set;
         }
+
+        /// <summary>
+        /// Files which cannot be adjusted, with a reason.
+        /// </summary>
+        public ObservableCollection<BlockedFileViewModel> BlockedItems
+        {
+            get;
+            private set;
+        }
+
+        /// <summary>
+        /// There is at least one blocked file to show.
+        /// </summary>
+        public bool HasBlockedItems => BlockedItems.Count > 0;
 
         /// <summary>
         /// Color of the status line.
@@ -335,6 +351,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
             _foreground = Brushes.Green;
             ToFilterItems = new ObservableCollection<ISelectItemViewModel>();
+            BlockedItems = new ObservableCollection<BlockedFileViewModel>();
 
             KnownRegexes = new ObservableCollection<KnownRegex>(
                 [
@@ -389,6 +406,8 @@ namespace AdjustNamespace.UI.ViewModel.Select
             _statusOk = false;
 
             ToFilterItems.Clear();
+            BlockedItems.Clear();
+            OnPropertyChanged(nameof(HasBlockedItems));
         }
 
         /// <summary>
@@ -400,7 +419,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
             {
                 await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-                MainMessage = $"Scanning for a type name conflicts...";
+                MainMessage = "Scanning for files to adjust...";
 
                 var replaceRegex = CreateNamespaceReplaceRegex();
 
@@ -417,8 +436,9 @@ namespace AdjustNamespace.UI.ViewModel.Select
                     );
 
                 BuildTree(sr.CollectedFiles);
+                BuildBlocked(sr.Blocked);
 
-                MainMessage = $"Total {sr.CollectedFiles.Count} files found. Choose files to process...";
+                MainMessage = BuildScanSummary(sr.CollectedFiles.Count, sr.Blocked.Count);
 
                 _statusOk = true;
             }
@@ -427,15 +447,29 @@ namespace AdjustNamespace.UI.ViewModel.Select
                 MainMessage =
                     $"Processing {excp.FilePath} fails."
                     + Environment.NewLine
-                    + $"Adjust namespace can produce an incorrect results."
-                    + Environment.NewLine
                     + excp.Message
-                    + Environment.NewLine
-                    + excp.StackTrace
                     ;
 
                 Logging.LogVS(excp);
             }
+        }
+
+        private static string BuildScanSummary(
+            int collectedCount,
+            int blockedCount
+            )
+        {
+            if (blockedCount == 0)
+            {
+                return $"Total {collectedCount} file(s) found. Choose files to process...";
+            }
+
+            if (collectedCount == 0)
+            {
+                return $"{blockedCount} file(s) cannot be adjusted.";
+            }
+
+            return $"{collectedCount} file(s) to adjust, {blockedCount} cannot be adjusted.";
         }
 
         /// <summary>
@@ -454,6 +488,8 @@ namespace AdjustNamespace.UI.ViewModel.Select
             List<FileEx> filteredFileExs
             )
         {
+            ToFilterItems.Clear();
+
             //perform grouping by files physical folder!
             var dirPaths = filteredFileExs.Select(f => f.FolderPath).Distinct().ToList();
             var dirs = new List<SelectFolderViewModel>();
@@ -485,6 +521,23 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
             RefreshStatus();
             OnPropertyChanged();
+        }
+
+        /// <summary>
+        /// Show the files which cannot be adjusted.
+        /// </summary>
+        private void BuildBlocked(
+            IReadOnlyList<AdjustBlock> blocked
+            )
+        {
+            BlockedItems.Clear();
+
+            foreach (var block in blocked.OrderBy(b => b.FilePath))
+            {
+                BlockedItems.Add(new BlockedFileViewModel(block));
+            }
+
+            OnPropertyChanged(nameof(HasBlockedItems));
         }
 
         /// <summary>
@@ -521,6 +574,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
         {
             ToFilterItems.ForEach(i => i.Clear());
             ToFilterItems.Clear();
+            BlockedItems.Clear();
         }
     }
 }

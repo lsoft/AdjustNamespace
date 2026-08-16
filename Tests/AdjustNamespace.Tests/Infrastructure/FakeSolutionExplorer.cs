@@ -48,7 +48,7 @@ namespace AdjustNamespace.Tests.Infrastructure
             if (Directory.Exists(_solution.SolutionFolder))
             {
                 result.AddRange(
-                    Directory.GetFiles(_solution.SolutionFolder, "*.xaml", SearchOption.AllDirectories)
+                    AdjustNamespace.Xaml.XamlPathHelper.EnumerateXamlFiles(_solution.SolutionFolder)
                     );
             }
 

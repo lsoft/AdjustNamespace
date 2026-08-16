@@ -4,9 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using AdjustNamespace;
 
 namespace AdjustNamespace.Namespace
@@ -143,24 +141,7 @@ namespace AdjustNamespace.Namespace
         /// </summary>
         private static string NormalizeUsingName(string name)
         {
-            var builder = new StringBuilder(name.Length);
-            foreach (var c in name)
-            {
-                if (!char.IsWhiteSpace(c))
-                {
-                    builder.Append(c);
-                }
-            }
-
-            var result = builder.ToString();
-
-            const string GlobalPrefix = "global::";
-            if (result.StartsWith(GlobalPrefix))
-            {
-                result = result.Substring(GlobalPrefix.Length);
-            }
-
-            return result;
+            return NamespaceHelper.NormalizeUsingName(name);
         }
 
         /// <summary>
@@ -257,7 +238,7 @@ namespace AdjustNamespace.Namespace
         /// </summary>
         private static bool IsDeclaredInSeveralFiles(ITypeSymbol type)
         {
-            var filePaths = new HashSet<string>();
+            var filePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var reference in type.DeclaringSyntaxReferences)
             {

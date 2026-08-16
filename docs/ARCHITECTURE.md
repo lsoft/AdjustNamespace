@@ -223,16 +223,17 @@ them, so such a file is skipped as well
 ### The decision (`AdjustPlanner`)
 
 Everything above is a rule about a single file, and all of these rules live in one place.
-`AdjustPlanner.TryPlanAsync` answers with an `AdjustPlanItem` — the file, its target namespace,
-its kind and, for a C# file, its namespace transitions — or with `null`, which means the file
-has to be left alone:
+`AdjustPlanner.PlanAsync` answers with an `AdjustPlanResult`:
 
-- it belongs to no project of the solution;
-- its target namespace cannot be determined (a file outside of its project folder);
-- it is no C# document of the workspace (`Predicate.IsDocumentInScope`);
-- several projects compile it (or, for a xaml file, its code behind);
-- it has no namespace transition at all: it is in the target namespace already;
-- the projects which compile it disagree about the namespace it is moved out of.
+- **Plan** — an `AdjustPlanItem` (the file, its target namespace, its kind and, for a C# file,
+  its namespace transitions);
+- **Block** — an `AdjustBlock` with a reason the wizard and the console utility show to the
+  user (no project, unknown target namespace, not a processable document, compiled by several
+  projects, contradictory TFM namespace state, xaml whose code behind is multi-project);
+- **None** — the file is already fine (in the target namespace already) and is dropped silently.
+
+`TryPlanAsync` remains as a thin wrapper that returns the plan or `null` for callers that only
+need to know whether the file is adjusted.
 
 The plan is the whole contract between the two steps of the wizard: the scan shows the files
 the planner accepts and the adjusters perform the plans it produced. Previously both of them
@@ -248,10 +249,15 @@ The collector asks the planner about every file chosen by the user and adds on t
 what only this step needs:
 
 - a planned xaml file is checked with `XamlAdjuster.IsChangesExistsAsync` (nothing is saved):
-  whether the root class really moves is known after the document has been read;
+  whether the root class really moves is known after the document has been read; no change is
+  a silent drop;
 - a planned C# file is checked for the type name conflicts in the target namespace
-  (`NamespaceTypeContainer`). A conflict raises `FileProcessException` and stops the scan:
-  such a move would break the compilation and cannot be undone by the adjusting itself.
+  (`NamespaceTypeContainer`). A conflict becomes an `AdjustBlock` for that file only: other
+  adjustable files of the same scan stay collected. Types of collected files are reserved so
+  two subject files cannot both land the same name into the same target.
+
+`SubjectCollectingResults` therefore carries `CollectedFiles` and `Blocked`. An unexpected
+failure while deciding still raises `FileProcessException` and aborts the scan.
 
 ### Adjusting
 
@@ -346,7 +352,8 @@ stays as soon as a single one of them still needs it.
 ## The xaml subsystem
 
 A xaml file is processed as a plain text with a set of regexes instead of an XML DOM: this is
-the only way to keep the user's formatting untouched.
+the only way to keep the user's formatting untouched. Both classic `.xaml` (WPF, MAUI, …)
+and Avalonia `.axaml` are recognized (`XamlPathHelper`).
 
 - `XamlEngine` creates a `XamlDocument` over an `IXamlBodyProvider`, and which one it is
   is decided by the `IXamlBodyProviderFactory` of the context:
@@ -358,15 +365,17 @@ the only way to keep the user's formatting untouched.
   written back until `SaveIfChangesExistsAgainst` is called. This allows to check whether a file
   is a subject to change without touching it.
 - `XamlStructure` holds the interesting fragments of the body with their positions: the xaml
-  language alias (`XamlX`), the clr-namespace declarations (`XamlXmlns`), the tags
+  language alias (`XamlX`, including the MAUI 2009 uri), the CLR namespace mappings
+  (`XamlXmlns`: both `clr-namespace:` and `using:`), the tags
   (`XamlControl`), the `{x:Type}` / `{x:Static}` markup extensions (`XamlAttributeReference`),
   the `x:Class` attributes (`XamlClass`) and every other `alias:ClassName` pair
   (`XamlTypeUsage`: an attribute value, an attached property, a custom markup extension,
   `x:TypeArguments`). The fragments which may reference a moved class implement
   `IXamlPerformable` and are applied in the backward order, so the earlier positions stay valid.
+  A newly created xmlns keeps the form of the source one (`using:` stays `using:`).
 - The `XamlTypeUsage` scan is a greedy one: it collects everything which looks like an
   `alias:ClassName` pair and is not a part of a fragment recognized above. Such a pair is
-  rewritten only if its alias is a clr-namespace one which points to the namespace the class
+  rewritten only if its alias is a CLR-namespace mapping which points to the namespace the class
   is moved out of, so the pairs which reference nothing (`mc:Ignorable="d"`, a time in a text)
   are simply skipped.
 

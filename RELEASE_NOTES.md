@@ -23,6 +23,15 @@ My others extensions lives [here](https://marketplace.visualstudio.com/publisher
 
 # Adjust namespaces Release Notes
 
+## Unreleased
+
+- Explicit support for MAUI and Avalonia xaml: the `.axaml` extension is treated like
+  `.xaml`, and `xmlns:…="using:…"` mappings are rewritten in the same form (Avalonia's
+  preferred syntax; also used by MAUI). Covered by automated tests; verified by building
+  `Tests/Standard/TestMauiApp` (Windows) and a minimal Avalonia desktop app on this machine.
+- Automated tests for C# files inside a `sqlproj` (the `RootNamespace` / folder chain and
+  the fixed references), matching the sample `Tests/Standard/DatabaseProject`.
+
 ## 0.6.0
 
 - Added the console utility `adjustns`: the same adjusting as the extension, over an

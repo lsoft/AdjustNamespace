@@ -1,4 +1,5 @@
 ﻿using AdjustNamespace.Roslyn;
+using AdjustNamespace.Namespace;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -67,7 +68,8 @@ namespace AdjustNamespace.Adjusting.Edit.Apply
                     s.Alias == null
                     && s.StaticKeyword.IsKind(SyntaxKind.None)
                     //Name is nullable since Roslyn 5 (`using unsafe int*;` has no name)
-                    && s.Name?.ToString() == symbolTargetNamespace
+                    && NamespaceHelper.NormalizeUsingName(s.Name?.ToString() ?? string.Empty)
+                        == symbolTargetNamespace
                     ))
                 {
                     //that using already exists

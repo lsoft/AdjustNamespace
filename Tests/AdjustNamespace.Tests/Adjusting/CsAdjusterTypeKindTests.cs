@@ -195,6 +195,54 @@ namespace X.Y
         }
 
         /// <summary>
+        /// A file may declare the same written name both as a root namespace and as a
+        /// nested one inside another wrapper. Only the root is renamed when that root
+        /// is moved: rewriting the nested fragment would turn <c>MyApp.A</c> into
+        /// <c>MyApp.MyApp</c>.
+        /// </summary>
+        [Fact]
+        public async Task A_nested_namespace_with_the_same_written_name_is_not_renamed()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Subject.cs",
+@"namespace MyApp
+{
+    namespace A
+    {
+        public class Nested { }
+    }
+}
+
+namespace A
+{
+    public class Subject { }
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            await AdjustAndCleanupAsync(solution, "MyApp", "Subject.cs", "MyApp");
+
+            var text = solution.TextOf("MyApp", "Subject.cs");
+
+            Assert.Contains(
+@"namespace MyApp
+{
+    namespace A
+    {
+        public class Nested { }
+    }
+}",
+                text
+                );
+            Assert.Contains("namespace MyApp\r\n{\r\n    public class Subject", text);
+            Assert.DoesNotContain("namespace MyApp\r\n{\r\n    namespace MyApp", text);
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
+
+        /// <summary>
         /// The very same namespace may be declared in a file both as a nested declaration
         /// and as a flat one. Only the outermost part of a name is replaced with the target
         /// namespace, so <c>A.B</c> becomes <c>X.B</c> in the first case and <c>X</c> in the

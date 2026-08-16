@@ -60,10 +60,61 @@ namespace AdjustNamespace.Tests.Adjusting
 ")
                 ;
 
-            var plan = await new AdjustPlanner(solution.Context, NoRegex())
-                .TryPlanAsync(solution.PathOf("MyApp", "Class1.cs"));
+            var result = await new AdjustPlanner(solution.Context, NoRegex())
+                .PlanAsync(solution.PathOf("MyApp", "Class1.cs"));
 
-            Assert.Null(plan);
+            Assert.True(result.IsNone);
+            Assert.Null(result.Plan);
+            Assert.Null(result.Block);
+        }
+
+        /// <summary>
+        /// A linked file outside of the project folder has no folder chain to build a
+        /// target namespace from.
+        /// </summary>
+        [Fact]
+        public async Task A_linked_file_outside_of_the_project_folder_is_blocked()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                ;
+
+            var linkedPath = solution.AddLinkedDocument(
+                "MyApp",
+                @"Outside\Class1.cs",
+@"namespace Legacy
+{
+    public class Class1 { }
+}
+"
+                );
+
+            var result = await new AdjustPlanner(solution.Context, NoRegex())
+                .PlanAsync(linkedPath);
+
+            Assert.True(result.HasBlock);
+            Assert.Equal(AdjustBlockKind.TargetNamespaceUnknown, result.Block!.Value.Kind);
+        }
+
+        /// <summary>
+        /// A path which is not a document of the workspace at all cannot be planned
+        /// even when a target namespace is forced.
+        /// </summary>
+        [Fact]
+        public async Task A_path_which_is_no_document_is_blocked()
+        {
+            using var solution = new TestSolution()
+                .AddProject("MyApp")
+                ;
+
+            var result = await AdjustPlanner.PlanAsync(
+                solution.Workspace,
+                solution.PathOf("MyApp", "Missing.cs"),
+                "MyApp"
+                );
+
+            Assert.True(result.HasBlock);
+            Assert.Equal(AdjustBlockKind.NotAProcessableDocument, result.Block!.Value.Kind);
         }
 
         /// <summary>
@@ -71,16 +122,19 @@ namespace AdjustNamespace.Tests.Adjusting
         /// may have been changed in the meantime.
         /// </summary>
         [Fact]
-        public async Task A_file_of_no_project_is_not_planned()
+        public async Task A_file_of_no_project_is_blocked()
         {
             using var solution = new TestSolution()
                 .AddProject("MyApp")
                 ;
 
-            var plan = await new AdjustPlanner(solution.Context, NoRegex())
-                .TryPlanAsync(solution.PathOf("MyApp", "NotHere.cs"));
+            var path = solution.PathOf("MyApp", "NotHere.cs");
+            var result = await new AdjustPlanner(solution.Context, NoRegex())
+                .PlanAsync(path);
 
-            Assert.Null(plan);
+            Assert.True(result.HasBlock);
+            Assert.Equal(AdjustBlockKind.NoProject, result.Block!.Value.Kind);
+            Assert.Null(result.Plan);
         }
 
         /// <summary>
@@ -88,7 +142,7 @@ namespace AdjustNamespace.Tests.Adjusting
         /// namespace which suits all of them.
         /// </summary>
         [Fact]
-        public async Task A_file_which_several_projects_compile_is_not_planned()
+        public async Task A_file_which_several_projects_compile_is_blocked()
         {
             using var solution = new TestSolution()
                 .AddProject("A")
@@ -102,13 +156,14 @@ namespace AdjustNamespace.Tests.Adjusting
 ", "A", "B")
                 ;
 
-            var plan = await AdjustPlanner.TryPlanAsync(
+            var result = await AdjustPlanner.PlanAsync(
                 solution.Workspace,
                 solution.PathOf("Common", "Class1.cs"),
                 "Common"
                 );
 
-            Assert.Null(plan);
+            Assert.True(result.HasBlock);
+            Assert.Equal(AdjustBlockKind.CompiledBySeveralProjects, result.Block!.Value.Kind);
         }
 
         /// <summary>
@@ -143,7 +198,7 @@ namespace AdjustNamespace.Tests.Adjusting
         /// one of the target frameworks breaks, so the file is left as it is.
         /// </summary>
         [Fact]
-        public async Task A_file_whose_old_namespace_lives_in_another_target_framework_is_not_planned()
+        public async Task A_file_whose_old_namespace_lives_in_another_target_framework_is_blocked()
         {
             using var solution = new TestSolution()
                 .AddMultiTargetProject("MyApp", "net48", "net8.0")
@@ -176,13 +231,14 @@ namespace MyApp
 ")
                 ;
 
-            var plan = await AdjustPlanner.TryPlanAsync(
+            var result = await AdjustPlanner.PlanAsync(
                 solution.Workspace,
                 solution.PathOf("MyApp", "Class1.cs"),
                 "X.Y"
                 );
 
-            Assert.Null(plan);
+            Assert.True(result.HasBlock);
+            Assert.Equal(AdjustBlockKind.NamespaceStateContradictory, result.Block!.Value.Kind);
         }
 
         [Fact]
@@ -213,7 +269,7 @@ namespace MyApp
         /// so the xaml has to be skipped as well.
         /// </summary>
         [Fact]
-        public async Task A_xaml_file_of_a_skipped_code_behind_is_not_planned()
+        public async Task A_xaml_file_of_a_skipped_code_behind_is_blocked()
         {
             using var solution = new TestSolution()
                 .AddProject("A")
@@ -233,13 +289,14 @@ namespace MyApp
     xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
 </Window>");
 
-            var plan = await AdjustPlanner.TryPlanAsync(
+            var result = await AdjustPlanner.PlanAsync(
                 solution.Workspace,
                 xamlFilePath,
                 "Common"
                 );
 
-            Assert.Null(plan);
+            Assert.True(result.HasBlock);
+            Assert.Equal(AdjustBlockKind.XamlCodeBehindMultiProject, result.Block!.Value.Kind);
         }
 
         /// <summary>

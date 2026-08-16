@@ -409,7 +409,8 @@ namespace AdjustNamespace.Xaml
         }
 
         /// <summary>
-        /// Find the clr-namespace declarations: <c>xmlns:alias="clr-namespace:A.B.C"</c>.
+        /// Find the CLR namespace mappings:
+        /// <c>xmlns:alias="clr-namespace:A.B.C"</c> and <c>xmlns:alias="using:A.B.C"</c>.
         /// </summary>
         private static IEnumerable<XamlXmlns> ReadXmlns(
             string xaml,
@@ -417,7 +418,10 @@ namespace AdjustNamespace.Xaml
             )
         {
             //the whitespace around the `:` and the `=` of an attribute is allowed by xml
-            var matches = Regex.Matches(xaml, @"xmlns\s*:\s*([\w\d]+)\s*=\s*""clr-namespace:([\w\d._]+)([^""]*)""");
+            var matches = Regex.Matches(
+                xaml,
+                @"xmlns\s*:\s*([\w\d]+)\s*=\s*""(clr-namespace|using):([\w\d._]+)([^""]*)"""
+                );
             foreach (Match match in matches)
             {
                 if (IsCommented(comments, match.Index))
@@ -429,8 +433,9 @@ namespace AdjustNamespace.Xaml
                     match.Index,
                     match.Length,
                     match.Groups[1].Value,
-                    match.Groups[2].Value,
-                    match.Groups[3].Value
+                    match.Groups[3].Value,
+                    match.Groups[4].Value,
+                    match.Groups[2].Value
                     );
 
                 yield return xx;

@@ -1,5 +1,7 @@
 ﻿using AdjustNamespace.Adjusting.Plan;
 using AdjustNamespace.Namespace;
+using AdjustNamespace.Xaml;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -52,7 +54,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
             var xamlFilePaths = new List<string>();
             foreach (var filePath in filePaths)
             {
-                if (filePath.EndsWith(".xaml"))
+                if (XamlPathHelper.IsXamlFile(filePath))
                 {
                     xamlFilePaths.Add(filePath);
                 }

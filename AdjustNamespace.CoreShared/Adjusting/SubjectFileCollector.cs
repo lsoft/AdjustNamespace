@@ -18,10 +18,10 @@ namespace AdjustNamespace.Adjusting
     /// Whether a file is a subject to change at all is decided by <see cref="AdjustPlanner"/>,
     /// i.e. by the very same code the adjusting itself runs on. What is added here is what
     /// only this step needs: the type name conflicts in the target namespaces, because such
-    /// a conflict makes the adjusting impossible and has to be reported before anything
-    /// has been changed.
+    /// a conflict makes the adjusting of that file impossible and has to be reported before
+    /// anything has been changed. Other files of the same scan keep being collected.
     ///
-    /// Used by the second step of the wizard.
+    /// Used by the second step of the wizard and by the console utility.
     /// </summary>
     public sealed class SubjectFileCollector
     {
@@ -59,12 +59,12 @@ namespace AdjustNamespace.Adjusting
         }
 
         /// <summary>
-        /// Analyze the incoming files and collect those of them which are the subject to change.
+        /// Analyze the incoming files and collect those of them which are the subject to change,
+        /// plus the ones which cannot be adjusted (with a reason for the user).
         /// </summary>
         /// <param name="progressMessageAction">Progress callback: (processed file index, total file count, current file path).</param>
         /// <exception cref="FileProcessException">
-        /// The target namespace of a file already contains a type with the same name,
-        /// or the file cannot be processed at all.
+        /// An unexpected failure while deciding what to do with a file.
         /// </exception>
         public async Task<SubjectCollectingResults> AnalyzeAndCollectAsync(
             Action<int, int, string> progressMessageAction
@@ -84,6 +84,7 @@ namespace AdjustNamespace.Adjusting
 
             var subjectFilePaths = _subjectFilePaths.ToList();
             var foundFileExs = new List<FileEx>();
+            var blocked = new List<AdjustBlock>();
 
             var total = subjectFilePaths.Count;
             for (int i = 0; i < total; i++)
@@ -92,20 +93,29 @@ namespace AdjustNamespace.Adjusting
 
                 progressMessageAction(i + 1, total, subjectFilePath);
 
-                var plan = await TryPlanAsync(planner, subjectFilePath);
-                if (!plan.HasValue)
+                var result = await PlanAsync(planner, subjectFilePath);
+                if (result.HasBlock)
                 {
+                    blocked.Add(result.Block!.Value);
                     continue;
                 }
 
-                if (plan.Value.IsXaml)
+                if (!result.HasPlan)
+                {
+                    //already in the target namespace (or otherwise nothing to do)
+                    continue;
+                }
+
+                var plan = result.Plan!.Value;
+
+                if (plan.IsXaml)
                 {
                     //a xaml file is planned as soon as it belongs to a project, and whether
                     //its root class really moves is known after the document has been read
                     var xamlAdjuster = new XamlAdjuster(
                         _context.XamlBodyProviderFactory,
                         false,
-                        plan.Value
+                        plan
                         );
                     if (!await xamlAdjuster.IsChangesExistsAsync())
                     {
@@ -114,8 +124,21 @@ namespace AdjustNamespace.Adjusting
                 }
                 else
                 {
-                    await CheckForTypeNameConflictsAsync(
-                        plan.Value,
+                    var conflict = await TryGetTypeNameConflictAsync(
+                        plan,
+                        typesInSolutionPerNamespace
+                        );
+                    if (conflict.HasValue)
+                    {
+                        blocked.Add(conflict.Value);
+                        continue;
+                    }
+
+                    //reserve the types this file is about to place into the target, so the
+                    //next subject file which would land the same name there conflicts with
+                    //this one and not only with the types which exist already
+                    await ReserveMovingTypesAsync(
+                        plan,
                         typesInSolutionPerNamespace
                         );
                 }
@@ -125,22 +148,22 @@ namespace AdjustNamespace.Adjusting
                     );
             }
 
-            return new SubjectCollectingResults(foundFileExs);
+            return new SubjectCollectingResults(foundFileExs, blocked);
         }
 
         /// <summary>
-        /// The decision of the planner for a single file, with a failure of it bound
-        /// to that file.
+        /// The decision of the planner for a single file, with an unexpected failure of it
+        /// bound to that file.
         /// </summary>
         /// <exception cref="FileProcessException">The file cannot be processed at all.</exception>
-        private static async Task<AdjustPlanItem?> TryPlanAsync(
+        private static async Task<AdjustPlanResult> PlanAsync(
             AdjustPlanner planner,
             string subjectFilePath
             )
         {
             try
             {
-                return await planner.TryPlanAsync(subjectFilePath);
+                return await planner.PlanAsync(subjectFilePath);
             }
             catch (Exception ex)
             {
@@ -149,14 +172,67 @@ namespace AdjustNamespace.Adjusting
         }
 
         /// <summary>
-        /// Check that no type of the file lands onto a type of the same name which exists
-        /// in the target namespace already: such a move breaks the solution and cannot be
-        /// undone by the adjusting itself.
+        /// The first type of the file which would land onto a type of the same name in the
+        /// target namespace, or <c>null</c> if there is no such conflict.
         /// </summary>
-        /// <exception cref="FileProcessException">There is such a type.</exception>
-        private async Task CheckForTypeNameConflictsAsync(
+        private async Task<AdjustBlock?> TryGetTypeNameConflictAsync(
             AdjustPlanItem plan,
             NamespaceTypeContainer typesInSolutionPerNamespace
+            )
+        {
+            AdjustBlock? conflict = null;
+
+            await ForEachMovingTypeAsync(
+                plan,
+                (symbolInfo, transition) =>
+                {
+                    if (conflict.HasValue)
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    if (typesInSolutionPerNamespace.CheckForTypeExists(transition.ModifiedName, symbolInfo.Name))
+                    {
+                        conflict = AdjustBlock.TypeNameConflict(
+                            plan.FilePath,
+                            transition.ModifiedName,
+                            symbolInfo.Name
+                            );
+                    }
+
+                    return Task.CompletedTask;
+                }
+                );
+
+            return conflict;
+        }
+
+        /// <summary>
+        /// Record the types of the file under the namespaces they will land in, so the
+        /// next file of the same scan sees them as occupants of those namespaces.
+        /// </summary>
+        private async Task ReserveMovingTypesAsync(
+            AdjustPlanItem plan,
+            NamespaceTypeContainer typesInSolutionPerNamespace
+            )
+        {
+            await ForEachMovingTypeAsync(
+                plan,
+                (symbolInfo, transition) =>
+                {
+                    typesInSolutionPerNamespace.Reserve(transition.ModifiedName, symbolInfo.Name);
+                    return Task.CompletedTask;
+                }
+                );
+        }
+
+        /// <summary>
+        /// Walk every top-level type of the file which is going to move, with the
+        /// transition of the declaration it is written in.
+        /// </summary>
+        private async Task ForEachMovingTypeAsync(
+            AdjustPlanItem plan,
+            Func<INamedTypeSymbol, NamespaceTransition, Task> action
             )
         {
             //every project which compiles the file is asked: a type declared under
@@ -175,9 +251,18 @@ namespace AdjustNamespace.Adjusting
                     continue;
                 }
 
-                foreach (var foundType in syntaxRoot.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                //the same kinds CsAdjuster moves: classes/structs/interfaces/records,
+                //enums and delegates. TypeDeclarationSyntax alone misses the last two,
+                //and a name conflict of either of them is just as fatal (CS0101).
+                var foundTypes = (
+                    from snode in syntaxRoot.DescendantNodes()
+                    where snode is TypeDeclarationSyntax || snode is EnumDeclarationSyntax || snode is DelegateDeclarationSyntax
+                    select snode
+                    );
+
+                foreach (var foundType in foundTypes)
                 {
-                    var symbolInfo = semanticModel.GetDeclaredSymbol(foundType);
+                    var symbolInfo = semanticModel.GetDeclaredSymbol(foundType) as INamedTypeSymbol;
                     if (symbolInfo == null)
                     {
                         continue;
@@ -214,13 +299,7 @@ namespace AdjustNamespace.Adjusting
                         continue;
                     }
 
-                    if (typesInSolutionPerNamespace.CheckForTypeExists(transition.Value.ModifiedName, symbolInfo.Name))
-                    {
-                        throw new FileProcessException(
-                            $"'{plan.TargetNamespace}' already contains a type '{symbolInfo.Name}'",
-                            plan.FilePath
-                            );
-                    }
+                    await action(symbolInfo, transition.Value);
                 }
             }
         }
@@ -238,8 +317,17 @@ namespace AdjustNamespace.Adjusting
                 get;
             }
 
+            /// <summary>
+            /// Files which cannot be adjusted, with a reason for the user.
+            /// </summary>
+            public IReadOnlyList<AdjustBlock> Blocked
+            {
+                get;
+            }
+
             public SubjectCollectingResults(
-                List<FileEx> collectedFiles
+                List<FileEx> collectedFiles,
+                IReadOnlyList<AdjustBlock> blocked
                 )
             {
                 if (collectedFiles is null)
@@ -247,13 +335,20 @@ namespace AdjustNamespace.Adjusting
                     throw new ArgumentNullException(nameof(collectedFiles));
                 }
 
+                if (blocked is null)
+                {
+                    throw new ArgumentNullException(nameof(blocked));
+                }
+
                 CollectedFiles = collectedFiles;
+                Blocked = blocked;
             }
         }
     }
 
     /// <summary>
-    /// An error which makes the processing of a specific file impossible.
+    /// An unexpected error which makes the processing of a specific file impossible.
+    /// Type name conflicts and other known blocks are <see cref="AdjustBlock"/> instead.
     /// </summary>
     public sealed class FileProcessException : Exception
     {

@@ -84,10 +84,11 @@ dotnet run --project AdjustNamespace.Cli -- <solution> --dry-run
 
 Notes:
 
-- Do not smoke test it against `Tests/Standard`: `TestMauiApp` does not compile without the
-  MAUI workload and the utility refuses to adjust a solution with compilation errors. Build a
-  throwaway solution of two small `net8.0` projects instead, run the utility over it and
-  `dotnet build` the result — the produced code has to compile.
+- Do not smoke test the CLI against the whole `Tests/Standard` solution: `TestMauiApp`
+  needs the MAUI workload (Windows TFM works with `maui-windows` installed here), and a
+  `sqlproj` is not opened by `MSBuildWorkspace`. Build a throwaway solution of two small
+  `net8.0` projects instead, run the utility over it and `dotnet build` the result — the
+  produced code has to compile.
 - `Program` must not touch an MSBuild type before `MSBuildLocator` is registered, otherwise the
   jit resolves the MSBuild assemblies too early and the run dies with a `FileNotFoundException`.
   Everything which mentions one lives in `AdjustCommand` and below.

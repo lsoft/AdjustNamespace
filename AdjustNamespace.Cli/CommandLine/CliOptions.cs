@@ -130,8 +130,8 @@ extension reads them.
 
 Exit codes:
   0   done (or nothing to do)
-  1   the utility has failed
-  2   --check has found the files to adjust
+  1   the utility has failed, or at least one file cannot be adjusted
+  2   --check has found the files to adjust (and none is blocked)
 ";
 
         /// <summary>

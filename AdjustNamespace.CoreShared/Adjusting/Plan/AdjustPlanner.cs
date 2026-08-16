@@ -1,6 +1,7 @@
 ﻿using AdjustNamespace.Roslyn;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.VisualStudio;
+using AdjustNamespace.Xaml;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
@@ -18,6 +19,10 @@ namespace AdjustNamespace.Adjusting.Plan
     /// going to change, and the adjusters made it again while the third step was running
     /// and silently did nothing when they disagreed. Now the adjusters execute a plan
     /// and never refuse it.
+    ///
+    /// A file the adjusting cannot process safely comes back as an <see cref="AdjustBlock"/>
+    /// with a reason the wizard and the console utility show to the user. A file which is
+    /// already in the right namespace is dropped silently (<see cref="AdjustPlanResult.None"/>).
     /// </summary>
     public sealed class AdjustPlanner
     {
@@ -53,17 +58,10 @@ namespace AdjustNamespace.Adjusting.Plan
         }
 
         /// <summary>
-        /// Decide what to do with the given file.
+        /// Decide what to do with the given file, with a block reason when the file
+        /// cannot be adjusted safely.
         /// </summary>
-        /// <param name="subjectFilePath">Full path to the file.</param>
-        /// <param name="cancellationToken">Cancellation of the session.</param>
-        /// <returns>
-        /// The decision, or <c>null</c> if the file is not a subject to change at all:
-        /// it belongs to no project of the solution, its target namespace cannot be
-        /// determined, or it is one of the files we are unable to process,
-        /// see <see cref="TryPlanAsync(Workspace, string, string, CancellationToken)"/>.
-        /// </returns>
-        public async Task<AdjustPlanItem?> TryPlanAsync(
+        public async Task<AdjustPlanResult> PlanAsync(
             string subjectFilePath,
             CancellationToken cancellationToken = default
             )
@@ -76,7 +74,28 @@ namespace AdjustNamespace.Adjusting.Plan
             var project = await TryGetProjectOfAsync(subjectFilePath);
             if (!project.HasValue)
             {
-                return null;
+                return AdjustPlanResult.ForBlock(
+                    AdjustBlock.Create(subjectFilePath, AdjustBlockKind.NoProject)
+                    );
+            }
+
+            //several projects must be detected before the target namespace: a shared file
+            //often lies outside of every referencing project's folder, and that would look
+            //like an unknown target namespace instead of the real reason
+            if (XamlPathHelper.IsXamlFile(subjectFilePath))
+            {
+                if (_context.Workspace.IsCompiledBySeveralProjects(subjectFilePath + ".cs"))
+                {
+                    return AdjustPlanResult.ForBlock(
+                        AdjustBlock.Create(subjectFilePath, AdjustBlockKind.XamlCodeBehindMultiProject)
+                        );
+                }
+            }
+            else if (_context.Workspace.IsCompiledBySeveralProjects(subjectFilePath))
+            {
+                return AdjustPlanResult.ForBlock(
+                    AdjustBlock.Create(subjectFilePath, AdjustBlockKind.CompiledBySeveralProjects)
+                    );
             }
 
             var targetNamespace = await _context.TargetNamespaces.TryResolveAsync(
@@ -86,10 +105,12 @@ namespace AdjustNamespace.Adjusting.Plan
                 );
             if (string.IsNullOrEmpty(targetNamespace))
             {
-                return null;
+                return AdjustPlanResult.ForBlock(
+                    AdjustBlock.Create(subjectFilePath, AdjustBlockKind.TargetNamespaceUnknown)
+                    );
             }
 
-            return await TryPlanAsync(
+            return await PlanAsync(
                 _context.Workspace,
                 subjectFilePath,
                 targetNamespace!,
@@ -98,17 +119,26 @@ namespace AdjustNamespace.Adjusting.Plan
         }
 
         /// <summary>
+        /// Decide what to do with the given file.
+        /// </summary>
+        /// <returns>
+        /// The decision, or <c>null</c> if the file is not adjusted (blocked or already fine).
+        /// Prefer <see cref="PlanAsync(string, CancellationToken)"/> when the reason matters.
+        /// </returns>
+        public async Task<AdjustPlanItem?> TryPlanAsync(
+            string subjectFilePath,
+            CancellationToken cancellationToken = default
+            )
+        {
+            var result = await PlanAsync(subjectFilePath, cancellationToken);
+            return result.Plan;
+        }
+
+        /// <summary>
         /// The part of the decision which needs the Roslyn workspace only, i.e. everything
         /// except the target namespace of the file.
         /// </summary>
-        /// <param name="workspace">Roslyn workspace of the solution.</param>
-        /// <param name="subjectFilePath">Full path to the file.</param>
-        /// <param name="targetNamespace">The namespace the types of that file have to be moved into.</param>
-        /// <param name="cancellationToken">Cancellation of the session.</param>
-        /// <returns>
-        /// The decision, or <c>null</c> if the file has to be left alone.
-        /// </returns>
-        public static async Task<AdjustPlanItem?> TryPlanAsync(
+        public static async Task<AdjustPlanResult> PlanAsync(
             Workspace workspace,
             string subjectFilePath,
             string targetNamespace,
@@ -130,15 +160,34 @@ namespace AdjustNamespace.Adjusting.Plan
                 throw new ArgumentNullException(nameof(targetNamespace));
             }
 
-            if (subjectFilePath.EndsWith(".xaml"))
+            if (XamlPathHelper.IsXamlFile(subjectFilePath))
             {
-                return TryPlanXaml(workspace, subjectFilePath, targetNamespace);
+                return PlanXaml(workspace, subjectFilePath, targetNamespace);
             }
 
-            return await TryPlanCsAsync(workspace, subjectFilePath, targetNamespace, cancellationToken);
+            return await PlanCsAsync(workspace, subjectFilePath, targetNamespace, cancellationToken);
         }
 
-        private static AdjustPlanItem? TryPlanXaml(
+        /// <summary>
+        /// The part of the decision which needs the Roslyn workspace only.
+        /// </summary>
+        /// <returns>
+        /// The decision, or <c>null</c> if the file has to be left alone.
+        /// Prefer <see cref="PlanAsync(Workspace, string, string, CancellationToken)"/>
+        /// when the reason matters.
+        /// </returns>
+        public static async Task<AdjustPlanItem?> TryPlanAsync(
+            Workspace workspace,
+            string subjectFilePath,
+            string targetNamespace,
+            CancellationToken cancellationToken = default
+            )
+        {
+            var result = await PlanAsync(workspace, subjectFilePath, targetNamespace, cancellationToken);
+            return result.Plan;
+        }
+
+        private static AdjustPlanResult PlanXaml(
             Workspace workspace,
             string subjectFilePath,
             string targetNamespace
@@ -149,13 +198,17 @@ namespace AdjustNamespace.Adjusting.Plan
             //several projects compile it, so this file has to be skipped too
             if (workspace.IsCompiledBySeveralProjects(subjectFilePath + ".cs"))
             {
-                return null;
+                return AdjustPlanResult.ForBlock(
+                    AdjustBlock.Create(subjectFilePath, AdjustBlockKind.XamlCodeBehindMultiProject)
+                    );
             }
 
-            return AdjustPlanItem.Xaml(subjectFilePath, targetNamespace);
+            return AdjustPlanResult.ForPlan(
+                AdjustPlanItem.Xaml(subjectFilePath, targetNamespace)
+                );
         }
 
-        private static async Task<AdjustPlanItem?> TryPlanCsAsync(
+        private static async Task<AdjustPlanResult> PlanCsAsync(
             Workspace workspace,
             string subjectFilePath,
             string targetNamespace,
@@ -165,14 +218,18 @@ namespace AdjustNamespace.Adjusting.Plan
             //we can do nothing with not a C# document
             if (!workspace.GetDocument(subjectFilePath).IsDocumentInScope())
             {
-                return null;
+                return AdjustPlanResult.ForBlock(
+                    AdjustBlock.Create(subjectFilePath, AdjustBlockKind.NotAProcessableDocument)
+                    );
             }
 
             if (workspace.IsCompiledBySeveralProjects(subjectFilePath))
             {
                 //a file of a shared project which is referenced by several projects:
                 //there is no target namespace which suits all of them
-                return null;
+                return AdjustPlanResult.ForBlock(
+                    AdjustBlock.Create(subjectFilePath, AdjustBlockKind.CompiledBySeveralProjects)
+                    );
             }
 
             //a file may be compiled by several projects (the target frameworks of a multi target
@@ -186,7 +243,7 @@ namespace AdjustNamespace.Adjusting.Plan
             if (transitions.IsEmpty)
             {
                 //nothing to move: the file is in the target namespace already
-                return null;
+                return AdjustPlanResult.None();
             }
 
             foreach (var transition in transitions.Transitions)
@@ -196,11 +253,15 @@ namespace AdjustNamespace.Adjusting.Plan
                     //the projects which compile this file do not agree whether the namespace
                     //it is moved out of stays alive, and there is a single text for all of them:
                     //whatever we do with the using clauses, one of these projects breaks
-                    return null;
+                    return AdjustPlanResult.ForBlock(
+                        AdjustBlock.Create(subjectFilePath, AdjustBlockKind.NamespaceStateContradictory)
+                        );
                 }
             }
 
-            return AdjustPlanItem.Cs(subjectFilePath, targetNamespace, transitions);
+            return AdjustPlanResult.ForPlan(
+                AdjustPlanItem.Cs(subjectFilePath, targetNamespace, transitions)
+                );
         }
 
         /// <summary>

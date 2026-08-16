@@ -27,8 +27,11 @@
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\FileEdit.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\MoveNamespaceEdit.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\ReplaceTextEdit.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Plan\AdjustBlock.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Plan\AdjustBlockKind.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Plan\AdjustPlanItem.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Plan\AdjustPlanner.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Plan\AdjustPlanResult.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Session\AdjustProgress.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Session\AdjustSession.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Session\AdjustSessionOutcome.cs" />
@@ -72,6 +75,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlXmlns.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlDocument.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlEngine.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlPathHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlStructure.cs" />
   </ItemGroup>
 </Project>
