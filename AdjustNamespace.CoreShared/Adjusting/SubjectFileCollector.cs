@@ -114,7 +114,6 @@ namespace AdjustNamespace.Adjusting
                     //its root class really moves is known after the document has been read
                     var xamlAdjuster = new XamlAdjuster(
                         _context.XamlBodyProviderFactory,
-                        false,
                         plan
                         );
                     if (!await xamlAdjuster.IsChangesExistsAsync())

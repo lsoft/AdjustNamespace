@@ -1,5 +1,6 @@
 ﻿using AdjustNamespace.Adjusting.Session;
 using AdjustNamespace.Options;
+using AdjustNamespace.VisualStudio;
 using System.Collections.Generic;
 using System.Threading;
 using System.Windows.Input;
@@ -10,8 +11,9 @@ namespace AdjustNamespace.UI.ViewModel
     /// Viewmodel of the third (last) wizard step: the adjusting itself.
     ///
     /// The adjusting is performed by <see cref="AdjustSession"/>; what is left here is what
-    /// the wizard is responsible for: showing the progress, cancelling the session and
-    /// closing the window when it is over.
+    /// the wizard is responsible for: showing the progress, cancelling the session,
+    /// wrapping the run in a global linked undo transaction and closing the window when
+    /// it is over.
     /// </summary>
     public class PerformingViewModel : ChainViewModel
     {
@@ -21,7 +23,6 @@ namespace AdjustNamespace.UI.ViewModel
         private readonly IWizardHost _host;
         private readonly List<string> _subjectFilePaths;
         private readonly NamespaceReplaceRegex _replaceRegex;
-        private readonly bool _openFilesToEnableUndo;
 
         private RelayCommand? _cancelCommand;
         private System.Threading.Tasks.Task<AdjustSessionOutcome>? _task;
@@ -84,7 +85,6 @@ namespace AdjustNamespace.UI.ViewModel
             _host = host;
             _subjectFilePaths = parameters.SubjectFilePaths;
             _replaceRegex = parameters.ReplaceRegex;
-            _openFilesToEnableUndo = parameters.OpenFilesToEnableUndo;
             _progressMessage = string.Empty;
         }
 
@@ -93,34 +93,36 @@ namespace AdjustNamespace.UI.ViewModel
         {
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            //var undoManager = (await the service provider.GetServiceAsync(typeof(SVsLinkedUndoTransactionManager))) as IVsLinkedUndoTransactionManager;
-            //ErrorHandler.ThrowOnFailure(
-            //    undoManager!.OpenLinkedUndo((uint)LinkedTransactionFlagsEnum.Global, "Adjusting Namespaces")
-            //    );
+            using var undo = LinkedUndoTransaction.Open("Adjust Namespaces");
 
-            //int transactionCount = 0;
-            //ErrorHandler.ThrowOnFailure(
-            //    undoManager.CountOpenTransactions(ref transactionCount)
-            //    );
+            try
+            {
+                _task = new AdjustSession(_context, _replaceRegex)
+                    .RunAsync(
+                        _subjectFilePaths,
+                        //this Progress is built on the main thread (see the switch above) and
+                        //therefore marshals the reports of the session back to it: the binding
+                        //of the progress line is never touched from a background thread
+                        new Progress<AdjustProgress>(p => ProgressMessage = p.Message),
+                        _cts.Token
+                        );
 
-            _task = new AdjustSession(_context, _replaceRegex, _openFilesToEnableUndo)
-                .RunAsync(
-                    _subjectFilePaths,
-                    //this Progress is built on the main thread (see the switch above) and
-                    //therefore marshals the reports of the session back to it: the binding
-                    //of the progress line is never touched from a background thread
-                    new Progress<AdjustProgress>(p => ProgressMessage = p.Message),
-                    _cts.Token
-                    );
+                var outcome = await _task;
 
-            var outcome = await _task;
-
-            //ErrorHandler.ThrowOnFailure(undoManager.CloseLinkedUndo());
-
-            ProgressMessage = outcome == AdjustSessionOutcome.Cancelled
-                ? "Cancelled"
-                : "Completed"
-                ;
+                //CloseLinkedUndo (via Dispose) commits one undo unit for whatever was applied.
+                //Do not Abort on cancel: AbortLinkedUndo rolls the changes back, and the
+                //wizard promises that a cancel keeps the already applied edits.
+                ProgressMessage = outcome == AdjustSessionOutcome.Cancelled
+                    ? "Cancelled"
+                    : "Completed"
+                    ;
+            }
+            catch
+            {
+                //unexpected failure: roll the whole transaction back
+                undo.Abort();
+                throw;
+            }
 
             await System.Threading.Tasks.Task.Delay(750);
 

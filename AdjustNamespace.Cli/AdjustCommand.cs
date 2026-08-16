@@ -177,9 +177,8 @@ namespace AdjustNamespace.Cli
                     settings,
                     new ProjectFileDefaultNamespaceProvider(workspace)
                     ),
-                //there is no editor to open a file in, and therefore no undo:
-                //the safety net of the console utility is the version control
-                new NullDocumentOpener(),
+                //there is no editor here: the safety net of the console utility is the
+                //version control
                 new ClosedXamlBodyProviderFactory()
                 );
         }
@@ -363,9 +362,7 @@ namespace AdjustNamespace.Cli
         {
             var session = new AdjustSession(
                 context,
-                _options.ReplaceRegex,
-                //an undoable change requires an opened editor and there is none here
-                openFilesToEnableUndo: false
+                _options.ReplaceRegex
                 );
 
             var outcome = await session.RunAsync(

@@ -250,7 +250,7 @@ namespace A.Other
 
             Assert.NotNull(plan);
 
-            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, plan!.Value);
+            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), plan!.Value);
 
             Assert.True(await adjuster.IsChangesExistsAsync());
             Assert.True(await adjuster.AdjustAsync());
@@ -683,7 +683,7 @@ namespace Legacy.Core
 
             Assert.NotNull(plan);
 
-            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, plan!.Value);
+            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), plan!.Value);
 
             Assert.True(await adjuster.IsChangesExistsAsync());
             Assert.True(await adjuster.AdjustAsync());

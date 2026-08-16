@@ -17,15 +17,9 @@ namespace AdjustNamespace.UI.ViewModel
         /// </summary>
         public readonly NamespaceReplaceRegex ReplaceRegex;
 
-        /// <summary>
-        /// Open the changed files in the editor (this allows the user to undo the changes).
-        /// </summary>
-        public readonly bool OpenFilesToEnableUndo;
-
         public PerformingParameters(
             List<string> subjectFilePaths,
-            NamespaceReplaceRegex replaceRegex,
-            bool openFilesToEnableUndo
+            NamespaceReplaceRegex replaceRegex
             )
         {
             if (subjectFilePaths is null)
@@ -35,7 +29,6 @@ namespace AdjustNamespace.UI.ViewModel
 
             SubjectFilePaths = subjectFilePaths;
             ReplaceRegex = replaceRegex;
-            OpenFilesToEnableUndo = openFilesToEnableUndo;
         }
     }
 }

@@ -129,7 +129,6 @@ namespace AdjustNamespace.Tests.Infrastructure
                 Settings,
                 new FakeProjectDefaultNamespaceProvider()
                 ),
-            new NullDocumentOpener(),
             new ClosedXamlBodyProviderFactory()
             );
 

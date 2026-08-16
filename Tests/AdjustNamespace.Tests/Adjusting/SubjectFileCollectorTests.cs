@@ -535,8 +535,7 @@ namespace MyApp
 
             var outcome = await new AdjustNamespace.Adjusting.Session.AdjustSession(
                 solution.Context,
-                new NamespaceReplaceRegex(string.Empty, string.Empty),
-                false
+                new NamespaceReplaceRegex(string.Empty, string.Empty)
                 ).RunAsync(
                     results.CollectedFiles.ConvertAll(f => f.FilePath),
                     null,

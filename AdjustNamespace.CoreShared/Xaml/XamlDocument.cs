@@ -16,7 +16,7 @@ namespace AdjustNamespace.Xaml
     /// The xaml is processed as a plain text with a set of regexes instead of an XML DOM.
     /// This looks fragile, but it is the only way to keep the user's formatting untouched.
     /// </summary>
-    public readonly struct XamlDocument
+    public readonly struct XamlDocument : IDisposable
     {
         private readonly IXamlBodyProvider _bodyProvider;
 
@@ -180,6 +180,15 @@ namespace AdjustNamespace.Xaml
             }
 
             _bodyProvider.UpdateText(_xaml);
+        }
+
+        /// <summary>
+        /// Release the underlying body provider when it holds an (invisible) editor.
+        /// Safe to call more than once; a file-system provider is a no-op.
+        /// </summary>
+        public void Dispose()
+        {
+            (_bodyProvider as IDisposable)?.Dispose();
         }
 
         /// <summary>

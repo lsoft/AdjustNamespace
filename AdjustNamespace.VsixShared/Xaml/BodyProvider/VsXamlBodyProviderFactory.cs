@@ -4,35 +4,36 @@ using System.Threading.Tasks;
 namespace AdjustNamespace.Xaml.BodyProvider
 {
     /// <summary>
-    /// Factory which is able to work with the xaml file through the Visual Studio editor,
-    /// see <see cref="OpenedXamlBodyProvider"/>. This is what the extension itself uses:
-    /// the changes of a file opened in the editor are undoable by the user.
-    ///
-    /// Opening is slow, so it happens only if the user has asked for it
-    /// (see the second step of the wizard).
+    /// Factory used by the extension itself: reads go through the file system (fast probes),
+    /// writes go through an invisible text buffer so the change participates in the global
+    /// linked undo transaction without opening an editor tab.
     /// </summary>
     public sealed class VsXamlBodyProviderFactory : IXamlBodyProviderFactory
     {
         /// <inheritdoc/>
-        public async Task<IXamlBodyProvider> CreateAsync(
-            bool openFilesToEnableUndo,
-            string xamlFilePath
-            )
+        public Task<IXamlBodyProvider> CreateForReadAsync(string xamlFilePath)
         {
             if (xamlFilePath is null)
             {
                 throw new ArgumentNullException(nameof(xamlFilePath));
             }
 
-            if (!openFilesToEnableUndo)
+            return Task.FromResult<IXamlBodyProvider>(
+                new ClosedXamlBodyProvider(xamlFilePath)
+                );
+        }
+
+        /// <inheritdoc/>
+        public async Task<IXamlBodyProvider> CreateForWriteAsync(string xamlFilePath)
+        {
+            if (xamlFilePath is null)
             {
-                return new ClosedXamlBodyProvider(xamlFilePath);
+                throw new ArgumentNullException(nameof(xamlFilePath));
             }
 
-            var provider = new OpenedXamlBodyProvider(xamlFilePath);
-            await provider.OpenAsync();
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
-            return provider;
+            return InvisibleXamlBodyProvider.Open(xamlFilePath);
         }
     }
 }

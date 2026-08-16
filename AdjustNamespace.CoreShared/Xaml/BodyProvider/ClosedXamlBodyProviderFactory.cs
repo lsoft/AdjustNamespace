@@ -10,10 +10,18 @@ namespace AdjustNamespace.Xaml.BodyProvider
     public sealed class ClosedXamlBodyProviderFactory : IXamlBodyProviderFactory
     {
         /// <inheritdoc/>
-        public Task<IXamlBodyProvider> CreateAsync(
-            bool openFilesToEnableUndo,
-            string xamlFilePath
-            )
+        public Task<IXamlBodyProvider> CreateForReadAsync(string xamlFilePath)
+        {
+            return CreateClosedAsync(xamlFilePath);
+        }
+
+        /// <inheritdoc/>
+        public Task<IXamlBodyProvider> CreateForWriteAsync(string xamlFilePath)
+        {
+            return CreateClosedAsync(xamlFilePath);
+        }
+
+        private static Task<IXamlBodyProvider> CreateClosedAsync(string xamlFilePath)
         {
             if (xamlFilePath is null)
             {

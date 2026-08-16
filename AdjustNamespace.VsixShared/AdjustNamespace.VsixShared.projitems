@@ -58,7 +58,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\ProjectItemInformation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\SolutionHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\VsAdjustContext.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\VsDocumentOpener.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\LinkedUndoTransaction.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\VsSolutionExplorer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Window\AdjustNamespaceWindow.xaml.cs">
       <DependentUpon>AdjustNamespaceWindow.xaml</DependentUpon>
@@ -66,7 +66,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Window\EditSkippedPathsWindow.xaml.cs">
       <DependentUpon>EditSkippedPathsWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\OpenedXamlBodyProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\InvisibleXamlBodyProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\VsXamlBodyProviderFactory.cs" />
   </ItemGroup>
   <ItemGroup>

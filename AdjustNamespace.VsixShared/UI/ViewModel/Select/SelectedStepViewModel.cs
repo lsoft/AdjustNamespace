@@ -18,17 +18,11 @@ namespace AdjustNamespace.UI.ViewModel.Select
     /// Viewmodel of the second wizard step.
     /// It scans the chosen files (see <see cref="SubjectFileCollector"/>), shows the files
     /// which are really the subject to change (grouped by their physical folder) and allows
-    /// the user to uncheck some of them, to tune the target namespace with a regex and
-    /// to decide whether the changed files should be opened in the editor.
+    /// the user to uncheck some of them and to tune the target namespace with a regex.
     /// Files which cannot be adjusted are listed separately with a reason.
     /// </summary>
     public class SelectedStepViewModel : ChainViewModel
     {
-        /// <summary>
-        /// The maximum number of files that can be opened in the editor without causing a delay in VS.
-        /// </summary>
-        public const int MaxFilesAllowedToOpen = 15;
-
         private readonly AdjustContext _context;
         private readonly IWizardHost _host;
         private readonly IStepFactory<PreparationParameters> _previousStepFactory;
@@ -49,9 +43,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
         private ICommand? _invertStatusCommand;
         private ICommand? _previousCommand;
         private ICommand? _rescanCommand;
-        
-        private bool _enableOpenFileCheckBox;
-        private bool _openFilesToEnableUndo;
+
         private string _replaceRegex = string.Empty;
         private string _replacedString = string.Empty;
 
@@ -103,42 +95,6 @@ namespace AdjustNamespace.UI.ViewModel.Select
                 OnPropertyChanged(nameof(Foreground));
             }
         }
-
-        #region open files to enable undo checkbox
-
-        /// <summary>
-        /// The `open affected files` checkbox is available
-        /// (i.e. not too many files are checked, see <see cref="MaxFilesAllowedToOpen"/>).
-        /// </summary>
-        public bool EnableOpenFileCheckBox
-        {
-            get => _enableOpenFileCheckBox;
-            set
-            {
-                _enableOpenFileCheckBox = value;
-                OnPropertyChanged(nameof(EnableOpenFileCheckBox));
-            }
-        }
-
-        /// <summary>
-        /// Text of the `open affected files` checkbox.
-        /// </summary>
-        public string OpenFileCheckBoxText => $"Open affected files to enable Undo (max is {MaxFilesAllowedToOpen} to prevent delays)";
-
-        /// <summary>
-        /// Open the changed files in the editor (this allows the user to undo the changes).
-        /// </summary>
-        public bool OpenFilesToEnableUndo
-        {
-            get => _openFilesToEnableUndo;
-            set
-            {
-                _openFilesToEnableUndo = value;
-                OnPropertyChanged(nameof(OpenFilesToEnableUndo));
-            }
-        }
-
-        #endregion
 
         /// <summary>
         /// The regex which additionally modifies the target namespace.
@@ -268,8 +224,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
                                 .ToList();
                             var pp = new PerformingParameters(
                                 filePaths,
-                                CreateNamespaceReplaceRegex(),
-                                _openFilesToEnableUndo
+                                CreateNamespaceReplaceRegex()
                                 );
 
                             Cleanup();
@@ -542,29 +497,10 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
         /// <summary>
         /// Re-evaluate the state of the step after a checkbox has been changed.
-        /// Called by the child viewmodels.
+        /// Called by the child viewmodels; kept as a hook for future status UI.
         /// </summary>
         public void RefreshStatus()
         {
-            RefreshOpenFileCheckBox();
-        }
-
-        /// <summary>
-        /// Disable (and uncheck) the `open affected files` checkbox if too many files are checked:
-        /// a lot of documents opened at once makes Visual Studio unresponsive.
-        /// </summary>
-        private void RefreshOpenFileCheckBox()
-        {
-            var cnt = ToFilterItems
-                .Where(i => i.FileEx.HasValue && i.IsChecked.GetValueOrDefault(false))
-                .Count();
-            var allowed = cnt < MaxFilesAllowedToOpen;
-
-            EnableOpenFileCheckBox = allowed;
-            if (!allowed)
-            {
-                OpenFilesToEnableUndo = false;
-            }
         }
 
         /// <summary>

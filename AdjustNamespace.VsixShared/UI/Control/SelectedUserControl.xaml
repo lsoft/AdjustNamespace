@@ -41,7 +41,6 @@
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
             <RowDefinition Height="auto" />
-            <RowDefinition Height="auto" />
         </Grid.RowDefinitions>
 
         <TextBlock
@@ -144,17 +143,9 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <CheckBox
-            Grid.Row="5"
-            HorizontalAlignment="Right"
-            Content="{Binding OpenFileCheckBoxText}"
-            IsChecked="{Binding OpenFilesToEnableUndo}"
-            IsEnabled="{Binding EnableOpenFileCheckBox}"
-            />
-
         <Grid
             Name="RegexGrid"
-            Grid.Row="6"
+            Grid.Row="5"
             Margin="0,10,0,0"
             HorizontalAlignment="Stretch"
             >
@@ -202,7 +193,7 @@
         </Grid>
 
         <ListView
-            Grid.Row="7"
+            Grid.Row="6"
             HorizontalAlignment="Stretch"
             ItemsSource="{Binding KnownRegexes}"
             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -242,7 +233,7 @@
 
         <Grid
             Name="ButtonGrid"
-            Grid.Row="8"
+            Grid.Row="7"
             Margin="0,10,0,0"
             HorizontalAlignment="Stretch"
             >

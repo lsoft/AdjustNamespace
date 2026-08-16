@@ -2,7 +2,6 @@ using AdjustNamespace.Adjusting;
 using AdjustNamespace.Adjusting.Adjuster;
 using AdjustNamespace.Adjusting.Plan;
 using AdjustNamespace.Namespace;
-using AdjustNamespace.VisualStudio;
 using AdjustNamespace.Xaml.BodyProvider;
 using System.Linq;
 
@@ -77,9 +76,7 @@ namespace AdjustNamespace.Tests.Infrastructure
 
             var adjuster = new CsAdjuster(
                 solution.Workspace,
-                new NullDocumentOpener(),
                 new ClosedXamlBodyProviderFactory(),
-                false,
                 namespaceCenter,
                 plan.Value,
                 xamlFilePaths.ToList()

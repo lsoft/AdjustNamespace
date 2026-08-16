@@ -56,10 +56,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Settings\AdjustNamespaceSettings2.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Settings\SettingsReader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)TypeContainer.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\IDocumentOpener.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\IProjectDefaultNamespaceProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\ISolutionExplorer.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\NullDocumentOpener.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\ProjectRef.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\ClosedXamlBodyProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\ClosedXamlBodyProviderFactory.cs" />

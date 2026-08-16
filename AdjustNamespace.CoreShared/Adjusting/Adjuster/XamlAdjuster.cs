@@ -21,14 +21,11 @@ namespace AdjustNamespace.Adjusting.Adjuster
         private readonly IXamlBodyProviderFactory _xamlBodyProviderFactory;
         private readonly string _subjectFilePath;
         private readonly string _targetNamespace;
-        private readonly bool _openFilesToEnableUndo;
 
         /// <param name="xamlBodyProviderFactory">How the xaml file is read and written.</param>
-        /// <param name="openFilesToEnableUndo">Open the changed file in the editor (this allows the user to undo the changes).</param>
         /// <param name="plan">What has to happen with the file.</param>
         public XamlAdjuster(
             IXamlBodyProviderFactory xamlBodyProviderFactory,
-            bool openFilesToEnableUndo,
             AdjustPlanItem plan
             )
         {
@@ -38,7 +35,6 @@ namespace AdjustNamespace.Adjusting.Adjuster
             }
 
             _xamlBodyProviderFactory = xamlBodyProviderFactory;
-            _openFilesToEnableUndo = openFilesToEnableUndo;
             _subjectFilePath = plan.FilePath;
             _targetNamespace = plan.TargetNamespace;
         }
@@ -48,13 +44,16 @@ namespace AdjustNamespace.Adjusting.Adjuster
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var (xamlDocument, modifiedDocument) = await TryModifyDocumentAsync();
-            if (!modifiedDocument.HasValue)
+            var xamlEngine = new XamlEngine(_xamlBodyProviderFactory);
+
+            using var xamlDocument = await xamlEngine.CreateForWriteAsync(_subjectFilePath);
+
+            if (!TryBuildModified(xamlDocument, out var modifiedDocument))
             {
                 return false;
             }
 
-            modifiedDocument.Value.SaveIfChangesExistsAgainst(xamlDocument);
+            modifiedDocument.SaveIfChangesExistsAgainst(xamlDocument);
 
             return true;
         }
@@ -67,44 +66,48 @@ namespace AdjustNamespace.Adjusting.Adjuster
         public async Task<bool> IsChangesExistsAsync(
             )
         {
-            var (xamlDocument, modifiedDocument) = await TryModifyDocumentAsync();
-            return modifiedDocument.HasValue && modifiedDocument.Value.IsChangesExists(xamlDocument);
+            var xamlEngine = new XamlEngine(_xamlBodyProviderFactory);
+
+            using var xamlDocument = await xamlEngine.CreateForReadAsync(_subjectFilePath);
+
+            if (!TryBuildModified(xamlDocument, out var modifiedDocument))
+            {
+                return false;
+            }
+
+            return modifiedDocument.IsChangesExists(xamlDocument);
         }
 
         /// <summary>
         /// Build the modified version of the subject xaml document.
         /// </summary>
         /// <returns>
-        /// The original document and its modified copy. The modified copy is <c>null</c>
-        /// if the document has no root class at all or it is in the target namespace already.
+        /// <c>true</c> when the root class exists and is not already in the target namespace.
         /// </returns>
-        private async Task<(XamlDocument, XamlDocument?)> TryModifyDocumentAsync(
+        private bool TryBuildModified(
+            XamlDocument xamlDocument,
+            out XamlDocument modifiedDocument
             )
         {
-            var xamlEngine = new XamlEngine(_xamlBodyProviderFactory);
-
-            var xamlDocument = await xamlEngine.CreateDocumentAsync(
-                _openFilesToEnableUndo,
-                _subjectFilePath
-                );
+            modifiedDocument = default;
 
             if (!xamlDocument.GetRootInfo(out var rootNamespace, out var rootName))
             {
-                return (xamlDocument, null);
+                return false;
             }
 
             if (rootNamespace == _targetNamespace)
             {
-                return (xamlDocument, null);
+                return false;
             }
 
-            var modifiedXamlDocument = xamlDocument.MoveObject(
+            modifiedDocument = xamlDocument.MoveObject(
                 rootNamespace!,
                 rootName!,
                 _targetNamespace
                 );
 
-            return (xamlDocument, modifiedXamlDocument);
+            return true;
         }
     }
 }

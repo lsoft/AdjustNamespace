@@ -14,7 +14,6 @@ using AdjustNamespace.Adjusting.Edit.Apply;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Adjusting.Adjuster.Cs;
 using AdjustNamespace.Adjusting.Plan;
-using AdjustNamespace.VisualStudio;
 using AdjustNamespace;
 
 namespace AdjustNamespace.Adjusting.Adjuster
@@ -36,9 +35,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
     public class CsAdjuster : IAdjuster
     {
         private readonly Workspace _workspace;
-        private readonly IDocumentOpener _documentOpener;
         private readonly IXamlBodyProviderFactory _xamlBodyProviderFactory;
-        private readonly bool _openFilesToEnableUndo;
         private readonly NamespaceCenter _namespaceCenter;
         private readonly string _subjectFilePath;
         private readonly string _targetNamespace;
@@ -46,17 +43,13 @@ namespace AdjustNamespace.Adjusting.Adjuster
         private readonly List<string> _xamlFilePaths;
 
         /// <param name="workspace">Roslyn workspace of the solution.</param>
-        /// <param name="documentOpener">Opener of the changed files in the editor.</param>
         /// <param name="xamlBodyProviderFactory">How a xaml file is read and written.</param>
-        /// <param name="openFilesToEnableUndo">Open the changed files in the editor (this allows the user to undo the changes).</param>
         /// <param name="namespaceCenter">Namespace state container shared across the whole adjusting session.</param>
         /// <param name="plan">What has to happen with the file.</param>
         /// <param name="xamlFilePaths">All the xaml files of the solution (they may reference the moved types).</param>
         public CsAdjuster(
             Workspace workspace,
-            IDocumentOpener documentOpener,
             IXamlBodyProviderFactory xamlBodyProviderFactory,
-            bool openFilesToEnableUndo,
             NamespaceCenter namespaceCenter,
             AdjustPlanItem plan,
             List<string> xamlFilePaths
@@ -65,11 +58,6 @@ namespace AdjustNamespace.Adjusting.Adjuster
             if (workspace is null)
             {
                 throw new ArgumentNullException(nameof(workspace));
-            }
-
-            if (documentOpener is null)
-            {
-                throw new ArgumentNullException(nameof(documentOpener));
             }
 
             if (xamlBodyProviderFactory is null)
@@ -88,9 +76,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
             }
 
             _workspace = workspace;
-            _documentOpener = documentOpener;
             _xamlBodyProviderFactory = xamlBodyProviderFactory;
-            _openFilesToEnableUndo = openFilesToEnableUndo;
             _namespaceCenter = namespaceCenter;
             _subjectFilePath = plan.FilePath;
             _targetNamespace = plan.TargetNamespace;
@@ -146,7 +132,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
             //perform the changes. The cancellation is not asked anymore: the edits of one file
             //describe a single consistent change of the solution and a half of them is a broken
             //file, so the writing is never interrupted
-            await new EditApplier(_workspace, _documentOpener, _openFilesToEnableUndo)
+            await new EditApplier(_workspace)
                 .ApplyAsync(edits);
 
             //TODO: describe these changes as the edits of the set above
@@ -326,9 +312,9 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
         /// <summary>
         /// Fix the references to the moved types in the xaml files of the solution.
-        /// To keep it fast, the changes are firstly applied to an in-memory copy of the file,
-        /// and only if that copy differs from the original one the real (possibly opened
-        /// in the editor) document is touched.
+        /// To keep it fast, the changes are firstly applied to an in-memory copy of the file
+        /// (read from the disk), and only if that copy differs from the original one the
+        /// write path (an invisible text buffer in Visual Studio) is touched.
         /// </summary>
         private async System.Threading.Tasks.Task FixReferenceInXamlFilesAsync(
             Dictionary<INamedTypeSymbol, NamespaceTransition> processedTypes
@@ -348,25 +334,26 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
                 var xamlEngine = new XamlEngine(_xamlBodyProviderFactory);
 
-                var testDocument = await xamlEngine.CreateDocumentAsync(false, xamlFilePath);
+                using var testDocument = await xamlEngine.CreateForReadAsync(xamlFilePath);
 
                 var modifiedTestDocument = PerformChanges(
                     testDocument,
                     processedTypes
                     );
 
-                //open XAML files only if changes exists
-                if (modifiedTestDocument.IsChangesExists(testDocument))
+                if (!modifiedTestDocument.IsChangesExists(testDocument))
                 {
-                    var realDocument = await xamlEngine.CreateDocumentAsync(_openFilesToEnableUndo, xamlFilePath);
-
-                    var modifiedRealDocument = PerformChanges(
-                        realDocument,
-                        processedTypes
-                        );
-
-                    modifiedRealDocument.SaveIfChangesExistsAgainst(realDocument);
+                    continue;
                 }
+
+                using var realDocument = await xamlEngine.CreateForWriteAsync(xamlFilePath);
+
+                var modifiedRealDocument = PerformChanges(
+                    realDocument,
+                    processedTypes
+                    );
+
+                modifiedRealDocument.SaveIfChangesExistsAgainst(realDocument);
             }
         }
 

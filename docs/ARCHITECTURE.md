@@ -104,8 +104,7 @@ the core, the implementations belong to the host:
 | --- | --- | --- | --- |
 | `ISolutionExplorer` | The files of the solution and the project of every one of them (`ProjectRef`). The tree is walked once per session, see `AdjustPlanner`. | `VsSolutionExplorer` (the solution tree, main thread) | `MsBuildSolutionExplorer` (the documents of the workspace plus the xaml files found on the disk) |
 | `IProjectDefaultNamespaceProvider` | The `DefaultNamespace` property of a project. | `DteProjectDefaultNamespaceProvider` (DTE, main thread) | `ProjectFileDefaultNamespaceProvider` (`Project.DefaultNamespace` of Roslyn, i.e. the `RootNamespace` of the project file) |
-| `IDocumentOpener` | Opens a changed file in the editor, which is what makes the change undoable. | `VsDocumentOpener`, or `NullDocumentOpener` when the user has not asked for it | `NullDocumentOpener`: there is no editor, and the safety net of a console run is the version control |
-| `IXamlBodyProviderFactory` | The way a xaml file is read and written. | `VsXamlBodyProviderFactory`: the text buffer of the editor when the change has to be undoable, the file system otherwise | `ClosedXamlBodyProviderFactory`: always the file system |
+| `IXamlBodyProviderFactory` | The way a xaml file is read and written. Reads always go through the file system; writes in Visual Studio go through an invisible text buffer so they participate in the global linked undo. | `VsXamlBodyProviderFactory` | `ClosedXamlBodyProviderFactory`: always the file system |
 
 `AdjustContext` carries these plus the Roslyn workspace and `TargetNamespaceResolver`, and is
 created once per run: by `VsAdjustContext.CreateAsync` (which is the only place asking the IDE
@@ -116,8 +115,8 @@ core cannot reach the IDE by accident.
 
 The classes of the core take what they really use and not the whole context: `Cleanup`,
 `RefProcessor` and the appliers take a Roslyn `Workspace`, `CsAdjuster` and `EditApplier` take
-a `Workspace` plus an `IDocumentOpener`, an `EditSet` needs nothing at all and the xaml
-subsystem — `XamlAdjuster` included — needs nothing either. Only `AdjustPlanner`,
+a `Workspace`, an `EditSet` needs nothing at all and the xaml
+subsystem — `XamlAdjuster` included — needs the body-provider factory only. Only `AdjustPlanner`,
 `AdjusterFactory`, `AdjustSession`, `SubjectFileCollector` and the wizard take the context
 itself.
 
@@ -146,11 +145,11 @@ user with the error text and not with an empty window.
 2. **`SelectedStepViewModel`** runs `SubjectFileCollector` and shows the files which are really
    the subject to change, grouped by their physical folder (`SelectFolderViewModel` +
    `SelectFileViewModel`). Here the user tunes the target namespace regex
-   (`NamespaceReplaceRegex`, `KnownRegex`) and decides whether the affected files have to be
-   opened in the editor (this is the only way to make the changes undoable).
-3. **`PerformingViewModel`** starts an `AdjustSession`, shows what it reports and closes the
-   window when it is over. The adjusting itself is not written here: the viewmodel owns the
-   `CancellationTokenSource` behind the `Cancel` button and nothing else.
+   (`NamespaceReplaceRegex`, `KnownRegex`).
+3. **`PerformingViewModel`** opens a global linked undo transaction (`mdtGlobal`), starts an
+   `AdjustSession`, shows what it reports and closes the window when it is over. The adjusting
+   itself is not written here: the viewmodel owns the `CancellationTokenSource` behind the
+   `Cancel` button and the undo transaction.
 
 ### The session
 
@@ -357,9 +356,10 @@ and Avalonia `.axaml` are recognized (`XamlPathHelper`).
 
 - `XamlEngine` creates a `XamlDocument` over an `IXamlBodyProvider`, and which one it is
   is decided by the `IXamlBodyProviderFactory` of the context:
-  `ClosedXamlBodyProvider` works with the file system (fast, not undoable) and
-  `OpenedXamlBodyProvider` works with the text buffer of the Visual Studio editor
-  (undoable, requires the main thread). The second one lives in `AdjustNamespace.VsixShared`:
+  `CreateForReadAsync` always uses the file system (fast probes),
+  `CreateForWriteAsync` uses `InvisibleXamlBodyProvider` in Visual Studio (an invisible text
+  buffer that participates in the global linked undo, no editor tab) and
+  `ClosedXamlBodyProvider` elsewhere. The invisible provider lives in `AdjustNamespace.VsixShared`:
   the core knows the interface and never the editor.
 - `XamlDocument` is immutable: every modification produces a new instance, and nothing is
   written back until `SaveIfChangesExistsAgainst` is called. This allows to check whether a file

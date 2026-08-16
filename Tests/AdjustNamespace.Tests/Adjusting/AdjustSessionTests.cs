@@ -276,11 +276,10 @@ namespace Other
                     solution.Settings,
                     new FakeProjectDefaultNamespaceProvider()
                     ),
-                new NullDocumentOpener(),
                 new ClosedXamlBodyProviderFactory()
                 );
 
-            await new AdjustSession(context, NoRegex(), false)
+            await new AdjustSession(context, NoRegex())
                 .RunAsync(
                     new[]
                     {
@@ -307,7 +306,7 @@ namespace Other
             params string[] subjectFilePaths
             )
         {
-            return await new AdjustSession(solution.Context, NoRegex(), false)
+            return await new AdjustSession(solution.Context, NoRegex())
                 .RunAsync(subjectFilePaths, progress, cancellationToken);
         }
 

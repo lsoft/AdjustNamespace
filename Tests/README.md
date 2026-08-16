@@ -22,7 +22,7 @@ The tests run without Visual Studio at all:
 - the xaml subsystem works with a plain string through `MemoryXamlBodyProvider`;
 - the core (`CsAdjuster`, the appliers, `Cleanup`) works over an `AdhocWorkspace` built by
   `TestSolution`, and everything the extension needs from Visual Studio is behind an interface
-  (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`, `IDocumentOpener`,
+  (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`,
   `IXamlBodyProviderFactory`) with a fake of
   `Infrastructure` behind it, bound together by `TestSolution.Context`. There is no half built
   service object with `null` fields anymore, so a test which reaches for the IDE gets an answer

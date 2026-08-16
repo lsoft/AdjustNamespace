@@ -6,8 +6,8 @@ namespace AdjustNamespace.Xaml
 {
     /// <summary>
     /// Factory of <see cref="XamlDocument"/>.
-    /// It hides the difference between a xaml file opened in the Visual Studio editor
-    /// and a closed one (see <see cref="IXamlBodyProviderFactory"/>).
+    /// It hides the difference between a xaml file edited through an (invisible) text buffer
+    /// and one rewritten on the disk (see <see cref="IXamlBodyProviderFactory"/>).
     /// </summary>
     public class XamlEngine
     {
@@ -26,24 +26,22 @@ namespace AdjustNamespace.Xaml
         }
 
         /// <summary>
-        /// Read the xaml file and parse its structure.
+        /// Read the xaml file for a probe (no editor is opened).
         /// </summary>
-        /// <param name="openFilesToEnableUndo">
-        /// Open the file in the Visual Studio editor and work with its text buffer.
-        /// This makes the changes undoable by the user, but slows the processing down.
-        /// Implementations without an editor ignore the flag.
-        /// </param>
-        /// <param name="xamlFilePath">Full path to the xaml file.</param>
-        public async Task<XamlDocument> CreateDocumentAsync(
-            bool openFilesToEnableUndo,
-            string xamlFilePath
-            )
+        public async Task<XamlDocument> CreateForReadAsync(string xamlFilePath)
         {
-            var bodyProvider = await _bodyProviderFactory.CreateAsync(
-                openFilesToEnableUndo,
-                xamlFilePath
-                );
+            var bodyProvider = await _bodyProviderFactory.CreateForReadAsync(xamlFilePath);
+            return new XamlDocument(bodyProvider);
+        }
 
+        /// <summary>
+        /// Read the xaml file for applying a change. In Visual Studio the body is an invisible
+        /// text buffer so the write is undoable; elsewhere it is the file on disk.
+        /// Dispose the document's body provider after saving (or when abandoning the write).
+        /// </summary>
+        public async Task<XamlDocument> CreateForWriteAsync(string xamlFilePath)
+        {
+            var bodyProvider = await _bodyProviderFactory.CreateForWriteAsync(xamlFilePath);
             return new XamlDocument(bodyProvider);
         }
     }

@@ -20,7 +20,6 @@ namespace AdjustNamespace.Adjusting.Adjuster
     {
         private readonly AdjustContext _context;
         private readonly AdjustPlanner _planner;
-        private readonly bool _openFilesToEnableUndo;
         private readonly NamespaceCenter _namespaceCenter;
 
         /// <summary>
@@ -35,12 +34,10 @@ namespace AdjustNamespace.Adjusting.Adjuster
         /// </summary>
         /// <param name="context">Everything the adjusting session works with.</param>
         /// <param name="replaceRegex">User defined regex which additionally modifies the target namespace.</param>
-        /// <param name="openFilesToEnableUndo">Open the changed files in the editor (this allows the user to undo the changes).</param>
         /// <param name="namespaceCenter">Namespace state container shared across the whole adjusting session.</param>
         public static async Task<AdjusterFactory> CreateAsync(
             AdjustContext context,
             NamespaceReplaceRegex replaceRegex,
-            bool openFilesToEnableUndo,
             NamespaceCenter namespaceCenter
             )
         {
@@ -63,7 +60,6 @@ namespace AdjustNamespace.Adjusting.Adjuster
             return new AdjusterFactory(
                 context,
                 new AdjustPlanner(context, replaceRegex),
-                openFilesToEnableUndo,
                 namespaceCenter,
                 xamlFilePaths
                 );
@@ -73,7 +69,6 @@ namespace AdjustNamespace.Adjusting.Adjuster
         private AdjusterFactory(
             AdjustContext context,
             AdjustPlanner planner,
-            bool openFilesToEnableUndo,
             NamespaceCenter namespaceCenter,
             List<string> xamlFilePaths
             )
@@ -90,7 +85,6 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
             _context = context;
             _planner = planner;
-            _openFilesToEnableUndo = openFilesToEnableUndo;
             _namespaceCenter = namespaceCenter;
             _xamlFilePaths = xamlFilePaths;
         }
@@ -134,16 +128,13 @@ namespace AdjustNamespace.Adjusting.Adjuster
             {
                 return new XamlAdjuster(
                     _context.XamlBodyProviderFactory,
-                    _openFilesToEnableUndo,
                     plan
                     );
             }
 
             return new CsAdjuster(
                 _context.Workspace,
-                _context.DocumentOpener,
                 _context.XamlBodyProviderFactory,
-                _openFilesToEnableUndo,
                 _namespaceCenter,
                 plan,
                 _xamlFilePaths

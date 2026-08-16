@@ -2,7 +2,6 @@ using AdjustNamespace.Adjusting.Edit;
 using AdjustNamespace.Adjusting.Edit.Apply;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Tests.Infrastructure;
-using AdjustNamespace.VisualStudio;
 using Microsoft.CodeAnalysis.Text;
 using Xunit;
 
@@ -327,11 +326,7 @@ namespace Other
 
         private static async Task ApplyAsync(TestSolution solution, EditSet edits)
         {
-            await new EditApplier(
-                solution.Workspace,
-                new NullDocumentOpener(),
-                false
-                )
+            await new EditApplier(solution.Workspace)
                 .ApplyAsync(edits);
         }
 

@@ -59,8 +59,8 @@ Notes:
   the produced text only, otherwise a name which is written correctly but resolves to another
   type slips through.
 - Everything the extension needs from Visual Studio is behind an interface of
- `AdjustNamespace.VisualStudio` (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`,
- `IDocumentOpener`) or `AdjustNamespace.Xaml.BodyProvider` (`IXamlBodyProviderFactory`),
+ `AdjustNamespace.VisualStudio` (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`)
+ or `AdjustNamespace.Xaml.BodyProvider` (`IXamlBodyProviderFactory`),
  and `AdjustContext` carries them together with the Roslyn workspace.
   Take the narrowest dependency a class really needs — most of the core needs a `Workspace`
   and nothing else. The wizard itself is covered by the manual procedure only,

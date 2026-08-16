@@ -388,7 +388,6 @@ namespace C.D
                         solution.Settings,
                         new FakeProjectDefaultNamespaceProvider()
                         ),
-                    new NullDocumentOpener(),
                     new ClosedXamlBodyProviderFactory()
                     ),
                 NoRegex()

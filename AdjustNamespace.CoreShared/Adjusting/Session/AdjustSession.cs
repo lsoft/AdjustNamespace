@@ -24,15 +24,12 @@ namespace AdjustNamespace.Adjusting.Session
     {
         private readonly AdjustContext _context;
         private readonly NamespaceReplaceRegex _replaceRegex;
-        private readonly bool _openFilesToEnableUndo;
 
         /// <param name="context">Everything the adjusting session works with.</param>
         /// <param name="replaceRegex">User defined regex which additionally modifies the target namespace.</param>
-        /// <param name="openFilesToEnableUndo">Open the changed files in the editor (this allows the user to undo the changes).</param>
         public AdjustSession(
             AdjustContext context,
-            NamespaceReplaceRegex replaceRegex,
-            bool openFilesToEnableUndo
+            NamespaceReplaceRegex replaceRegex
             )
         {
             if (context is null)
@@ -47,7 +44,6 @@ namespace AdjustNamespace.Adjusting.Session
 
             _context = context;
             _replaceRegex = replaceRegex;
-            _openFilesToEnableUndo = openFilesToEnableUndo;
         }
 
         /// <summary>
@@ -87,7 +83,6 @@ namespace AdjustNamespace.Adjusting.Session
                 var adjusterFactory = await AdjusterFactory.CreateAsync(
                     _context,
                     _replaceRegex,
-                    _openFilesToEnableUndo,
                     namespaceCenter
                     );
 

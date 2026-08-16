@@ -1,5 +1,4 @@
-﻿using AdjustNamespace.VisualStudio;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,21 +11,17 @@ namespace AdjustNamespace.Adjusting.Edit.Apply
     /// Writes an <see cref="EditSet"/> into the solution.
     ///
     /// This is the only part of the adjusting which mutates anything: everything before it
-    /// only decides what has to be changed.
+    /// only decides what has to be changed. Inside Visual Studio the workspace applies the
+    /// edits through invisible text buffers when a global linked undo transaction is open,
+    /// so the user can undo the whole run with one Ctrl+Z without opening editor tabs.
     /// </summary>
     public sealed class EditApplier
     {
         private readonly Workspace _workspace;
-        private readonly IDocumentOpener _documentOpener;
-        private readonly bool _openFilesToEnableUndo;
 
         /// <param name="workspace">Roslyn workspace of the solution.</param>
-        /// <param name="documentOpener">Opener of the changed files in the editor.</param>
-        /// <param name="openFilesToEnableUndo">Open the changed files in the editor (this allows the user to undo the changes).</param>
         public EditApplier(
-            Workspace workspace,
-            IDocumentOpener documentOpener,
-            bool openFilesToEnableUndo
+            Workspace workspace
             )
         {
             if (workspace is null)
@@ -34,14 +29,7 @@ namespace AdjustNamespace.Adjusting.Edit.Apply
                 throw new ArgumentNullException(nameof(workspace));
             }
 
-            if (documentOpener is null)
-            {
-                throw new ArgumentNullException(nameof(documentOpener));
-            }
-
             _workspace = workspace;
-            _documentOpener = documentOpener;
-            _openFilesToEnableUndo = openFilesToEnableUndo;
         }
 
         /// <summary>
@@ -75,11 +63,6 @@ namespace AdjustNamespace.Adjusting.Edit.Apply
             IReadOnlyList<FileEdit> fileEdits
             )
         {
-            if (_openFilesToEnableUndo)
-            {
-                await _documentOpener.OpenAsync(filePath);
-            }
-
             await ReplaceTextApplier.ApplyAsync(
                 _workspace,
                 filePath,

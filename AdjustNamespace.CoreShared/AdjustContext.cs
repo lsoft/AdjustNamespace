@@ -52,17 +52,8 @@ namespace AdjustNamespace
         }
 
         /// <summary>
-        /// Opens a changed file in the editor (so the user can undo the change), or does
-        /// nothing when there is no editor.
-        /// </summary>
-        public IDocumentOpener DocumentOpener
-        {
-            get;
-        }
-
-        /// <summary>
-        /// How a xaml file is read and written: the editor buffer when the change has to be
-        /// undoable, the file system otherwise.
+        /// How a xaml file is read and written: an invisible text buffer in Visual Studio
+        /// (so the change is undoable), the file system elsewhere.
         /// </summary>
         public IXamlBodyProviderFactory XamlBodyProviderFactory
         {
@@ -73,7 +64,6 @@ namespace AdjustNamespace
             Workspace workspace,
             ISolutionExplorer solution,
             TargetNamespaceResolver targetNamespaces,
-            IDocumentOpener documentOpener,
             IXamlBodyProviderFactory xamlBodyProviderFactory
             )
         {
@@ -92,11 +82,6 @@ namespace AdjustNamespace
                 throw new ArgumentNullException(nameof(targetNamespaces));
             }
 
-            if (documentOpener is null)
-            {
-                throw new ArgumentNullException(nameof(documentOpener));
-            }
-
             if (xamlBodyProviderFactory is null)
             {
                 throw new ArgumentNullException(nameof(xamlBodyProviderFactory));
@@ -105,7 +90,6 @@ namespace AdjustNamespace
             Workspace = workspace;
             Solution = solution;
             TargetNamespaces = targetNamespaces;
-            DocumentOpener = documentOpener;
             XamlBodyProviderFactory = xamlBodyProviderFactory;
         }
 

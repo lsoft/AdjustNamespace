@@ -59,7 +59,6 @@ namespace AdjustNamespace.VisualStudio
                     settings,
                     new DteProjectDefaultNamespaceProvider(dte)
                     ),
-                new VsDocumentOpener(),
                 new VsXamlBodyProviderFactory()
                 );
         }

@@ -88,7 +88,13 @@ XAML files (`.xaml` and Avalonia `.axaml`):
 
 ## Undo
 
-By default the files are changed without opening them in the editor, so such changes cannot be undone with Ctrl+Z. Check `Open affected files to enable Undo` on the second step of the wizard to open the affected files instead. The checkbox is disabled if too many files are chosen, because a lot of documents opened at once makes Visual Studio unresponsive.
+The whole adjusting run is wrapped in a global linked undo transaction
+(`IVsLinkedUndoTransactionManager` with `mdtGlobal`). One Ctrl+Z undoes every file the run
+touched, including files that were never opened as editor tabs: C# edits go through
+`VisualStudioWorkspace.TryApplyChanges` (invisible buffers) and xaml edits go through
+`InvisibleXamlBodyProvider`. A cancelled or failed run aborts the transaction instead of
+committing a half-finished undo unit. The console utility has no editor, so its safety net is
+version control.
 
 ## Console utility
 
@@ -146,7 +152,7 @@ A few things which are worth to know:
 - the `System*` and `Microsoft*` namespaces are never touched;
 - the xaml files (including Avalonia `.axaml`) are processed as a plain text (with a set of regexes) to keep your formatting untouched, so an exotic markup may be missed;
 - both `clr-namespace:` and `using:` xmlns forms are rewritten; a new mapping keeps the form of the source one;
-- the whole adjusting is a bunch of separate edits, there is no single `undo` transaction for it.
+- one Ctrl+Z undoes the whole adjusting run (a global linked undo transaction).
 
 ## Requirements
 

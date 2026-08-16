@@ -37,7 +37,7 @@ namespace AdjustNamespace.Tests.Xaml
 
             var xamlFilePath = solution.AddXamlFile("MyApp", "MainWindow.xaml", Body, new UTF8Encoding(true));
 
-            await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
+            await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
 
             var bytes = solution.XamlBytesOf("MyApp", "MainWindow.xaml");
 
@@ -57,7 +57,7 @@ namespace AdjustNamespace.Tests.Xaml
 
             var xamlFilePath = solution.AddXamlFile("MyApp", "MainWindow.xaml", Body, new UTF8Encoding(false));
 
-            await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
+            await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
 
             var bytes = solution.XamlBytesOf("MyApp", "MainWindow.xaml");
 
@@ -83,7 +83,7 @@ namespace AdjustNamespace.Tests.Xaml
 
             var xamlFilePath = solution.AddXamlFile("MyApp", "MainWindow.xaml", body, new UTF8Encoding(true));
 
-            await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
+            await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
 
             Assert.Contains(@"Text=""Привет, мир""", solution.XamlTextOf("MyApp", "MainWindow.xaml"));
         }
@@ -103,7 +103,7 @@ namespace AdjustNamespace.Tests.Xaml
 
             var xamlFilePath = solution.AddXamlFile("MyApp", "MainWindow.xaml", body, new UTF8Encoding(false));
 
-            await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
+            await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
 
             var text = solution.XamlTextOf("MyApp", "MainWindow.xaml");
 
