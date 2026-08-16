@@ -1,0 +1,94 @@
+# The extension is built as a single AnyCPU payload for both amd64 and arm64, so the only
+# thing which really has to be proven is that the arm64 Visual Studio accepts it: an
+# installation is refused by the architecture declared in the manifest and by nothing else.
+# The GitHub hosted `windows-11-arm` image is a Windows 11 arm64 machine with an arm64
+# Visual Studio 2022 and the `Visual Studio extension development` workload on it.
+name: arm64
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  install:
+    name: Install into the arm64 Visual Studio
+    runs-on: windows-11-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Locate Visual Studio 2022
+        id: vs
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $path = & $vswhere -latest -prerelease -products * -version '[17.0,18.0)' -property installationPath
+          if (-not $path) {
+              throw 'No Visual Studio 2022 on the runner. The windows-11-arm image migrates to Visual Studio 2026 in September 2026 - pin the image version or widen the InstallationTarget of the manifest.'
+          }
+          "path=$path" >> $env:GITHUB_OUTPUT
+          "msbuild=$path\MSBuild\Current\Bin\MSBuild.exe" >> $env:GITHUB_OUTPUT
+
+      - name: Build the vsix
+        shell: pwsh
+        run: |
+          & '${{ steps.vs.outputs.msbuild }}' AdjustNamespace.sln -t:Build -restore -p:Configuration=Release -p:Platform='Any CPU' -v:quiet -nologo '-clp:ErrorsOnly;Summary'
+          if ($LASTEXITCODE -ne 0) {
+              throw "MSBuild has failed with $LASTEXITCODE"
+          }
+
+      - name: The built vsix declares arm64
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path 'AdjustNamespace.2022\bin\Release\AdjustNamespace.vsix'))
+          try {
+              $entry = $zip.Entries | Where-Object { $_.FullName -eq 'extension.vsixmanifest' }
+              $manifest = (New-Object System.IO.StreamReader($entry.Open())).ReadToEnd()
+          } finally {
+              $zip.Dispose()
+          }
+          if ($manifest -notmatch '(?i)<ProductArchitecture>\s*arm64\s*</ProductArchitecture>') {
+              throw 'The built vsix does not declare the arm64 architecture.'
+          }
+
+      - name: Install it
+        shell: pwsh
+        run: |
+          $vsix = Resolve-Path 'AdjustNamespace.2022\bin\Release\AdjustNamespace.vsix'
+          $installer = '${{ steps.vs.outputs.path }}\Common7\IDE\VSIXInstaller.exe'
+          $process = Start-Process -FilePath $installer -ArgumentList '/quiet', '/logFile:vsix-install.log', $vsix -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+              throw "VSIXInstaller has failed with $($process.ExitCode). 1001 means the extension is installed already, everything else is a real refusal."
+          }
+
+      - name: The extension is registered
+        shell: pwsh
+        run: |
+          $installed = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\VisualStudio" -Filter 'extension.vsixmanifest' -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { (Get-Content $_.FullName -Raw) -match 'AdjustNamespace\.5744262e' }
+          if (-not $installed) {
+              throw 'The extension is not among the installed ones.'
+          }
+          $installed.FullName
+
+      - name: Keep the installation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix-install-log
+          path: vsix-install.log
+          if-no-files-found: ignore
+
+  tests:
+    name: Test suite on arm64
+    runs-on: windows-11-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the tests
+        run: dotnet test Tests/AdjustNamespace.Tests/AdjustNamespace.Tests.csproj --filter "Category!=KnownBug"

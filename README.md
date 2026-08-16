@@ -101,8 +101,13 @@ A few things which are worth to know:
 
 ## Requirements
 
-- Visual Studio 2022 (17.0 - 18.0), amd64;
+- Visual Studio 2022 (17.0 - 18.0), amd64 or arm64;
 - .NET Framework 4.8 (to build the extension).
+
+The extension is a single `AnyCPU` payload which is installed into both the amd64 and the arm64
+Visual Studio, so it is built on either of them and no arm64 machine is needed to produce it.
+One thing is worth to know on arm64: the SQL Server Data Tools are not available there, so a
+`sqlproj` project is not opened by Visual Studio at all and is therefore never adjusted.
 
 ## Building from sources
 

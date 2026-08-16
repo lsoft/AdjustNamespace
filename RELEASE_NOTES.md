@@ -23,6 +23,10 @@ My others extensions lives [here](https://marketplace.visualstudio.com/publisher
 
 # Adjust namespaces Release Notes
 
+## 0.5.1
+
+- Added the support of the arm64 Visual Studio: the extension refused to install there, because its manifest declared the amd64 architecture only.
+
 ## 0.5.0
 
 - Added an automated test suite and fixed a lot of the errors it has found.
