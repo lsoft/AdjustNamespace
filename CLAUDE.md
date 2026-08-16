@@ -59,8 +59,9 @@ Notes:
   the produced text only, otherwise a name which is written correctly but resolves to another
   type slips through.
 - Everything the extension needs from Visual Studio is behind an interface of
-  `AdjustNamespace.VisualStudio` (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`,
-  `IDocumentOpener`), and `AdjustContext` carries them together with the Roslyn workspace.
+ `AdjustNamespace.VisualStudio` (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`,
+ `IDocumentOpener`) or `AdjustNamespace.Xaml.BodyProvider` (`IXamlBodyProviderFactory`),
+ and `AdjustContext` carries them together with the Roslyn workspace.
   Take the narrowest dependency a class really needs — most of the core needs a `Workspace`
   and nothing else. The wizard itself is covered by the manual procedure only,
   see [Tests/README.md](Tests/README.md).
@@ -70,6 +71,26 @@ Notes:
   exists in one of them only. `Microsoft.VisualStudio.LanguageServices` has no release for that
   Roslyn, hence the binding redirects and the explicit MEF composition in `TestSolution`; the
   `NU1608` warnings about it are expected.
+
+## The console utility
+
+`AdjustNamespace.Cli` (the `adjustns` tool) is an SDK style `net8.0` project and is the second
+exception to the "`dotnet build` does not work here" rule:
+
+```bash
+dotnet build AdjustNamespace.Cli/AdjustNamespace.Cli.csproj
+dotnet run --project AdjustNamespace.Cli -- <solution> --dry-run
+```
+
+Notes:
+
+- Do not smoke test it against `Tests/Standard`: `TestMauiApp` does not compile without the
+  MAUI workload and the utility refuses to adjust a solution with compilation errors. Build a
+  throwaway solution of two small `net8.0` projects instead, run the utility over it and
+  `dotnet build` the result — the produced code has to compile.
+- `Program` must not touch an MSBuild type before `MSBuildLocator` is registered, otherwise the
+  jit resolves the MSBuild assemblies too early and the run dies with a `FileNotFoundException`.
+  Everything which mentions one lives in `AdjustCommand` and below.
 
 ## Line endings
 
@@ -84,5 +105,11 @@ as changed instead of the actual edit. If a diff ever looks like a full-file rew
 - The extension targets .NET Framework 4.8; `LangVersion` is `latest` and `Nullable` is
   `enable`, with `nullable;CS8766;CS8767` promoted to errors.
 - Version-specific code is guarded with the `VS2022` conditional compilation symbol.
-- Almost all of the code lives in the shared project `AdjustNamespace.VsixShared`; new files
-  have to be added to `AdjustNamespace.VsixShared.projitems`.
+- Almost all of the code lives in two shared projects: `AdjustNamespace.CoreShared` (the
+  Visual Studio independent core, compiled into the extension, the tests **and** the console
+  utility) and `AdjustNamespace.VsixShared` (the wizard, the commands, the boundary to the IDE).
+  A new file has to be added to the `.projitems` of the one it belongs to.
+- The core is compiled against .NET Framework 4.8 **and** .NET 8 at once: it may use neither
+  the Visual Studio SDK (`Microsoft.VisualStudio.*`, `EnvDTE`) nor an API which exists in one
+  of the two target frameworks only. Whatever it needs from the outside goes through an
+  interface — see the boundary table in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

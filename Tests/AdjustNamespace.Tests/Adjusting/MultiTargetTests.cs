@@ -3,6 +3,7 @@ using AdjustNamespace.Adjusting.Adjuster;
 using AdjustNamespace.Adjusting.Plan;
 using AdjustNamespace.Roslyn;
 using AdjustNamespace.Tests.Infrastructure;
+using AdjustNamespace.Xaml.BodyProvider;
 using System.Linq;
 using Xunit;
 using static AdjustNamespace.Tests.Infrastructure.AdjustRunner;
@@ -249,7 +250,7 @@ namespace A.Other
 
             Assert.NotNull(plan);
 
-            var adjuster = new XamlAdjuster(false, plan!.Value);
+            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, plan!.Value);
 
             Assert.True(await adjuster.IsChangesExistsAsync());
             Assert.True(await adjuster.AdjustAsync());
@@ -682,7 +683,7 @@ namespace Legacy.Core
 
             Assert.NotNull(plan);
 
-            var adjuster = new XamlAdjuster(false, plan!.Value);
+            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, plan!.Value);
 
             Assert.True(await adjuster.IsChangesExistsAsync());
             Assert.True(await adjuster.AdjustAsync());

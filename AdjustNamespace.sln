@@ -3,9 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.9.12023.133 insiders
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "AdjustNamespace.CoreShared", "AdjustNamespace.CoreShared\AdjustNamespace.CoreShared.shproj", "{3FCBDC6F-A0E8-4397-9532-6C40D1A36BE5}"
+EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "AdjustNamespace.VsixShared", "AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.shproj", "{B8F4DE5D-EEFF-4F14-9C3D-2A6EE41DB482}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdjustNamespace.2022", "AdjustNamespace.2022\AdjustNamespace.2022.csproj", "{E36D5F78-82AF-4BFE-9147-3D70F51CE1FB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdjustNamespace.Cli", "AdjustNamespace.Cli\AdjustNamespace.Cli.csproj", "{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
@@ -55,6 +59,22 @@ Global
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|x64.Build.0 = Release|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|x86.ActiveCfg = Release|Any CPU
 		{1783C86A-4CAA-4E1A-8834-518DC695BBEC}.Release|x86.Build.0 = Release|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Debug|arm64.ActiveCfg = Debug|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Debug|arm64.Build.0 = Debug|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Debug|x64.Build.0 = Debug|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Debug|x86.Build.0 = Debug|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Release|arm64.ActiveCfg = Release|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Release|arm64.Build.0 = Release|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Release|x64.ActiveCfg = Release|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Release|x64.Build.0 = Release|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Release|x86.ActiveCfg = Release|Any CPU
+		{AF61A125-23AD-4FA7-8F73-5B4D93588D4B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -66,6 +86,10 @@ Global
 		SolutionGuid = {7332E76C-88D8-4DD6-866A-168626CDF920}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		AdjustNamespace.CoreShared\AdjustNamespace.CoreShared.projitems*{1783c86a-4caa-4e1a-8834-518dc695bbec}*SharedItemsImports = 5
+		AdjustNamespace.CoreShared\AdjustNamespace.CoreShared.projitems*{3fcbdc6f-a0e8-4397-9532-6c40d1a36be5}*SharedItemsImports = 13
+		AdjustNamespace.CoreShared\AdjustNamespace.CoreShared.projitems*{af61a125-23ad-4fa7-8f73-5b4d93588d4b}*SharedItemsImports = 5
+		AdjustNamespace.CoreShared\AdjustNamespace.CoreShared.projitems*{e36d5f78-82af-4bfe-9147-3d70f51ce1fb}*SharedItemsImports = 4
 		AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems*{1783c86a-4caa-4e1a-8834-518dc695bbec}*SharedItemsImports = 5
 		AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems*{b8f4de5d-eeff-4f14-9c3d-2a6ee41db482}*SharedItemsImports = 13
 		AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems*{e36d5f78-82af-4bfe-9147-3d70f51ce1fb}*SharedItemsImports = 4

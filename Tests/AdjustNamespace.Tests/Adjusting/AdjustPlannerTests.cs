@@ -2,6 +2,7 @@ using AdjustNamespace.Adjusting.Plan;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Tests.Infrastructure;
 using AdjustNamespace.VisualStudio;
+using AdjustNamespace.Xaml.BodyProvider;
 using System.Linq;
 using Xunit;
 
@@ -330,7 +331,8 @@ namespace C.D
                         solution.Settings,
                         new FakeProjectDefaultNamespaceProvider()
                         ),
-                    new NullDocumentOpener()
+                    new NullDocumentOpener(),
+                    new ClosedXamlBodyProviderFactory()
                     ),
                 NoRegex()
                 );

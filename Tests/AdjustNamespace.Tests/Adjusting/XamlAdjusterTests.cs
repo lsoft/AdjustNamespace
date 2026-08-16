@@ -2,6 +2,7 @@ using AdjustNamespace.Adjusting;
 using AdjustNamespace.Adjusting.Adjuster;
 using AdjustNamespace.Adjusting.Plan;
 using AdjustNamespace.Tests.Infrastructure;
+using AdjustNamespace.Xaml.BodyProvider;
 using Xunit;
 
 namespace AdjustNamespace.Tests.Adjusting
@@ -29,7 +30,7 @@ namespace AdjustNamespace.Tests.Adjusting
     xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
 </Window>");
 
-            var adjusted = await new XamlAdjuster(false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
+            var adjusted = await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
 
             Assert.True(adjusted);
             Assert.Contains(@"x:Class=""X.Y.MainWindow""", solution.XamlTextOf("MyApp", "MainWindow.xaml"));
@@ -50,7 +51,7 @@ namespace AdjustNamespace.Tests.Adjusting
 
             var xamlFilePath = solution.AddXamlFile("MyApp", "MainWindow.xaml", Body);
 
-            var adjuster = new XamlAdjuster(false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y"));
+            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y"));
 
             Assert.False(await adjuster.IsChangesExistsAsync());
             Assert.False(await adjuster.AdjustAsync());
@@ -74,7 +75,7 @@ namespace AdjustNamespace.Tests.Adjusting
 
             var xamlFilePath = solution.AddXamlFile("MyApp", "Styles.xaml", Body);
 
-            var adjuster = new XamlAdjuster(false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y"));
+            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y"));
 
             Assert.False(await adjuster.IsChangesExistsAsync());
             Assert.False(await adjuster.AdjustAsync());
@@ -101,7 +102,7 @@ namespace AdjustNamespace.Tests.Adjusting
 
             var xamlFilePath = solution.AddXamlFile("MyApp", "MainWindow.xaml", Body);
 
-            var adjuster = new XamlAdjuster(false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y"));
+            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y"));
 
             Assert.True(await adjuster.IsChangesExistsAsync());
             Assert.Equal(Body, solution.XamlTextOf("MyApp", "MainWindow.xaml"));
@@ -127,7 +128,7 @@ namespace AdjustNamespace.Tests.Adjusting
     <local:MyButton />
 </Window>");
 
-            await new XamlAdjuster(false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
+            await new XamlAdjuster(new ClosedXamlBodyProviderFactory(), false, AdjustPlanItem.Xaml(xamlFilePath, "X.Y")).AdjustAsync();
 
             var xaml = solution.XamlTextOf("MyApp", "MainWindow.xaml");
 

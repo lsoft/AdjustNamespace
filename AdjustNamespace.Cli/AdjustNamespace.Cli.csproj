@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The console utility. It shares the whole core with the extension through the shared project
+    AdjustNamespace.CoreShared and adds what Visual Studio does inside the IDE: the solution is
+    opened with an MSBuildWorkspace and the questions of the AdjustNamespace.VisualStudio
+    interfaces are answered from the MSBuild data instead of the solution tree.
+
+    It is a plain SDK style project and is built and published with the `dotnet` CLI
+    (unlike AdjustNamespace.2022, see ../CLAUDE.md).
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>nullable;CS8766;CS8767</WarningsAsErrors>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>AdjustNamespace.Cli</RootNamespace>
+    <AssemblyName>AdjustNamespace.Cli</AssemblyName>
+    <!-- the shared code is guarded with this symbol, see ../docs/ARCHITECTURE.md -->
+    <DefineConstants>$(DefineConstants);VS2022</DefineConstants>
+    <!-- the shared project brings its own file list, so the default globbing is off -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>adjustns</ToolCommandName>
+    <PackageId>AdjustNamespace.Cli</PackageId>
+    <Version>0.6.0</Version>
+    <Description>Brings the C# namespaces of a solution in accordance with the location of the files and fixes the resulting regressions, including the xaml.</Description>
+  </PropertyGroup>
+
+  <Import Project="..\AdjustNamespace.CoreShared\AdjustNamespace.CoreShared.projitems" Label="Shared" />
+
+  <ItemGroup>
+    <Compile Include="**\*.cs" Exclude="bin\**\*.cs;obj\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The same Roslyn as the test project and a newer one than AdjustNamespace.2022 uses
+      (the extension takes Roslyn from the Visual Studio it runs in, see ../CLAUDE.md).
+      A .slnx is parsed by Microsoft.CodeAnalysis.Workspaces.MSBuild 5.0 and newer only.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.6.0" />
+    <!-- finds the MSBuild of the installed .NET SDK, which MSBuildWorkspace evaluates the projects with -->
+    <PackageReference Include="Microsoft.Build.Locator" Version="1.9.1" />
+  </ItemGroup>
+
+</Project>

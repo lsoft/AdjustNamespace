@@ -8,9 +8,10 @@ The extension is covered on two levels:
 
 # Automated tests
 
-`AdjustNamespace.Tests` is an ordinary SDK style project which imports the shared project
-`AdjustNamespace.VsixShared`, so it works with the very same code as the VSIX. It is built and
-run with the plain `dotnet` CLI, the full MSBuild and the VSSDK are not required here:
+`AdjustNamespace.Tests` is an ordinary SDK style project which imports the shared projects
+`AdjustNamespace.CoreShared` and `AdjustNamespace.VsixShared`, so it works with the very same
+code as the VSIX (and, for the core, as the console utility). It is built and run with the
+plain `dotnet` CLI, the full MSBuild and the VSSDK are not required here:
 
 ```bash
 dotnet test Tests/AdjustNamespace.Tests/AdjustNamespace.Tests.csproj
@@ -21,7 +22,8 @@ The tests run without Visual Studio at all:
 - the xaml subsystem works with a plain string through `MemoryXamlBodyProvider`;
 - the core (`CsAdjuster`, the appliers, `Cleanup`) works over an `AdhocWorkspace` built by
   `TestSolution`, and everything the extension needs from Visual Studio is behind an interface
-  (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`, `IDocumentOpener`) with a fake of
+  (`ISolutionExplorer`, `IProjectDefaultNamespaceProvider`, `IDocumentOpener`,
+  `IXamlBodyProviderFactory`) with a fake of
   `Infrastructure` behind it, bound together by `TestSolution.Context`. There is no half built
   service object with `null` fields anymore, so a test which reaches for the IDE gets an answer
   instead of a `NullReferenceException`. The window of the wizard itself is still covered by
@@ -108,6 +110,7 @@ described here and are fixed since then:
 | A file which lies outside of the folder of its project has no target namespace, but the folders were compared as plain strings: `c:\sln\MyApp.Tests\Sub` starts with `c:\sln\MyApp`, so a linked file of a sibling folder whose name merely begins with the name of the project folder got the whole sibling folder into its namespace (`MyApp.MyApp.Tests.Sub`). | `TargetNamespaceCalculator.IsSameFolderOrBelow` stops the comparison at the folder border: the character behind the root folder has to be a separator. |
 | A xaml class is referenced not only by a tag and by an `{x:Type}`/`{x:Static}` markup extension, but also by an attribute value (`TargetType="local:MyButton"`), by an attached property, by a custom markup extension and by `x:TypeArguments`. Such a reference is not moved and keeps pointing to the old namespace. | Everything which looks like an `alias:ClassName` pair and is not a part of an already recognized fragment becomes a `XamlTypeUsage`. A pair is rewritten only if its alias is a clr-namespace one which points to the namespace the class is moved out of, so the pairs which are no type references at all (`mc:Ignorable="d"`) cost nothing. |
 | A reference written in a documentation comment (`<see cref="Class1"/>`) was skipped silently: such a comment is a trivia of the declaration it is attached to, and `SyntaxNode.FindNode` does not descend into the trivia unless it is asked to, so the node found for the reference was that declaration and no symbol of it matched. The cref kept pointing to the old namespace, and the using clause it resolved through was removed by the cleanup (`CS1574` in a project which generates the documentation file). | `RefProcessor.ProcessLocationAsync` calls `FindNode` with `findInsideTrivia: true`, and `ProcessQualifiedCref` rewrites the container of a cref which spells the namespace out (`<see cref="A.B.Class1"/>`): a cref is a `QualifiedCrefSyntax` and not a qualified name, so the namespace part of it is a separate node. |
+| A file moved out of a namespace got a `using` of that namespace because a *child* namespace still had types (another file of the same project, a referenced project, or a stale xaml `.g.cs`). `using Parent;` does not import the children, and once they had moved away too the clause pointed at a namespace the project could not see (`CS0234`). Found while adjusting FreeAIr: `NullToUnsetValueConverter` left `FreeAIr.UI` for `WpfHelpers.NestedCheckBox` and kept `using FreeAIr.UI;` because of `FreeAIr.UI.NestedCheckBox` in the generated code behind. | `IsNamespaceFilledOutside` and the cleanup look at the types declared *directly* in the namespace only (`GetDirectTypes`), not at the nested namespaces. |
 
 ### A note about the shared projects
 
@@ -156,8 +159,9 @@ The [unions](https://github.com/dotnet/csharplang/blob/main/proposals/unions.md)
 (`public union Pet(Cat, Dog);`) need a compiler which understands them, so
 `AdjustNamespace.Tests` references a **newer Roslyn than `AdjustNamespace.2022` does**
 (see the comments in the `.csproj`): the extension takes Roslyn from the Visual Studio it runs
-in and the test project brings its own. The consequence is that the code of
-`AdjustNamespace.VsixShared` has to compile against **both** of them — do not use an API which
+in and the test project brings its own. The consequence is that the shared code has to compile
+against **both** of them (and the core, additionally, against .NET 8 — see
+`AdjustNamespace.Cli`) — do not use an API which
 only one of these versions has (`SyntaxKind.UnionDeclaration`, for example, does not exist in
 the older one and is `[Experimental]` in the newer one).
 

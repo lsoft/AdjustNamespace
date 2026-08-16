@@ -23,6 +23,19 @@ My others extensions lives [here](https://marketplace.visualstudio.com/publisher
 
 # Adjust namespaces Release Notes
 
+## 0.6.0
+
+- Added the console utility `adjustns`: the same adjusting as the extension, over an
+  `MSBuildWorkspace`, with no Visual Studio required (usable on a build server).
+- Split the Visual Studio independent core into `AdjustNamespace.CoreShared`, so the extension,
+  the tests and the console utility share one codebase.
+- Fixed the `using` clause of the old namespace of a moved file: types of the *child*
+  namespaces (including the generated code behind of a xaml file) were counted as keeping the
+  parent alive, so a helper project got `using FreeAIr.UI;` while only
+  `FreeAIr.UI.NestedCheckBox` still existed there and the clause did not compile.
+- The detailed `[Adjust]` diagnostics of the core go through `AdjustLog` and are written into
+  `%TEMP%\AdjustNamespace.cli.log` when the utility is started with `--debug`.
+
 ## 0.5.1
 
 - Added the support of the arm64 Visual Studio: the extension refused to install there, because its manifest declared the amd64 architecture only.

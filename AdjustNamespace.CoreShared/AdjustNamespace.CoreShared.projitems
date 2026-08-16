@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>3fcbdc6f-a0e8-4397-9532-6c40d1a36be5</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>AdjustNamespace</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)AdjustContext.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)AdjustLog.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\AdjusterFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\Cs\RefProcessor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\Cs\SelfReferenceFixer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\CsAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\IAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\XamlAdjuster.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Cleanup.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\AddUsingEdit.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\Apply\AddUsingApplier.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\Apply\EditApplier.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\Apply\MoveNamespaceApplier.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\Apply\ReplaceTextApplier.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\EditSet.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\FileEdit.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\MoveNamespaceEdit.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Edit\ReplaceTextEdit.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Plan\AdjustPlanItem.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Plan\AdjustPlanner.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Session\AdjustProgress.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Session\AdjustSession.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Session\AdjustSessionOutcome.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Session\AdjustStage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\SubjectFileCollector.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)CollectionExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)FileEx.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceCenter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceHelper.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceTransition.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Namespace\NamespaceTransitionContainer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Namespace\TargetNamespaceCalculator.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Namespace\TargetNamespaceResolver.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)NamespaceReplaceRegex.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Roslyn\DocumentChanger.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Roslyn\GeneratedCode.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Roslyn\Scope.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Roslyn\SymbolExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Roslyn\SyntaxExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Roslyn\WorkspaceExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\AdjustNamespaceSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\AdjustNamespaceSettings2.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Settings\SettingsReader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TypeContainer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\IDocumentOpener.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\IProjectDefaultNamespaceProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\ISolutionExplorer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\NullDocumentOpener.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\ProjectRef.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\ClosedXamlBodyProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\ClosedXamlBodyProviderFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\IXamlBodyProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\BodyProvider\IXamlBodyProviderFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\IXamlPerformable.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\IXamlPositioned.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlAttributeReference.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlClass.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlControl.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlTypeUsage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlX.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlXmlns.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlDocument.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlEngine.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlStructure.cs" />
+  </ItemGroup>
+</Project>

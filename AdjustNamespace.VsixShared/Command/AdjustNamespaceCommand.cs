@@ -99,7 +99,7 @@ namespace AdjustNamespace.Command
                 //this is possible if you click Adjust on xaml file (with cs behind)
                 var filePaths = new HashSet<string>();
 
-                var context = await AdjustContext.CreateAsync(ServiceProvider);
+                var context = await VsAdjustContext.CreateAsync(ServiceProvider);
 
                 var dte = await ServiceProvider.GetServiceAsync(typeof(EnvDTE.DTE)) as EnvDTE80.DTE2;
 

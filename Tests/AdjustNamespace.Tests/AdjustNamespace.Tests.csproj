@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    The whole code of the extension lives in the shared project AdjustNamespace.VsixShared,
-    so this project imports its .projitems instead of referencing an assembly.
+    The whole code of the extension lives in the shared projects AdjustNamespace.CoreShared
+    (the Visual Studio independent core) and AdjustNamespace.VsixShared (the IDE itself),
+    so this project imports their .projitems instead of referencing an assembly.
 
     It is a plain SDK style project: it is built and run with `dotnet test`,
     the full MSBuild and the VSSDK targets are NOT required here
@@ -25,7 +26,7 @@
     <!--
       Microsoft.VisualStudio.LanguageServices is built against an older Roslyn than the one
       resolved here (see the package references below), and the shared code loads it
-      (AdjustContext asks the MEF composition for the VisualStudioWorkspace),
+      (VsAdjustContext asks the MEF composition for the VisualStudioWorkspace),
       so the assembly of it has to be bound to the Roslyn we really load.
     -->
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -38,6 +39,7 @@
     <NoWarn>$(NoWarn);MSB3277;NU1608</NoWarn>
   </PropertyGroup>
 
+  <Import Project="..\..\AdjustNamespace.CoreShared\AdjustNamespace.CoreShared.projitems" Label="Shared" />
   <Import Project="..\..\AdjustNamespace.VsixShared\AdjustNamespace.VsixShared.projitems" Label="Shared" />
 
   <ItemGroup>

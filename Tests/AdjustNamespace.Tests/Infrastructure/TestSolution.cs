@@ -1,6 +1,7 @@
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Settings;
 using AdjustNamespace.VisualStudio;
+using AdjustNamespace.Xaml.BodyProvider;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using System.Collections.Generic;
@@ -128,7 +129,8 @@ namespace AdjustNamespace.Tests.Infrastructure
                 Settings,
                 new FakeProjectDefaultNamespaceProvider()
                 ),
-            new NullDocumentOpener()
+            new NullDocumentOpener(),
+            new ClosedXamlBodyProviderFactory()
             );
 
         /// <summary>

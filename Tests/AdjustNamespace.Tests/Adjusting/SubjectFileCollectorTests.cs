@@ -261,7 +261,7 @@ namespace AdjustNamespace.Tests.Adjusting
             Assert.Empty(results.CollectedFiles);
         }
 
-        private static async System.Threading.Tasks.Task<List<UI.FileEx>> CollectAsync(
+        private static async System.Threading.Tasks.Task<List<FileEx>> CollectAsync(
             TestSolution solution,
             params string[] subjectFilePaths
             )

@@ -467,6 +467,58 @@ namespace Common.Core
         }
 
         /// <summary>
+        /// FreeAIr repro: a file leaves <c>App.UI</c>, while a referenced project still has
+        /// types in a nested namespace <c>App.UI.Windows</c> and the main app (not referenced
+        /// by the helper) still fills <c>App.UI</c> itself.
+        ///
+        /// <c>using App.UI;</c> imports only the types declared directly in <c>App.UI</c>,
+        /// not the ones in <c>App.UI.Windows</c>. Counting nested namespaces as "the old
+        /// namespace is still alive" would add a using clause which later fails to compile
+        /// once those nested types have moved away too (and the cleanup cannot drop it while
+        /// generated or stale code still exposes the parent namespace).
+        /// </summary>
+        [Fact]
+        public async Task Nested_namespace_of_a_referenced_project_does_not_keep_the_parent_alive()
+        {
+            using var solution = new TestSolution()
+                .AddProject("Helpers")
+                .AddProject("Shared")
+                .AddProject("App")
+                .AddProjectReference("Helpers", "Shared")
+                .AddProjectReference("App", "Helpers")
+                .AddDocument("Helpers", "Converter.cs",
+@"namespace App.UI
+{
+    public class Converter { }
+}
+")
+                .AddDocument("Shared", "WindowHelper.cs",
+@"namespace App.UI.Windows
+{
+    public class WindowHelper { }
+}
+")
+                .AddDocument("App", "Theme.cs",
+@"namespace App.UI
+{
+    public class Theme { }
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            //only the helper file is moved: Shared still exposes App.UI.Windows
+            await AdjustAndCleanupAsync(solution, "Helpers", "Converter.cs", "Helpers.Nested");
+
+            var text = solution.TextOf("Helpers", "Converter.cs");
+
+            Assert.Contains("namespace Helpers.Nested", text);
+            Assert.DoesNotContain("using App.UI;", text);
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
+
+        /// <summary>
         /// The very same thing with a shared project: the namespace of the shared file
         /// is filled by one of the projects additionally, so it stays alive for the solution
         /// while one of the projects has nothing in it anymore.

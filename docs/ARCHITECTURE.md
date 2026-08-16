@@ -7,8 +7,17 @@ contributors; if you are looking for the user documentation, please read [../REA
 
 | Project | Contents |
 | --- | --- |
-| `AdjustNamespace.VsixShared` | A shared MSBuild project with the whole code of the extension. |
-| `AdjustNamespace.2022` | The VSIX project for Visual Studio 2022: the manifest, the command table (`VSCommandTable.vsct`), the image manifest and the resources. |
+| `AdjustNamespace.CoreShared` | A shared MSBuild project with the core: the planner, the adjusters, the edits, the session, the xaml subsystem, the settings and the interfaces of the boundary to the IDE. It knows nothing about Visual Studio and is compiled by every host below. |
+| `AdjustNamespace.VsixShared` | A shared MSBuild project with everything which needs the running IDE: the wizard, the menu commands, the options, the info bar and the implementations of the boundary interfaces. |
+| `AdjustNamespace.2022` | The VSIX project for Visual Studio 2022: the manifest, the command table (`VSCommandTable.vsct`), the image manifest and the resources. Imports both shared projects. |
+| `AdjustNamespace.Cli` | The console utility `adjustns` (`net8.0`): the core over an `MSBuildWorkspace`. Imports `AdjustNamespace.CoreShared` only. |
+| `Tests/AdjustNamespace.Tests` | The automated tests (`net48`, xunit). Imports both shared projects, see [../Tests/README.md](../Tests/README.md). |
+
+The line between the two shared projects is the whole point of the split: a class of the core
+compiles into a .NET Framework 4.8 extension and into a .NET 8 console tool at once, so it may
+use neither the Visual Studio SDK nor an API which exists in one of the two Roslyn versions
+only. A new file of the core is added to `AdjustNamespace.CoreShared.projitems`, a new file of
+the IDE part to `AdjustNamespace.VsixShared.projitems`.
 
 The extension targets .NET Framework 4.8 and is built against
 [Community.VisualStudio.Toolkit](https://github.com/VsixCommunity/Community.VisualStudio.Toolkit),
@@ -20,6 +29,8 @@ The post-build event of `AdjustNamespace.2022` refreshes the `Tests/Subject` fol
 `Tests/Standard`, see [../Tests/README.md](../Tests/README.md).
 
 ## The big picture
+
+The core has two hosts. Visual Studio drives it through the wizard:
 
 ```
  Command (AdjustNamespaceCommand / AdjustSolutionCommand / AdjustSelectedCommand)
@@ -36,6 +47,22 @@ The post-build event of `AdjustNamespace.2022` refreshes the `Tests/Subject` fol
                                         AdjustSession does the job
 ```
 
+and the console utility walks the very same three steps without asking anybody:
+
+```
+ Program (adjustns)
+   |  parses the command line (CliOptions)
+   v
+ AdjustCommand
+   |
+   +--> 1. MsBuildSolutionLoader     - opens the .sln/.slnx/.csproj, compiles it,
+   |                                   stops on the errors unless --force
+   |
+   +--> 2. SubjectFileCollector      - the same scan; --dry-run and --check stop here
+   |
+   +--> 3. AdjustSession             - the same job, the progress goes to the console
+```
+
 Both the scan and the adjusting ask one and the same `AdjustPlanner` whether a file is a
 subject to change, so the wizard cannot offer a file which the adjusting then silently skips.
 
@@ -47,7 +74,7 @@ the solution.
 
 | Namespace | Responsibility |
 | --- | --- |
-| `AdjustNamespace` (the root) | The entry point (`AdjustNamespacePackage`), the context of a run (`AdjustContext`) and the few things everything else uses: `Logging`, `RelayCommand`, `CollectionExtensions`, `TypeContainer`. |
+| `AdjustNamespace` (the root) | The entry point (`AdjustNamespacePackage`), the context of a run (`AdjustContext`) and the few things everything else uses: `Logging`, `RelayCommand`, `CollectionExtensions`, `TypeContainer`, `FileEx`. |
 | `AdjustNamespace.Command` | Menu commands. Each of them collects the file paths and opens the wizard. |
 | `AdjustNamespace.UI` | The wizard: the place a step is shown in (`IWizardHost`), the steps (`StepFactory`), the viewmodels and the WPF controls. |
 | `AdjustNamespace.Adjusting` | The core: the scanner, the adjusters and the final cleanup. |
@@ -59,26 +86,31 @@ the solution.
 | `AdjustNamespace.Settings` | Per solution settings stored in the solution folder. |
 | `AdjustNamespace.Options` | Per user options stored by Visual Studio. |
 | `AdjustNamespace.InfoBar` | The release notes gold bar. |
-| `AdjustNamespace.VisualStudio` | The boundary to the IDE: the solution tree, the editor and the project properties, each behind its own interface. |
+| `AdjustNamespace.VisualStudio` | The boundary to the IDE: the interfaces (in the core) and their Visual Studio implementations (in `AdjustNamespace.VsixShared`). |
 | `AdjustNamespace.Roslyn` | Everything which is asked of Roslyn itself: the syntax trees (`SyntaxExtensions`), the symbols (`SymbolExtensions`), the workspace (`WorkspaceExtensions`), what may be processed at all (`Scope`) and what is generated code (`GeneratedCode`). |
+| `AdjustNamespace.Cli` | The console utility: the command line (`CommandLine`), the run itself (`AdjustCommand`) and the answers to the boundary interfaces built out of the MSBuild data (`MsBuild`). |
 
 A folder is a namespace and a namespace is a folder: `AdjustNamespace.Roslyn` is
-`AdjustNamespace.VsixShared\Roslyn`, and a file declares the type it is named after. There is no
+`AdjustNamespace.CoreShared\Roslyn`, and a file declares the type it is named after. There is no
 `Helper` namespace any more — a helper belongs to whatever it is a helper of.
 
 ### The boundary to Visual Studio
 
-Everything the extension needs from the running IDE is behind three interfaces of
-`AdjustNamespace.VisualStudio`:
+Everything the core needs from the outside world is behind four interfaces of
+`AdjustNamespace.VisualStudio` and `AdjustNamespace.Xaml.BodyProvider`. The interfaces live in
+the core, the implementations belong to the host:
 
-| Interface | What it gives | Real implementation |
-| --- | --- | --- |
-| `ISolutionExplorer` | The files of the solution and the project of every one of them (`ProjectRef`). The tree is walked once per session, see `AdjustPlanner`. | `VsSolutionExplorer` (the solution tree, main thread) |
-| `IProjectDefaultNamespaceProvider` | The `DefaultNamespace` property of a project. | `DteProjectDefaultNamespaceProvider` (DTE, main thread) |
-| `IDocumentOpener` | Opens a changed file in the editor, which is what makes the change undoable. | `VsDocumentOpener`, or `NullDocumentOpener` when the user has not asked for it |
+| Interface | What it gives | In Visual Studio | In the console utility |
+| --- | --- | --- | --- |
+| `ISolutionExplorer` | The files of the solution and the project of every one of them (`ProjectRef`). The tree is walked once per session, see `AdjustPlanner`. | `VsSolutionExplorer` (the solution tree, main thread) | `MsBuildSolutionExplorer` (the documents of the workspace plus the xaml files found on the disk) |
+| `IProjectDefaultNamespaceProvider` | The `DefaultNamespace` property of a project. | `DteProjectDefaultNamespaceProvider` (DTE, main thread) | `ProjectFileDefaultNamespaceProvider` (`Project.DefaultNamespace` of Roslyn, i.e. the `RootNamespace` of the project file) |
+| `IDocumentOpener` | Opens a changed file in the editor, which is what makes the change undoable. | `VsDocumentOpener`, or `NullDocumentOpener` when the user has not asked for it | `NullDocumentOpener`: there is no editor, and the safety net of a console run is the version control |
+| `IXamlBodyProviderFactory` | The way a xaml file is read and written. | `VsXamlBodyProviderFactory`: the text buffer of the editor when the change has to be undoable, the file system otherwise | `ClosedXamlBodyProviderFactory`: always the file system |
 
 `AdjustContext` carries these plus the Roslyn workspace and `TargetNamespaceResolver`, and is
-created once per command invocation. Everything in it is a real object in the tests as well
+created once per run: by `VsAdjustContext.CreateAsync` (which is the only place asking the IDE
+for the DTE and the `VisualStudioWorkspace`) in the extension and by `AdjustCommand` over an
+`MSBuildWorkspace` in the console utility. Everything in it is a real object in the tests as well
 (an `AdhocWorkspace` and the fakes of `Tests\AdjustNamespace.Tests\Infrastructure`), so the
 core cannot reach the IDE by accident.
 
@@ -300,10 +332,12 @@ ends know about the compilation of the document they work with:
 
 - `MoveNamespaceApplier` adds the `using` clause of the old namespace of the adjusted file only
   if that namespace still contains something for the projects of that file
-  (`SymbolExtensions.IsNamespaceFilledOutside`);
+  (`SymbolExtensions.IsNamespaceFilledOutside`); only the types declared *directly* in the
+  namespace count — types of the child namespaces are invisible to a `using` of the parent,
+  so counting them would add a clause which later fails to compile;
 - `NamespaceCenter.GetRemovedNamespaces` removes a clause of a namespace the adjusting has
-  touched as soon as that namespace is gone for the given compilations, even if the rest of the
-  solution still fills it.
+  touched as soon as that namespace has no direct types left for the given compilations, even
+  if the rest of the solution still fills it (or a child namespace of it still exists).
 
 A file which several projects compile has a single text for all of them, so both of these
 questions are asked about every project which compiles it and the answers are merged: the clause
@@ -314,10 +348,12 @@ stays as soon as a single one of them still needs it.
 A xaml file is processed as a plain text with a set of regexes instead of an XML DOM: this is
 the only way to keep the user's formatting untouched.
 
-- `XamlEngine` creates a `XamlDocument` over an `IXamlBodyProvider`:
+- `XamlEngine` creates a `XamlDocument` over an `IXamlBodyProvider`, and which one it is
+  is decided by the `IXamlBodyProviderFactory` of the context:
   `ClosedXamlBodyProvider` works with the file system (fast, not undoable) and
   `OpenedXamlBodyProvider` works with the text buffer of the Visual Studio editor
-  (undoable, requires the main thread).
+  (undoable, requires the main thread). The second one lives in `AdjustNamespace.VsixShared`:
+  the core knows the interface and never the editor.
 - `XamlDocument` is immutable: every modification produces a new instance, and nothing is
   written back until `SaveIfChangesExistsAgainst` is called. This allows to check whether a file
   is a subject to change without touching it.
@@ -334,14 +370,46 @@ the only way to keep the user's formatting untouched.
   is moved out of, so the pairs which reference nothing (`mc:Ignorable="d"`, a time in a text)
   are simply skipped.
 
+## The console utility
+
+`AdjustNamespace.Cli` is the second host of the core. There is no IDE, so it does itself what
+Visual Studio does for the extension:
+
+- `MsBuildSolutionLoader` opens the `.sln`, the `.slnx` or the `.csproj` into an
+  `MSBuildWorkspace`. `Program` registers `MSBuildLocator` before that and touches no MSBuild
+  type itself: a method which mentions one must not be jitted before the locator has found the
+  MSBuild of the installed .NET SDK. A `.slnx` is understood by
+  `Microsoft.CodeAnalysis.Workspaces.MSBuild` 5.0 and newer, which is why the utility uses a
+  newer Roslyn than the extension does. What MSBuild fails to load (a `sqlproj`, a `shproj`)
+  is reported as a warning and left out of the run.
+- `AdjustCommand` walks the three steps of the wizard without a user: it compiles every project
+  and stops if there are errors (`--force` overrules, exactly as the "Next" button of the first
+  step does), collects the subject files and runs an `AdjustSession` with a `ConsoleProgress`.
+  `--dry-run` and `--check` stop after the collecting; they differ in the exit code only.
+- `MsBuildSolutionExplorer` answers out of the loaded workspace. Two things do not come from
+  Roslyn: the generated sources under `obj` are dropped (the solution tree of Visual Studio
+  never showed them, MSBuild reports them as usual documents of the project) and the xaml files
+  are searched for on the disk, in the folders of the projects.
+- When a `.csproj` is named instead of a solution, the projects it references are loaded with it
+  and are needed — the semantic model is built of them and the references to the moved types are
+  fixed in them — but only the files of the named project are candidates to be adjusted.
+
 ## Threading
 
 Visual Studio automation objects (DTE, the solution tree, the editor documents) are available
 from the main thread only, so such work is grouped into the separate steps which start with
-`ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync`. The heavy Roslyn analysis is moved
-to the thread pool with `await TaskScheduler.Default`.
+`ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync`. That is the IDE part; the core is
+free of it and offloads the heavy Roslyn analysis with a plain `Task.Run`, which means the same
+thing in a console process and inside Visual Studio.
 
 ## Logging
 
-`Logging.LogVS` writes into `%TEMP%\AdjustNamespace.vs.log`. It is compiled into the debug builds
-only (`[Conditional("DEBUG")]`).
+The detailed diagnostics of the adjusting (`[Adjust] ...` lines: the searched types, the found
+references, the scheduled edits, whether a namespace stays alive) go through `AdjustLog`. They
+still reach a debugger via `Debug.WriteLine`, and a host may also send them to a file:
+
+- the console utility writes them into `%TEMP%\AdjustNamespace.cli.log` when started with
+  `--debug`;
+- `Logging.LogVS` of the IDE part writes the exceptions of the commands and of the wizard into
+  `%TEMP%\AdjustNamespace.vs.log` and is compiled into the debug builds only
+  (`[Conditional("DEBUG")]`).

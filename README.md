@@ -2,6 +2,8 @@
 
 AdjustNamespace is a Visual Studio 2022 extension which brings the C# namespaces in accordance with the location and **rules the resulting regressions in the code (including XAML), e.g. fixes the broken references**. This extension works like Resharper `Adjust namespaces` function. If you know Resharper, you know what this extension is trying to do.
 
+The same job is done by the console utility `adjustns` (see [Console utility](#console-utility)), which needs no Visual Studio at all and is therefore usable on a build server.
+
 ## How to use
 
 Select object (solution, project, folder or file) in solution explorer, click RMB, choose `Adjust Namespaces...` and follow the wizard.
@@ -88,6 +90,50 @@ XAML files:
 
 By default the files are changed without opening them in the editor, so such changes cannot be undone with Ctrl+Z. Check `Open affected files to enable Undo` on the second step of the wizard to open the affected files instead. The checkbox is disabled if too many files are chosen, because a lot of documents opened at once makes Visual Studio unresponsive.
 
+## Console utility
+
+`adjustns` is the same core without the IDE: it opens a `.sln`, a `.slnx` or a `.csproj` with MSBuild, adjusts the namespaces and writes the files. It needs the .NET SDK installed (the projects are evaluated by the MSBuild of it) and nothing else — no Visual Studio, no extension.
+
+It is not published to NuGet yet, so it is built from the sources:
+
+```
+dotnet pack AdjustNamespace.Cli -c Release
+dotnet tool install --global --add-source AdjustNamespace.Cli\bin\Release AdjustNamespace.Cli
+adjustns MySolution.sln
+```
+
+or simply run in place:
+
+```
+dotnet run --project AdjustNamespace.Cli -- MySolution.sln --dry-run
+```
+
+```
+adjustns <solution> [options]
+```
+
+| Option | What it does |
+| --- | --- |
+| `<solution>` | The `.sln`, `.slnx` or `.csproj` to adjust. A folder is accepted too if it contains exactly one of them. |
+| `-p`, `--path <path>` | Adjust this file, or the files under this folder, only. May be repeated; the whole solution is taken if it is omitted. |
+| `--regex <regex>`, `--replacement <text>` | The same user regex the second step of the wizard offers: it is applied to every target namespace. Both of them are required for the regex to take effect. |
+| `-n`, `--dry-run` | Report what would be changed and change nothing. |
+| `--check` | Change nothing and exit with the code `2` if there is something to adjust. This is the mode a CI job runs the utility in. |
+| `--force` | Adjust even if the solution does not compile. |
+| `-v`, `--verbose` | Report every processed file and not the changed ones only. |
+| `--debug` | Write the detailed `[Adjust]` diagnostics into `%TEMP%\AdjustNamespace.cli.log`. |
+| `-h`, `--help` | Show the help. |
+
+The exit code is `0` when the run is over (including "there was nothing to do"), `1` when the utility has failed and `2` when `--check` has found the files to adjust.
+
+A few things which differ from the extension:
+
+- the solution has to compile, otherwise the run stops: there is no wizard to ask, and the adjusting is based on the semantic model. `--force` says "I know what I am doing";
+- the changes cannot be undone with Ctrl+Z — the safety net here is your version control, so commit before the run and review the diff after it;
+- the files under `bin` and `obj` are never touched: unlike the solution tree of Visual Studio, MSBuild reports the generated sources as usual files of a project;
+- naming a `.csproj` adjusts the files of that project only. The projects it references are loaded as well (the semantic model needs them and the references to the moved types are fixed in them), but their own namespaces are left alone;
+- `adjust_namespaces_settings.xml` is read from the folder of the solution, exactly as the extension reads it.
+
 ## Remarks
 
 I test it against plain C# code, WPF Xaml, and C# code from `sqlproj`. I encourage you test against your codebase and report bugs (with minimal repro) to https://github.com/lsoft/AdjustNamespace/issues.
@@ -102,7 +148,8 @@ A few things which are worth to know:
 ## Requirements
 
 - Visual Studio 2022 (17.0 - 18.0), amd64 or arm64;
-- .NET Framework 4.8 (to build the extension).
+- .NET Framework 4.8 (to build the extension);
+- .NET 8 SDK (to build and to run the console utility; a newer SDK is fine too).
 
 The extension is a single `AnyCPU` payload which is installed into both the amd64 and the arm64
 Visual Studio, so it is built on either of them and no arm64 machine is needed to produce it.
@@ -115,16 +162,19 @@ One thing is worth to know on arm64: the SQL Server Data Tools are not available
 2. Open `AdjustNamespace.sln` and build it. The dependencies (Community.VisualStudio.Toolkit, Roslyn, VSSDK build tools) are restored from NuGet.
 3. Press F5: an experimental instance of Visual Studio with the extension installed is started.
 
-The solution consists of two projects:
+The solution consists of:
 
-- `AdjustNamespace.VsixShared` — a shared project with the whole code of the extension;
-- `AdjustNamespace.2022` — the VSIX project for Visual Studio 2022 (the manifest, the command table, the resources).
+- `AdjustNamespace.CoreShared` — a shared project with the core: everything which knows nothing about Visual Studio;
+- `AdjustNamespace.VsixShared` — a shared project with the wizard, the menu commands and the boundary to the IDE;
+- `AdjustNamespace.2022` — the VSIX project for Visual Studio 2022 (the manifest, the command table, the resources);
+- `AdjustNamespace.Cli` — the console utility (`net8.0`), the core over an `MSBuildWorkspace`;
+- `Tests/AdjustNamespace.Tests` — the automated tests of the core (`dotnet test`).
 
 The code which depends on the Visual Studio version is guarded with the `VS2022` conditional compilation symbol.
 
 ## Tests
 
-There is no automated test suite; the extension is tested manually against the sample solution from the `Tests` folder. See [Tests/README.md](Tests/README.md).
+The core is covered by `Tests/AdjustNamespace.Tests` (`dotnet test Tests/AdjustNamespace.Tests/AdjustNamespace.Tests.csproj`); the wizard is tested manually against the sample solution from the `Tests` folder. See [Tests/README.md](Tests/README.md).
 
 ## Documentation
 
@@ -133,4 +183,4 @@ There is no automated test suite; the extension is tested manually against the s
 
 ## Troubleshooting
 
-Debug builds of the extension write a log into `%TEMP%\AdjustNamespace.vs.log`. Please attach it (and a minimal repro) to your bug report.
+Debug builds of the extension write a log into `%TEMP%\AdjustNamespace.vs.log`. The console utility writes the same kind of diagnostics into `%TEMP%\AdjustNamespace.cli.log` when started with `--debug`. Please attach the log (and a minimal repro) to your bug report.

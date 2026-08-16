@@ -1,4 +1,5 @@
-﻿using AdjustNamespace.Window;
+﻿using AdjustNamespace.VisualStudio;
+using AdjustNamespace.Window;
 using Microsoft.VisualStudio.Shell;
 using System;
 using System.ComponentModel.Design;
@@ -95,7 +96,7 @@ namespace AdjustNamespace.Command
 
             try
             {
-                var context = await AdjustContext.CreateAsync(ServiceProvider);
+                var context = await VsAdjustContext.CreateAsync(ServiceProvider);
 
                 //this window is about the settings file only, so it needs the solution folder
                 //and the settings and not the whole adjusting context
