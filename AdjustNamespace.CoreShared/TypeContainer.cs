@@ -24,6 +24,12 @@ namespace AdjustNamespace
         /// </summary>
         private readonly Dictionary<string, HashSet<string>> _dictByNamespace;
 
+        /// <summary>
+        /// The names reserved by <see cref="Reserve"/>, with the type which has reserved each
+        /// of them: the other part of the same partial type reserves the same name again.
+        /// </summary>
+        private readonly Dictionary<(string Namespace, string Name), string> _reservedBy;
+
         /// <param name="unused">Not used; see the comment inside.</param>
         public NamespaceTypeContainer(
             bool unused //here is CS0568 in VS2019 without this
@@ -31,16 +37,25 @@ namespace AdjustNamespace
         {
             _dictByNamespace = new Dictionary<string, HashSet<string>>(
                 );
+            _reservedBy = new Dictionary<(string Namespace, string Name), string>();
         }
 
         /// <summary>
         /// Add a type into the container.
         /// The nested types are skipped: <c>A.B.Container.Nested</c> belongs to its outer type
         /// and not to the namespace <c>A.B</c>, so it must not produce a name conflict there.
+        /// The file-local types of C# 11 (<c>file class Helper</c>) are skipped as well: such a
+        /// type is visible in its own file only, and the compiler accepts another type of the
+        /// same name in the same namespace.
         /// </summary>
         public void Add(INamedTypeSymbol symbol)
         {
             if (symbol.ContainingType != null)
+            {
+                return;
+            }
+
+            if (symbol.IsFileLocal)
             {
                 return;
             }
@@ -61,9 +76,14 @@ namespace AdjustNamespace
         /// the same name into the same target must conflict with each other and not only
         /// with the types which exist in the solution already.
         /// </summary>
+        /// <param name="namespaceName">The target namespace.</param>
+        /// <param name="typeName">The name of the moving type.</param>
+        /// <param name="owner">The full name of the moving type before the move: the other
+        /// part of the same partial type reserves the same name without a conflict.</param>
         public void Reserve(
             string namespaceName,
-            string typeName
+            string typeName,
+            string owner
             )
         {
             if (namespaceName is null)
@@ -76,33 +96,60 @@ namespace AdjustNamespace
                 throw new ArgumentNullException(nameof(typeName));
             }
 
-            if (!_dictByNamespace.TryGetValue(namespaceName, out var typeNames))
+            if (owner is null)
             {
-                typeNames = new HashSet<string>();
-                _dictByNamespace[namespaceName] = typeNames;
+                throw new ArgumentNullException(nameof(owner));
             }
 
-            typeNames.Add(typeName);
+            if (!_reservedBy.ContainsKey((namespaceName, typeName)))
+            {
+                _reservedBy[(namespaceName, typeName)] = owner;
+            }
         }
 
         /// <summary>
-        /// Check if the given namespace contains a type with the given name.
-        /// This is how the name conflicts are detected before the adjusting starts.
+        /// Check if the given namespace contains a type with the given name, or the name has
+        /// been reserved there by a moving type.
         /// </summary>
         public bool CheckForTypeExists(
             string namespaceName,
             string typeName
             )
         {
-            if (!_dictByNamespace.TryGetValue(
-                namespaceName,
-                out var typeNames
-                ))
+            return ContainsExisting(namespaceName, typeName)
+                || _reservedBy.ContainsKey((namespaceName, typeName));
+        }
+
+        /// <summary>
+        /// Moving the given type into the given namespace collides with another type there:
+        /// one which exists already, or one which has reserved the name before. This is how
+        /// the name conflicts are detected before the adjusting starts.
+        /// </summary>
+        /// <param name="namespaceName">The target namespace.</param>
+        /// <param name="typeName">The name of the moving type.</param>
+        /// <param name="owner">The full name of the moving type before the move, see <see cref="Reserve"/>.</param>
+        public bool IsConflict(
+            string namespaceName,
+            string typeName,
+            string owner
+            )
+        {
+            if (ContainsExisting(namespaceName, typeName))
             {
-                return false;
+                return true;
             }
 
-            return typeNames.Contains(typeName);
+            return _reservedBy.TryGetValue((namespaceName, typeName), out var reservedBy)
+                && reservedBy != owner;
+        }
+
+        private bool ContainsExisting(
+            string namespaceName,
+            string typeName
+            )
+        {
+            return _dictByNamespace.TryGetValue(namespaceName, out var typeNames)
+                && typeNames.Contains(typeName);
         }
 
         /// <summary>

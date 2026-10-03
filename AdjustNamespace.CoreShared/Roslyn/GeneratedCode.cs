@@ -23,8 +23,41 @@ namespace AdjustNamespace.Roslyn
             ".g.cs",
             ".g.i.cs",
             ".designer.cs",
-            ".generated.cs"
+            ".generated.cs",
+            //the code behind part the .NET MAUI source generator writes for a xaml file
+            ".sg.cs"
         };
+
+        /// <summary>
+        /// The file is generated again by every build out of something else, so its namespace
+        /// follows that source by itself: everything <see cref="IsGeneratedFile"/> knows except
+        /// a <c>.designer.cs</c>. A designer file (of a Windows Forms form, for example) is
+        /// written by a designer once and is a part of the sources from then on: the build does
+        /// not touch it, and its namespace has to be moved together with the other part of its
+        /// partial class.
+        /// </summary>
+        public static bool IsWrittenByTheBuild(string? filePath)
+        {
+            if (!IsGeneratedFile(filePath))
+            {
+                return false;
+            }
+
+            if (IsInIntermediateFolder(filePath!))
+            {
+                return true;
+            }
+
+            return !filePath!.EndsWith(".designer.cs", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsInIntermediateFolder(string filePath)
+        {
+            return filePath.Replace('/', '\\').IndexOf(
+                "\\obj\\",
+                StringComparison.OrdinalIgnoreCase
+                ) >= 0;
+        }
 
         /// <summary>
         /// The file is a generated one and is not a part of the sources of the solution.

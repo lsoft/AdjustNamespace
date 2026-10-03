@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace AdjustNamespace.Xaml
 {
@@ -17,12 +16,13 @@ namespace AdjustNamespace.Xaml
         public readonly XamlX XPrefix;
 
         /// <summary>
-        /// clr-namespace declarations: <c>xmlns:alias="clr-namespace:A.B.C"</c>.
+        /// Every namespace declaration of the document, the CLR ones
+        /// (<c>xmlns:alias="clr-namespace:A.B.C"</c>) and the other ones, with their scopes.
         /// </summary>
         public readonly List<XamlXmlns> Xmlns;
 
         /// <summary>
-        /// Tags with an alias: <c>&lt;alias:ClassName</c>.
+        /// Tags: <c>&lt;alias:ClassName</c>, and the tags without a prefix.
         /// </summary>
         public readonly List<XamlControl> Controls;
 
@@ -39,7 +39,8 @@ namespace AdjustNamespace.Xaml
         /// <summary>
         /// The <c>alias:ClassName</c> pairs which are neither a tag nor a
         /// <c>{x:Type}</c>/<c>{x:Static}</c> markup extension: an attribute value,
-        /// an attached property, a custom markup extension, <c>x:TypeArguments</c>.
+        /// an attached property, a custom markup extension, <c>x:TypeArguments</c>,
+        /// an Avalonia selector.
         /// </summary>
         public readonly List<XamlTypeUsage> TypeUsages;
 
@@ -52,59 +53,48 @@ namespace AdjustNamespace.Xaml
             List<XamlTypeUsage> typeUsages
             )
         {
-            if (xPrefix is null)
-            {
-                throw new ArgumentNullException(nameof(xPrefix));
-            }
-
-            if (xmlns is null)
-            {
-                throw new ArgumentNullException(nameof(xmlns));
-            }
-
-            if (controls is null)
-            {
-                throw new ArgumentNullException(nameof(controls));
-            }
-
-            if (refFroms is null)
-            {
-                throw new ArgumentNullException(nameof(refFroms));
-            }
-
-            if (classes is null)
-            {
-                throw new ArgumentNullException(nameof(classes));
-            }
-
-            if (typeUsages is null)
-            {
-                throw new ArgumentNullException(nameof(typeUsages));
-            }
-
-            XPrefix = xPrefix;
-            Xmlns = xmlns;
-            Controls = controls;
-            RefFroms = refFroms;
-            Classes = classes;
-            TypeUsages = typeUsages;
+            XPrefix = xPrefix ?? throw new ArgumentNullException(nameof(xPrefix));
+            Xmlns = xmlns ?? throw new ArgumentNullException(nameof(xmlns));
+            Controls = controls ?? throw new ArgumentNullException(nameof(controls));
+            RefFroms = refFroms ?? throw new ArgumentNullException(nameof(refFroms));
+            Classes = classes ?? throw new ArgumentNullException(nameof(classes));
+            TypeUsages = typeUsages ?? throw new ArgumentNullException(nameof(typeUsages));
         }
 
         /// <summary>
-        /// Get the clr-namespace declaration by its alias.
+        /// Get the namespace declaration of the given alias which is visible at the given
+        /// position: an alias declared again on a nested element means the nested declaration
+        /// inside of that element.
         /// </summary>
+        /// <param name="alias">The alias; empty for the default declaration.</param>
+        /// <param name="position">The position the alias is used at.</param>
         /// <returns>
-        /// <c>null</c> if there is no such alias in the document: the alias may belong
-        /// to a namespace which is not a clr one (<c>&lt;x:Array&gt;</c>, for example).
+        /// <c>null</c> if there is no such alias at that position. A declaration which is no
+        /// CLR namespace mapping is returned too (it shadows the outer ones), see <see cref="XamlXmlns.IsClr"/>.
         /// </returns>
-        public XamlXmlns? GetByAlias(string alias)
+        public XamlXmlns? GetByAlias(string alias, int position)
         {
-            return Xmlns.FirstOrDefault(x => x.Alias == alias);
+            XamlXmlns? result = null;
+
+            foreach (var xmlns in Xmlns)
+            {
+                if (xmlns.Alias != alias || !xmlns.IsInScopeAt(position))
+                {
+                    continue;
+                }
+
+                if (result == null || xmlns.ScopeStart > result.ScopeStart)
+                {
+                    result = xmlns;
+                }
+            }
+
+            return result;
         }
 
         /// <summary>
-        /// Try to find the clr-namespace declaration of the given namespace within
-        /// the given assembly.
+        /// Try to find a declaration of the given CLR namespace within the given assembly
+        /// which may be used at the given position.
         /// </summary>
         /// <param name="namespace">The clr namespace.</param>
         /// <param name="suffix">
@@ -114,10 +104,65 @@ namespace AdjustNamespace.Xaml
         /// the comparison is a plain one, so an explicit <c>;assembly=</c> of the own
         /// assembly leads to a second declaration instead of a wrong reuse.
         /// </param>
-        /// <returns><c>null</c> if there is no such declaration in the document.</returns>
-        public XamlXmlns? TryGetByNamespace(string @namespace, string suffix)
+        /// <param name="position">The position the alias is going to be used at: a declaration
+        /// of a nested element is not visible outside of it, and a declaration whose alias is
+        /// declared again in between is shadowed.</param>
+        /// <returns><c>null</c> if there is no such declaration.</returns>
+        public XamlXmlns? TryGetByNamespace(string @namespace, string suffix, int position)
         {
-            return Xmlns.FirstOrDefault(x => x.Namespace == @namespace && x.Suffix == suffix);
+            foreach (var xmlns in Xmlns)
+            {
+                if (!xmlns.IsClr
+                    || xmlns.Alias.Length == 0
+                    || xmlns.Namespace != @namespace
+                    || xmlns.Suffix != suffix
+                    )
+                {
+                    continue;
+                }
+
+                if (!xmlns.Saved)
+                {
+                    //a new declaration is written into the root element
+                    return xmlns;
+                }
+
+                if (ReferenceEquals(GetByAlias(xmlns.Alias, position), xmlns))
+                {
+                    return xmlns;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Every tag the given default CLR declaration maps is a reference to the moved class
+        /// (<c>&lt;MyButton xmlns="clr-namespace:A.B" /&gt;</c>): the declaration follows the
+        /// class then instead of the tags getting a prefix.
+        /// </summary>
+        public bool IsDefaultDeclarationOfMovedClassOnly(XamlXmlns declaration, in XamlMove move)
+        {
+            var found = false;
+
+            foreach (var control in Controls)
+            {
+                if (control.Alias.Length != 0
+                    || !ReferenceEquals(GetByAlias(string.Empty, control.Index), declaration)
+                    )
+                {
+                    continue;
+                }
+
+                if (!move.IsNamed(control.ClassName))
+                {
+                    return false;
+                }
+
+                found = true;
+            }
+
+            return found;
         }
 
         /// <summary>
@@ -135,6 +180,7 @@ namespace AdjustNamespace.Xaml
         {
             var performables = new List<IXamlPerformable>();
 
+            performables.AddRange(Xmlns.Where(x => x.IsClr && x.Alias.Length == 0));
             performables.AddRange(Controls);
             performables.AddRange(RefFroms);
             performables.AddRange(Classes);

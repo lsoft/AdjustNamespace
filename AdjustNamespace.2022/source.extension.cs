@@ -9,10 +9,10 @@ namespace AdjustNamespace
     internal sealed partial class Vsix
     {
         public const string Id = "AdjustNamespace.5744262e-0521-4f72-a2d6-aa7d60d8ea96";
-        public const string Name = "Adjust C# Namespaces 2022";
+        public const string Name = "Adjust C# Namespaces";
         public const string Description = @"Fix incorrect namespaces for a single file, folder, project or a whole solution and rules the resulting regressions in the code (including XAML), e.g. fixes the broken references. This extension works like Resharper `Adjust namespaces` function.";
         public const string Language = "en-US";
-        public const string Version = "0.6.0";
+        public const string Version = "0.7.0";
         public const string Author = "lsoft";
         public const string Tags = "namespace fix C#";
         public const bool IsPreview = true;

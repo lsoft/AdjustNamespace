@@ -9,12 +9,12 @@ contributors; if you are looking for the user documentation, please read [../REA
 | --- | --- |
 | `AdjustNamespace.CoreShared` | A shared MSBuild project with the core: the planner, the adjusters, the edits, the session, the xaml subsystem, the settings and the interfaces of the boundary to the IDE. It knows nothing about Visual Studio and is compiled by every host below. |
 | `AdjustNamespace.VsixShared` | A shared MSBuild project with everything which needs the running IDE: the wizard, the menu commands, the options, the info bar and the implementations of the boundary interfaces. |
-| `AdjustNamespace.2022` | The VSIX project for Visual Studio 2022: the manifest, the command table (`VSCommandTable.vsct`), the image manifest and the resources. Imports both shared projects. |
-| `AdjustNamespace.Cli` | The console utility `adjustns` (`net8.0`): the core over an `MSBuildWorkspace`. Imports `AdjustNamespace.CoreShared` only. |
+| `AdjustNamespace.2022` | The VSIX project for Visual Studio 2026 (the name is historical): the manifest, the command table (`VSCommandTable.vsct`), the image manifest and the resources. Imports both shared projects. |
+| `AdjustNamespace.Cli` | The console utility `adjustns` (`net10.0`): the core over an `MSBuildWorkspace`. Imports `AdjustNamespace.CoreShared` only. |
 | `Tests/AdjustNamespace.Tests` | The automated tests (`net48`, xunit). Imports both shared projects, see [../Tests/README.md](../Tests/README.md). |
 
 The line between the two shared projects is the whole point of the split: a class of the core
-compiles into a .NET Framework 4.8 extension and into a .NET 8 console tool at once, so it may
+compiles into a .NET Framework 4.8 extension and into a .NET 10 console tool at once, so it may
 use neither the Visual Studio SDK nor an API which exists in one of the two Roslyn versions
 only. A new file of the core is added to `AdjustNamespace.CoreShared.projitems`, a new file of
 the IDE part to `AdjustNamespace.VsixShared.projitems`.
@@ -22,8 +22,9 @@ the IDE part to `AdjustNamespace.VsixShared.projitems`.
 The extension targets .NET Framework 4.8 and is built against
 [Community.VisualStudio.Toolkit](https://github.com/VsixCommunity/Community.VisualStudio.Toolkit),
 Roslyn (`Microsoft.CodeAnalysis.*`) and `Microsoft.VisualStudio.LanguageServices`.
-The code which depends on the Visual Studio version is guarded with the `VS2022`
-conditional compilation symbol (file scoped namespaces, for example).
+It supports Visual Studio 2026 (18.x) only and is compiled against the Roslyn of 18.0, the
+lowest supported release: Visual Studio binds an older Roslyn reference to its own one, never
+a newer one. There is no code which depends on the Visual Studio version.
 
 The post-build event of `AdjustNamespace.2022` refreshes the `Tests/Subject` folder from
 `Tests/Standard`, see [../Tests/README.md](../Tests/README.md).
@@ -228,8 +229,12 @@ Everything above is a rule about a single file, and all of these rules live in o
   its namespace transitions);
 - **Block** — an `AdjustBlock` with a reason the wizard and the console utility show to the
   user (no project, unknown target namespace, not a processable document, compiled by several
-  projects, contradictory TFM namespace state, xaml whose code behind is multi-project);
+  projects, contradictory TFM namespace state, xaml whose code behind is multi-project, a
+  namespace a project file imports with `<Using Include>` which the move would empty);
 - **None** — the file is already fine (in the target namespace already) and is dropped silently.
+  A xaml whose `x:Class` names a class declared in a C# file is no subject either: the
+  `x:Class` belongs to that class and follows it when the C# file moves, whatever folder the
+  xaml lies in.
 
 `TryPlanAsync` remains as a thin wrapper that returns the plan or `null` for callers that only
 need to know whether the file is adjusted.
@@ -253,7 +258,13 @@ what only this step needs:
 - a planned C# file is checked for the type name conflicts in the target namespace
   (`NamespaceTypeContainer`). A conflict becomes an `AdjustBlock` for that file only: other
   adjustable files of the same scan stay collected. Types of collected files are reserved so
-  two subject files cannot both land the same name into the same target.
+  two subject files cannot both land the same name into the same target; a reservation
+  remembers its type, so the other part of the same partial type is no conflict, and the
+  file-local types of C# 11 are no conflict at all;
+- the collected files are checked as a whole: a file whose partial type has a part which is
+  not collected or would land in another namespace is blocked (a form and its `.Designer.cs`
+  have to move together), and so are the files which only together empty a namespace a project
+  file imports.
 
 `SubjectCollectingResults` therefore carries `CollectedFiles` and `Blocked`. An unexpected
 failure while deciding still raises `FileProcessException` and aborts the scan.
@@ -262,8 +273,8 @@ failure while deciding still raises `FileProcessException` and aborts the scan.
 
 `AdjusterFactory` creates the `IAdjuster` which performs a plan (and decides nothing itself):
 
-- **`XamlAdjuster`** rewrites the `x:Class` attribute of the root element. The code behind file
-  is processed separately, as a usual C# file.
+- **`XamlAdjuster`** rewrites the `x:Class` attribute of the root element of a xaml whose class
+  is not declared in a C# file (a xaml with a code behind is no subject, see the planner).
 - **`CsAdjuster`** does the main job, over the transitions the plan carries:
   1. for every type declared in the file `RefProcessor` finds its references across the solution
      (the type is moved by the transition of the namespace declaration it is written in, see
@@ -276,9 +287,14 @@ failure while deciding still raises `FileProcessException` and aborts the scan.
      the locations are deduplicated by their file and span, and every one of them is analyzed
      against the tree it belongs to (`ReferenceLocation.Document`) and not against the tree of
      the current context of that file;
-  2. an edit for every root namespace declaration of the file itself is scheduled;
-  3. `EditApplier.ApplyAsync` writes the whole set;
-  4. the references to the moved types are fixed in the xaml files of the solution.
+  2. `SelfReferenceFixer` schedules the edits of the references the file itself makes through
+     its old enclosing namespaces (a type, an extension member, a child namespace such as
+     `Properties`), and `XmlnsDefinitionFixer` the edits of the
+     `[assembly: XmlnsDefinition(uri, "A.B")]` attributes of the namespaces the types leave;
+  3. an edit for every root namespace declaration of the file itself is scheduled;
+  4. `EditApplier.ApplyAsync` writes the whole set;
+  5. the references to the moved top-level types are fixed in the xaml files of the solution
+     (a nested type is written through its outer type there).
 
 ### The edits
 
@@ -365,14 +381,22 @@ and Avalonia `.axaml` are recognized (`XamlPathHelper`).
   written back until `SaveIfChangesExistsAgainst` is called. This allows to check whether a file
   is a subject to change without touching it.
 - `XamlStructure` holds the interesting fragments of the body with their positions: the xaml
-  language alias (`XamlX`, including the MAUI 2009 uri), the CLR namespace mappings
-  (`XamlXmlns`: both `clr-namespace:` and `using:`), the tags
-  (`XamlControl`), the `{x:Type}` / `{x:Static}` markup extensions (`XamlAttributeReference`),
-  the `x:Class` attributes (`XamlClass`) and every other `alias:ClassName` pair
-  (`XamlTypeUsage`: an attribute value, an attached property, a custom markup extension,
-  `x:TypeArguments`). The fragments which may reference a moved class implement
+  language alias (`XamlX`, including the MAUI 2009 uri and the implicit `x` of a document which
+  declares none), every namespace declaration with the element it is written on
+  (`XamlXmlns`: the CLR mappings `clr-namespace:` and `using:`, and the other ones, which may
+  shadow a mapping), the tags with and without a prefix (`XamlControl`), the `{x:Type}` /
+  `{x:Static}` markup extensions (`XamlAttributeReference`), the `x:Class` attributes
+  (`XamlClass`) and every other `alias:ClassName` pair (`XamlTypeUsage`: an attribute value,
+  an attached property, a custom markup extension, `x:TypeArguments`, an Avalonia selector
+  `alias|ClassName`). The fragments which may reference a moved class implement
   `IXamlPerformable` and are applied in the backward order, so the earlier positions stay valid.
-  A newly created xmlns keeps the form of the source one (`using:` stays `using:`).
+- An alias is resolved by its scope (`XamlStructure.GetByAlias(alias, position)`): an alias
+  declared again on a nested element means the nested declaration inside of it. A mapping
+  references the moved class only if it names the assembly of the class as well
+  (`XamlMove.IsMappedBy`: its `;assembly=`, or the assembly of the xaml when there is none).
+- A newly created xmlns keeps the form of the source one (`using:` stays `using:`) and is
+  declared on the root element, the only place visible from everywhere. The cleanup removes the
+  declarations the move has left unused, and only those.
 - The `XamlTypeUsage` scan is a greedy one: it collects everything which looks like an
   `alias:ClassName` pair and is not a part of a fragment recognized above. Such a pair is
   rewritten only if its alias is a CLR-namespace mapping which points to the namespace the class

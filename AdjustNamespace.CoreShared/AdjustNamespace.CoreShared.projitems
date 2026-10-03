@@ -72,7 +72,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlX.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\Positioned\XamlXmlns.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlDocument.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Adjusting\Adjuster\Cs\XmlnsDefinitionFixer.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlEngine.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlMove.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlPathHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Xaml\XamlStructure.cs" />
   </ItemGroup>

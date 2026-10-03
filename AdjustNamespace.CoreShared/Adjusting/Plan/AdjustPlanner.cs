@@ -2,9 +2,11 @@
 using AdjustNamespace.Namespace;
 using AdjustNamespace.VisualStudio;
 using AdjustNamespace.Xaml;
+using AdjustNamespace.Xaml.BodyProvider;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -162,7 +164,7 @@ namespace AdjustNamespace.Adjusting.Plan
 
             if (XamlPathHelper.IsXamlFile(subjectFilePath))
             {
-                return PlanXaml(workspace, subjectFilePath, targetNamespace);
+                return await PlanXamlAsync(workspace, subjectFilePath, targetNamespace, cancellationToken);
             }
 
             return await PlanCsAsync(workspace, subjectFilePath, targetNamespace, cancellationToken);
@@ -187,10 +189,11 @@ namespace AdjustNamespace.Adjusting.Plan
             return result.Plan;
         }
 
-        private static AdjustPlanResult PlanXaml(
+        private static async Task<AdjustPlanResult> PlanXamlAsync(
             Workspace workspace,
             string subjectFilePath,
-            string targetNamespace
+            string targetNamespace,
+            CancellationToken cancellationToken
             )
         {
             //the `x:Class` of a xaml and the namespace of its code behind file are the two
@@ -203,9 +206,72 @@ namespace AdjustNamespace.Adjusting.Plan
                     );
             }
 
+            //the `x:Class` belongs to the class it names. When that class is declared in a C#
+            //file of the solution, the C# side moves the class into the namespace of the folder
+            //of that file, and the `x:Class` follows it (see CsAdjuster): the xaml may well lie
+            //in another folder (`Views\Shell.xaml` with `Code\Shell.cs`), and the class of the
+            //global namespace is not moved at all. The xaml itself has nothing to do then.
+            if (await IsRootClassDeclaredInSourceAsync(workspace, subjectFilePath, cancellationToken))
+            {
+                return AdjustPlanResult.None();
+            }
+
             return AdjustPlanResult.ForPlan(
                 AdjustPlanItem.Xaml(subjectFilePath, targetNamespace)
                 );
+        }
+
+        /// <summary>
+        /// The class of the <c>x:Class</c> of the xaml is declared in a C# file of its project
+        /// which is not a generated one.
+        /// </summary>
+        private static async Task<bool> IsRootClassDeclaredInSourceAsync(
+            Workspace workspace,
+            string xamlFilePath,
+            CancellationToken cancellationToken
+            )
+        {
+            string? rootNamespace;
+            string? rootName;
+
+            try
+            {
+                using var document = new XamlDocument(new ClosedXamlBodyProvider(xamlFilePath));
+                if (!document.GetRootInfo(out rootNamespace, out rootName))
+                {
+                    return false;
+                }
+            }
+            catch (System.IO.IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+
+            var fullName = string.IsNullOrEmpty(rootNamespace)
+                ? rootName!
+                : rootNamespace + "." + rootName;
+
+            foreach (var project in workspace.GetProjectsOfFolderOf(xamlFilePath))
+            {
+                var compilation = await project.GetCompilationAsync(cancellationToken);
+
+                var type = compilation?.GetTypeByMetadataName(fullName);
+                if (type == null)
+                {
+                    continue;
+                }
+
+                if (type.DeclaringSyntaxReferences.Any(r => !GeneratedCode.IsGeneratedFile(r.SyntaxTree.FilePath)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static async Task<AdjustPlanResult> PlanCsAsync(
@@ -255,6 +321,29 @@ namespace AdjustNamespace.Adjusting.Plan
                     //whatever we do with the using clauses, one of these projects breaks
                     return AdjustPlanResult.ForBlock(
                         AdjustBlock.Create(subjectFilePath, AdjustBlockKind.NamespaceStateContradictory)
+                        );
+                }
+
+                if (transition.KeepsOriginalAlive)
+                {
+                    continue;
+                }
+
+                //the namespace is imported by a project file and this file is the last thing in
+                //it; several files which empty it only together are caught by SubjectFileCollector
+                var importingProject = await workspace.TryFindProjectImportingEmptiedNamespaceAsync(
+                    transition.OriginalName,
+                    new[] { subjectFilePath },
+                    cancellationToken
+                    );
+                if (importingProject != null)
+                {
+                    return AdjustPlanResult.ForBlock(
+                        AdjustBlock.NamespaceImportedByProjectFile(
+                            subjectFilePath,
+                            transition.OriginalName,
+                            importingProject
+                            )
                         );
                 }
             }

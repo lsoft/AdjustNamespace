@@ -122,6 +122,10 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 edits
                 );
 
+            //fix the `[assembly: XmlnsDefinition(uri, "A.B")]` of the namespaces the types leave
+            await new XmlnsDefinitionFixer(_workspace, edits, _subjectFilePath)
+                .FixAsync(processedTypes.Values.Distinct().ToList(), cancellationToken);
+
             //move the namespaces of the current file; only the root ones are moved, the nested
             //ones follow them automatically because their full name contains the root one
             foreach (var transition in _transitions.Transitions.Where(t => t.IsRoot))
@@ -336,9 +340,13 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
                 using var testDocument = await xamlEngine.CreateForReadAsync(xamlFilePath);
 
+                //a `clr-namespace:` mapping without `;assembly=` points to the assembly of the xaml
+                var documentAssembly = _workspace.TryGetAssemblyNameOfFile(xamlFilePath);
+
                 var modifiedTestDocument = PerformChanges(
                     testDocument,
-                    processedTypes
+                    processedTypes,
+                    documentAssembly
                     );
 
                 if (!modifiedTestDocument.IsChangesExists(testDocument))
@@ -350,7 +358,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
 
                 var modifiedRealDocument = PerformChanges(
                     realDocument,
-                    processedTypes
+                    processedTypes,
+                    documentAssembly
                     );
 
                 modifiedRealDocument.SaveIfChangesExistsAgainst(realDocument);
@@ -360,24 +369,61 @@ namespace AdjustNamespace.Adjusting.Adjuster
         /// <summary>
         /// Apply the namespace transitions of every moved type to the given xaml document.
         /// <see cref="XamlDocument"/> is immutable, hence a new document is returned.
+        ///
+        /// A nested type is skipped: xaml names it through its outer type
+        /// (<c>local:Outer+Inner</c>), which moves itself, and its simple name alone would
+        /// match an unrelated top-level type of the same name (<c>local:Inner</c>).
         /// </summary>
-        private XamlDocument PerformChanges(
+        /// <param name="document">The xaml document.</param>
+        /// <param name="processedTypes">The moved types with their transitions.</param>
+        /// <param name="documentAssembly">The assembly the xaml belongs to, if known.</param>
+        private static XamlDocument PerformChanges(
             XamlDocument document,
-            Dictionary<INamedTypeSymbol, NamespaceTransition> processedTypes
+            Dictionary<INamedTypeSymbol, NamespaceTransition> processedTypes,
+            string? documentAssembly
             )
         {
             var result = document;
 
             foreach (var pair in processedTypes)
             {
+                var type = pair.Key;
+                if (type.ContainingType != null)
+                {
+                    continue;
+                }
+
                 result = result.MoveObject(
-                    pair.Key.ContainingNamespace.ToDisplayString(),
-                    pair.Key.Name,
-                    pair.Value.ModifiedName
+                    new XamlMove(
+                        type.ContainingNamespace.ToDisplayString(),
+                        type.Name,
+                        pair.Value.ModifiedName,
+                        type.ContainingAssembly?.Name,
+                        documentAssembly,
+                        AllowsShortExtensionName(type)
+                        )
                     );
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Xaml may write the given class without its <c>Extension</c> suffix, unless its
+        /// namespace has a class of that shorter name as well, see <see cref="XamlMove.AllowsShortExtensionName"/>.
+        /// </summary>
+        private static bool AllowsShortExtensionName(INamedTypeSymbol type)
+        {
+            const string Suffix = "Extension";
+
+            if (!type.Name.EndsWith(Suffix, StringComparison.Ordinal) || type.Name.Length == Suffix.Length)
+            {
+                return false;
+            }
+
+            var shortName = type.Name.Substring(0, type.Name.Length - Suffix.Length);
+
+            return type.ContainingNamespace.GetTypeMembers(shortName).Length == 0;
         }
     }
 }

@@ -1,4 +1,7 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using AdjustNamespace.Namespace;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -276,6 +279,221 @@ namespace AdjustNamespace.Roslyn
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// A project which imports the given namespace through its project file
+        /// (<c>&lt;Using Include="A.B" /&gt;</c>), while moving the given files out of that
+        /// namespace would leave it empty for that project.
+        ///
+        /// Such an item becomes a <c>global using global::A.B;</c> of a file MSBuild generates
+        /// into <c>obj</c> on every build. The clause of a namespace which does not exist does
+        /// not compile (CS0246), and the adjusting can fix neither the generated file (it is
+        /// written again out of the project file) nor the project file itself.
+        ///
+        /// A namespace exists as long as anything is left in it or in any of its child
+        /// namespaces, including the types of the referenced assemblies.
+        /// </summary>
+        /// <param name="workspace">The workspace of the solution.</param>
+        /// <param name="namespaceName">The namespace the files are moved out of.</param>
+        /// <param name="movingFilePaths">The files whose types leave that namespace.</param>
+        /// <param name="cancellationToken">Cancellation of the session.</param>
+        /// <returns>The name of the first such project, or <c>null</c> if there is none.</returns>
+        public static async Task<string?> TryFindProjectImportingEmptiedNamespaceAsync(
+            this Workspace workspace,
+            string namespaceName,
+            IEnumerable<string> movingFilePaths,
+            CancellationToken cancellationToken = default
+            )
+        {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
+
+            if (namespaceName is null)
+            {
+                throw new ArgumentNullException(nameof(namespaceName));
+            }
+
+            if (movingFilePaths is null)
+            {
+                throw new ArgumentNullException(nameof(movingFilePaths));
+            }
+
+            var moving = new HashSet<string>(movingFilePaths, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var project in workspace.CurrentSolution.Projects)
+            {
+                if (!await IsImportedByGeneratedGlobalUsingAsync(project, namespaceName, cancellationToken))
+                {
+                    continue;
+                }
+
+                var compilation = await project.GetCompilationAsync(cancellationToken);
+                if (compilation == null)
+                {
+                    continue;
+                }
+
+                var @namespace = compilation.TryFindNamespace(namespaceName);
+                if (@namespace == null)
+                {
+                    //the clause does not compile already, and the move changes nothing about it
+                    continue;
+                }
+
+                var keptAlive = @namespace
+                    .GetAllTypes()
+                    .Any(type => !IsDeclaredIn(type, moving));
+                if (!keptAlive)
+                {
+                    AdjustLog.WriteLine(
+                        $"[Adjust] {project.Name} imports {namespaceName} by its project file, "
+                        + "and the move leaves that namespace empty"
+                        );
+
+                    return project.Name;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The project has a generated file (see <see cref="GeneratedCode"/>) with a plain
+        /// <c>global using</c> of the given namespace.
+        /// </summary>
+        private static async Task<bool> IsImportedByGeneratedGlobalUsingAsync(
+            Microsoft.CodeAnalysis.Project project,
+            string namespaceName,
+            CancellationToken cancellationToken
+            )
+        {
+            foreach (var document in project.Documents)
+            {
+                if (!GeneratedCode.IsGeneratedFile(document.FilePath))
+                {
+                    continue;
+                }
+
+                if (!(await document.GetSyntaxRootAsync(cancellationToken) is CompilationUnitSyntax root))
+                {
+                    continue;
+                }
+
+                foreach (var usingDirective in root.Usings)
+                {
+                    if (usingDirective.GlobalKeyword.IsKind(SyntaxKind.None)
+                        || !usingDirective.StaticKeyword.IsKind(SyntaxKind.None)
+                        || usingDirective.Alias != null
+                        || usingDirective.Name == null
+                        )
+                    {
+                        continue;
+                    }
+
+                    if (NamespaceHelper.NormalizeUsingName(usingDirective.Name.ToString()) == namespaceName)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Every declaration of the type is written in one of the given files. A type of a
+        /// referenced assembly has no declaration in the source at all and is never moved.
+        /// </summary>
+        private static bool IsDeclaredIn(
+            INamedTypeSymbol type,
+            HashSet<string> filePaths
+            )
+        {
+            var references = type.DeclaringSyntaxReferences;
+            if (references.Length == 0)
+            {
+                return false;
+            }
+
+            return references.All(r => filePaths.Contains(r.SyntaxTree.FilePath));
+        }
+
+        /// <summary>
+        /// The Roslyn projects of the project whose folder contains the given file: the
+        /// innermost such folder wins, and a multi target project gives a Roslyn project per
+        /// target framework. Used for the files which are no documents of the workspace (xaml).
+        /// </summary>
+        public static List<Microsoft.CodeAnalysis.Project> GetProjectsOfFolderOf(
+            this Workspace workspace,
+            string filePath
+            )
+        {
+            if (workspace is null)
+            {
+                throw new ArgumentNullException(nameof(workspace));
+            }
+
+            if (filePath is null)
+            {
+                throw new ArgumentNullException(nameof(filePath));
+            }
+
+            var result = new List<Microsoft.CodeAnalysis.Project>();
+            var bestLength = -1;
+
+            foreach (var project in workspace.CurrentSolution.Projects)
+            {
+                if (string.IsNullOrEmpty(project.FilePath))
+                {
+                    continue;
+                }
+
+                var folder = System.IO.Path.GetDirectoryName(project.FilePath);
+                if (string.IsNullOrEmpty(folder))
+                {
+                    continue;
+                }
+
+                folder = folder!.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar)
+                    + System.IO.Path.DirectorySeparatorChar;
+
+                if (!filePath.StartsWith(folder, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (folder.Length > bestLength)
+                {
+                    bestLength = folder.Length;
+                    result.Clear();
+                }
+
+                if (folder.Length == bestLength)
+                {
+                    result.Add(project);
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The assembly of the project whose folder contains the given file,
+        /// see <see cref="GetProjectsOfFolderOf"/>.
+        /// </summary>
+        /// <returns><c>null</c> if no project folder contains the file.</returns>
+        public static string? TryGetAssemblyNameOfFile(
+            this Workspace workspace,
+            string filePath
+            )
+        {
+            return workspace
+                .GetProjectsOfFolderOf(filePath)
+                .Select(p => p.AssemblyName)
+                .FirstOrDefault();
         }
 
         /// <summary>

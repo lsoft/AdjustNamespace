@@ -198,6 +198,23 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             {
                 syntax = ps.Type;
             }
+            //the same tie for a nameless tuple element (`(Cat, int)`, also among the case
+            //types of a union: `union Pet((Cat, int), Dog)`): the element consists of its
+            //type only and FindNode answers the outermost node of a tie
+            if (syntax is TupleElementSyntax tes
+                && tes.Identifier.IsKind(SyntaxKind.None)
+                )
+            {
+                syntax = tes.Type;
+            }
+            //an indexer (an extension indexer of C# 15 above all: `cat[0]`) is reported as an
+            //empty span in front of its argument list, and that list has no symbol of its own
+            if (syntax is BracketedArgumentListSyntax bals
+                && bals.Parent is ElementAccessExpressionSyntax eaes
+                )
+            {
+                syntax = eaes;
+            }
 
             var semanticModel = await document.GetSemanticModelAsync(cancellationToken);
             if (semanticModel == null)
@@ -681,6 +698,43 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
                     foundReferences.AddRange(
                         methodFoundReferencesList
+                        );
+                }
+
+                //the members of the extension blocks of C# 14 (`extension(Cat cat) { ... }`).
+                //An instance method of a block has a classic extension method behind it, which
+                //the query above finds, but a property, a static member, an operator and an
+                //indexer have nothing like that: the calls of them are found only by asking
+                //for every member of the block. A location reported twice is skipped later.
+                var extensionBlockMembers = (
+                    from nestedType in symbolInfo.GetTypeMembers()
+                    where nestedType.IsExtensionBlock()
+                    from member in nestedType.GetMembers()
+                    where !member.IsImplicitlyDeclared
+                    where member.Kind.In(SymbolKind.Method, SymbolKind.Property, SymbolKind.Event)
+                    //an accessor is reached through its property or event
+                    where !(member is IMethodSymbol accessor && accessor.AssociatedSymbol != null)
+                    select member
+                    )
+                    .ToList();
+
+                foreach (var extensionBlockMember in extensionBlockMembers)
+                {
+                    var memberFoundReferences = await SymbolFinder.FindReferencesAsync(
+                        extensionBlockMember,
+                        workspace.CurrentSolution,
+                        cancellationToken
+                        );
+                    var memberFoundReferencesList = memberFoundReferences.ToList();
+
+                    AdjustLog.WriteLine(
+                        $"[Adjust] RefProcessor: SymbolFinder.FindReferencesAsync({extensionBlockMember.ToDisplayString()}) "
+                        + $"(extension block member) -> {memberFoundReferencesList.Count} symbol(s), "
+                        + $"{memberFoundReferencesList.Sum(r => r.Locations.Count())} location(s) total"
+                        );
+
+                    foundReferences.AddRange(
+                        memberFoundReferencesList
                         );
                 }
             }

@@ -10,9 +10,7 @@
         /// Rewrite this fragment if it references the given class.
         /// </summary>
         /// <param name="structure">Structure of the document (to resolve and to create the xmlns aliases).</param>
-        /// <param name="sourceNamespace">Namespace the class lives in now.</param>
-        /// <param name="objectClassName">Name of the class (without the namespace).</param>
-        /// <param name="targetNamespace">Namespace the class is being moved into.</param>
+        /// <param name="move">What moves where.</param>
         /// <param name="xaml">(in/out) Body of the xaml document.</param>
         /// <param name="newXmlns">
         /// (out) A new clr-namespace declaration which has to be added to the document,
@@ -21,9 +19,7 @@
         /// <returns><c>true</c> if the fragment has been rewritten.</returns>
         bool Perform(
             XamlStructure structure,
-            string sourceNamespace,
-            string objectClassName,
-            string targetNamespace,
+            in XamlMove move,
             ref string xaml,
             out XamlXmlns? newXmlns
             );

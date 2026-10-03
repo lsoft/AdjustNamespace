@@ -1,6 +1,6 @@
 # Adjust Namespaces
 
-AdjustNamespace is a Visual Studio 2022 extension which brings the C# namespaces in accordance with the location and **rules the resulting regressions in the code (including XAML), e.g. fixes the broken references**. This extension works like Resharper `Adjust namespaces` function. If you know Resharper, you know what this extension is trying to do.
+AdjustNamespace is a Visual Studio 2026 extension which brings the C# namespaces in accordance with the location and **rules the resulting regressions in the code (including XAML), e.g. fixes the broken references**. This extension works like Resharper `Adjust namespaces` function. If you know Resharper, you know what this extension is trying to do.
 
 The same job is done by the console utility `adjustns` (see [Console utility](#console-utility)), which needs no Visual Studio at all and is therefore usable on a build server.
 
@@ -156,9 +156,12 @@ A few things which are worth to know:
 
 ## Requirements
 
-- Visual Studio 2022 (17.0 - 18.0), amd64 or arm64;
+- Visual Studio 2026 (18.0 and newer 18.x), amd64 or arm64. Visual Studio 2022 is supported up
+  to version 0.6.0 of the extension: the newer ones are compiled against the Roslyn of Visual
+  Studio 2026, which Visual Studio 2022 cannot load;
 - .NET Framework 4.8 (to build the extension);
-- .NET 8 SDK (to build and to run the console utility; a newer SDK is fine too).
+- .NET 10 SDK (to build and to run the console utility; a newer SDK is fine too). The adjusted
+  projects themselves may target any framework the installed SDK can build.
 
 The extension is a single `AnyCPU` payload which is installed into both the amd64 and the arm64
 Visual Studio, so it is built on either of them and no arm64 machine is needed to produce it.
@@ -167,7 +170,7 @@ One thing is worth to know on arm64: the SQL Server Data Tools are not available
 
 ## Building from sources
 
-1. Install Visual Studio 2022 with the `Visual Studio extension development` workload.
+1. Install Visual Studio 2026 with the `Visual Studio extension development` workload.
 2. Open `AdjustNamespace.sln` and build it. The dependencies (Community.VisualStudio.Toolkit, Roslyn, VSSDK build tools) are restored from NuGet.
 3. Press F5: an experimental instance of Visual Studio with the extension installed is started.
 
@@ -175,11 +178,11 @@ The solution consists of:
 
 - `AdjustNamespace.CoreShared` — a shared project with the core: everything which knows nothing about Visual Studio;
 - `AdjustNamespace.VsixShared` — a shared project with the wizard, the menu commands and the boundary to the IDE;
-- `AdjustNamespace.2022` — the VSIX project for Visual Studio 2022 (the manifest, the command table, the resources);
-- `AdjustNamespace.Cli` — the console utility (`net8.0`), the core over an `MSBuildWorkspace`;
+- `AdjustNamespace.2022` — the VSIX project (the manifest, the command table, the resources); it keeps its old name, but targets Visual Studio 2026;
+- `AdjustNamespace.Cli` — the console utility (`net10.0`), the core over an `MSBuildWorkspace`;
 - `Tests/AdjustNamespace.Tests` — the automated tests of the core (`dotnet test`).
 
-The code which depends on the Visual Studio version is guarded with the `VS2022` conditional compilation symbol.
+There is no code which depends on the Visual Studio version: a single Visual Studio is supported.
 
 ## Tests
 

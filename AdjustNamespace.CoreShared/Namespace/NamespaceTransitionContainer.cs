@@ -194,12 +194,10 @@ namespace AdjustNamespace.Namespace
                     return TryGetNamespaceTransitionInfo(nds, root);
                 }
 
-#if VS2022
                 if (p is FileScopedNamespaceDeclarationSyntax fsnds)
                 {
                     return TryGetNamespaceTransitionInfo(fsnds, root);
                 }
-#endif
 
                 p = p.Parent;
             }
@@ -222,7 +220,6 @@ namespace AdjustNamespace.Namespace
                 select ni.Value
                 ).ToList();
 
-#if VS2022
             var candidateNamespaces2 = (
                 from dnode in node.DescendantNodesAndSelf()
                 let fsndnode = dnode as FileScopedNamespaceDeclarationSyntax
@@ -234,12 +231,9 @@ namespace AdjustNamespace.Namespace
                 ).ToList();
 
             candidateNamespaces.AddRange(candidateNamespaces2);
-#endif
 
             return candidateNamespaces;
         }
-
-#if VS2022
 
         /// <summary>
         /// Build a transition for a file scoped namespace declaration (<c>namespace A;</c>).
@@ -275,8 +269,6 @@ namespace AdjustNamespace.Namespace
                 true
                 );
         }
-
-#endif
 
         /// <summary>
         /// Build a transition for a classic namespace declaration (<c>namespace A { }</c>).

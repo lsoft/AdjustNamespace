@@ -45,5 +45,21 @@ namespace AdjustNamespace.Adjusting.Plan
         /// itself cannot be moved either.
         /// </summary>
         XamlCodeBehindMultiProject,
+
+        /// <summary>
+        /// The namespace the file leaves is imported by a project file
+        /// (<c>&lt;Using Include="A.B" /&gt;</c>, which becomes a <c>global using</c> of a
+        /// generated file in <c>obj</c>), and the move would leave that namespace empty.
+        /// The generated file is written again out of the project file on every build, and
+        /// the adjusting does not edit the project files, so the build would break (CS0246).
+        /// </summary>
+        NamespaceImportedByProjectFile,
+
+        /// <summary>
+        /// A type of the file is partial, and another part of it (the designer file of a
+        /// Windows Forms form, for example) is not adjusted together with it or would land in
+        /// another namespace: the parts would become two different classes.
+        /// </summary>
+        PartialTypeSplit,
     }
 }

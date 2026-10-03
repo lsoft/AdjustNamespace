@@ -39,14 +39,17 @@ namespace AdjustNamespace.Xaml.Positioned
         /// <param name="index">Index of the attribute in the xaml body.</param>
         /// <param name="length">Length of the attribute.</param>
         /// <param name="fullClassName">Value of the attribute (the full class name).</param>
+        /// <param name="quote">The quote the value is written in.</param>
         public XamlClass(
             int index,
             int length,
-            string fullClassName
+            string fullClassName,
+            char quote = '"'
             )
         {
             Index = index;
             Length = length;
+            Quote = quote;
 
             var dotIndex = fullClassName.LastIndexOf('.');
             if (dotIndex > 0)
@@ -62,24 +65,33 @@ namespace AdjustNamespace.Xaml.Positioned
         }
 
         /// <inheritdoc/>
+        /// <summary>
+        /// The quote the value is written in; it is written back as it is.
+        /// </summary>
+        public char Quote
+        {
+            get;
+        }
+
+        /// <inheritdoc/>
         public bool Perform(
             XamlStructure structure,
-            string sourceNamespace,
-            string objectClassName,
-            string targetNamespace,
+            in XamlMove move,
             ref string xaml,
             out XamlXmlns? newXmlns
             )
         {
             newXmlns = null;
 
-            if (ClassName != objectClassName)
+            if (ClassName != move.ClassName)
             {
                 return false;
             }
 
-            if (Namespace != sourceNamespace)
+            if (Namespace.Length == 0 || Namespace != move.SourceNamespace)
             {
+                //a class of the global namespace is never moved: its code behind
+                //has no namespace declaration to move
                 return false;
             }
 
@@ -88,7 +100,7 @@ namespace AdjustNamespace.Xaml.Positioned
             var xPrefix = structure.GetXPrefix();
 
             xaml = xaml.Substring(0, Index)
-                + $@"{xPrefix.Alias}:Class=""{targetNamespace}.{ClassName}"""
+                + $"{xPrefix.Alias}:Class={Quote}{move.TargetNamespace}.{ClassName}{Quote}"
                 + xaml.Substring(Index + Length)
                 ;
             return true;

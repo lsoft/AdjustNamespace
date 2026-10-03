@@ -38,6 +38,51 @@ namespace AdjustNamespace.Roslyn
                     yield return type;
         }
 
+        /// <summary>
+        /// The type is an extension block of C# 14 (<c>extension(Cat cat) { ... }</c> inside
+        /// a static class). Roslyn shows such a block as a nested type of its static class.
+        /// </summary>
+        public static bool IsExtensionBlock(this INamedTypeSymbol type)
+        {
+            return type.TypeKind == TypeKind.Extension;
+        }
+
+        /// <summary>
+        /// The static class whose import makes the given member callable without writing
+        /// that class: the class of a classic extension method (<c>this Cat cat</c>) or of
+        /// an extension block member (an extension property, a static extension member, an
+        /// extension operator or indexer).
+        ///
+        /// Such a call (<c>cat.Shout()</c>, <c>Cat.Create()</c>, <c>a + b</c>, <c>cat[0]</c>)
+        /// writes neither the class nor its namespace and resolves only because a using
+        /// clause or an enclosing namespace imports that class.
+        /// </summary>
+        /// <returns><c>null</c> if the member is visible without any import.</returns>
+        public static INamedTypeSymbol? TryGetImportedExtensionContainer(this ISymbol member)
+        {
+            var containingType = member.ContainingType;
+            if (containingType == null)
+            {
+                return null;
+            }
+
+            if (containingType.IsExtensionBlock())
+            {
+                return containingType.ContainingType;
+            }
+
+            if (member is IMethodSymbol method)
+            {
+                var extensionMethod = method.ReducedFrom ?? method;
+                if (extensionMethod.IsExtensionMethod)
+                {
+                    return extensionMethod.ContainingType;
+                }
+            }
+
+            return null;
+        }
+
 
         /// <summary>
         /// The namespace with the given full name, as this compilation sees it

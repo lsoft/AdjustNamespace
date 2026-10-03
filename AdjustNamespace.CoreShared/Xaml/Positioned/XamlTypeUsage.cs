@@ -10,12 +10,24 @@ namespace AdjustNamespace.Xaml.Positioned
     /// <item>an attribute value: <c>TargetType="local:MyButton"</c>, <c>DataType="local:Item"</c>;</item>
     /// <item>an attached property: <c>&lt;Button attached:Helper.IsEnabled="True" /&gt;</c>;</item>
     /// <item>a custom markup extension: <c>{conv:UpperCase}</c>;</item>
-    /// <item>the type arguments of a generic control: <c>x:TypeArguments="local:Item"</c>.</item>
+    /// <item>the type arguments of a generic control: <c>x:TypeArguments="local:Item"</c>;</item>
+    /// <item>an Avalonia style selector, which separates the alias with a <c>|</c>:
+    /// <c>Selector="local|MyButton:pointerover"</c>.</item>
     /// </list>
     /// All of them are references to a class and have to follow it into its new namespace.
     /// </summary>
     public class XamlTypeUsage : IXamlPerformable
     {
+        /// <summary>
+        /// The separator of an ordinary xaml name.
+        /// </summary>
+        public const char NameSeparator = ':';
+
+        /// <summary>
+        /// The separator of an Avalonia style selector.
+        /// </summary>
+        public const char SelectorSeparator = '|';
+
         /// <inheritdoc/>
         public int Index
         {
@@ -58,12 +70,22 @@ namespace AdjustNamespace.Xaml.Positioned
             get;
         }
 
+        /// <summary>
+        /// <see cref="NameSeparator"/> or <see cref="SelectorSeparator"/>: the character between
+        /// the alias and the name, which is written back as it is.
+        /// </summary>
+        public char Separator
+        {
+            get;
+        }
+
         public XamlTypeUsage(
             int index,
             int length,
             string alias,
             string className,
-            bool isMarkupExtension
+            bool isMarkupExtension,
+            char separator = NameSeparator
             )
         {
             Index = index;
@@ -71,54 +93,44 @@ namespace AdjustNamespace.Xaml.Positioned
             Alias = alias;
             ClassName = className;
             IsMarkupExtension = isMarkupExtension;
+            Separator = separator;
         }
 
         /// <inheritdoc/>
         public bool Perform(
             XamlStructure structure,
-            string sourceNamespace,
-            string objectClassName,
-            string targetNamespace,
+            in XamlMove move,
             ref string xaml,
             out XamlXmlns? newXmlns
             )
         {
-            if (sourceNamespace == null)
-                throw new ArgumentNullException(nameof(sourceNamespace));
-
-            if (objectClassName == null)
-                throw new ArgumentNullException(nameof(objectClassName));
-
-            if (targetNamespace == null)
-                throw new ArgumentNullException(nameof(targetNamespace));
-
             if (xaml == null)
                 throw new ArgumentNullException(nameof(xaml));
 
             newXmlns = null;
 
-            if (!IsReferenceTo(objectClassName))
+            if (!IsReferenceTo(move))
             {
                 return false;
             }
 
-            var sourceXmlns = structure.GetByAlias(Alias);
-            if (sourceXmlns == null || sourceXmlns.Namespace != sourceNamespace)
+            var sourceXmlns = structure.GetByAlias(Alias, Index);
+            if (!move.IsMappedBy(sourceXmlns))
             {
-                //the alias is unknown (it is not a clr-namespace one)
-                //or it points to another namespace
+                //the alias is unknown (it is not a clr-namespace one), it points to another
+                //namespace or to the same namespace of another assembly
                 return false;
             }
 
             //match!
 
             //get or create new xmlns
-            var targetXmlns = structure.TryGetByNamespace(targetNamespace, sourceXmlns.Suffix);
+            var targetXmlns = structure.TryGetByNamespace(move.TargetNamespace, sourceXmlns!.Suffix, Index);
             if (targetXmlns == null)
             {
                 targetXmlns = new XamlXmlns(
                     sourceXmlns,
-                    targetNamespace
+                    move.TargetNamespace
                     );
                 newXmlns = targetXmlns;
             }
@@ -126,24 +138,21 @@ namespace AdjustNamespace.Xaml.Positioned
             //the name itself is written back as the user has written it:
             //a markup extension may be named without the `Extension` suffix of its class
             xaml = xaml.Substring(0, Index)
-                + $"{targetXmlns.Alias}:{ClassName}"
+                + $"{targetXmlns.Alias}{Separator}{ClassName}"
                 + xaml.Substring(Index + Length)
                 ;
             return true;
         }
 
-        /// <summary>
-        /// This pair references the class with the given name.
-        /// </summary>
-        private bool IsReferenceTo(string objectClassName)
+        private bool IsReferenceTo(in XamlMove move)
         {
-            if (ClassName == objectClassName)
+            if (ClassName == move.ClassName)
             {
                 return true;
             }
 
             //`{conv:UpperCase}` is a reference to `UpperCaseExtension` as well
-            return IsMarkupExtension && objectClassName == ClassName + "Extension";
+            return IsMarkupExtension && move.IsNamed(ClassName);
         }
     }
 }

@@ -2,7 +2,9 @@
 # thing which really has to be proven is that the arm64 Visual Studio accepts it: an
 # installation is refused by the architecture declared in the manifest and by nothing else.
 # The GitHub hosted `windows-11-arm` image is a Windows 11 arm64 machine with an arm64
-# Visual Studio 2022 and the `Visual Studio extension development` workload on it.
+# Visual Studio 2026 and the `Visual Studio extension development` workload on it (it has
+# migrated from Visual Studio 2022 in September 2026). The extension supports Visual Studio
+# 2026 (18.x) only, see the InstallationTarget of the manifest.
 name: arm64
 
 on:
@@ -20,14 +22,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Locate Visual Studio 2022
+      - name: Locate Visual Studio 2026
         id: vs
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $path = & $vswhere -latest -prerelease -products * -version '[17.0,18.0)' -property installationPath
+          $path = & $vswhere -latest -prerelease -products * -version '[18.0,19.0)' -property installationPath
           if (-not $path) {
-              throw 'No Visual Studio 2022 on the runner. The windows-11-arm image migrates to Visual Studio 2026 in September 2026 - pin the image version or widen the InstallationTarget of the manifest.'
+              throw 'No Visual Studio 2026 on the runner, while the manifest targets [18.0, 19.0) only. Check the Visual Studio of the windows-11-arm image.'
           }
           "path=$path" >> $env:GITHUB_OUTPUT
           "msbuild=$path\MSBuild\Current\Bin\MSBuild.exe" >> $env:GITHUB_OUTPUT

@@ -74,6 +74,32 @@ namespace AdjustNamespace.Adjusting.Plan
                 );
         }
 
+        public static AdjustBlock NamespaceImportedByProjectFile(
+            string filePath,
+            string namespaceName,
+            string projectName
+            )
+        {
+            return new AdjustBlock(
+                filePath,
+                AdjustBlockKind.NamespaceImportedByProjectFile,
+                $"'{namespaceName}' would become empty, but the project '{projectName}' imports it "
+                + $"(<Using Include=\"{namespaceName}\" />); remove that item from the project file first"
+                );
+        }
+
+        public static AdjustBlock PartialTypeSplit(
+            string filePath,
+            string message
+            )
+        {
+            return new AdjustBlock(
+                filePath,
+                AdjustBlockKind.PartialTypeSplit,
+                message
+                );
+        }
+
         private static string MessageOf(
             AdjustBlockKind kind
             )
@@ -100,6 +126,12 @@ namespace AdjustNamespace.Adjusting.Plan
 
                 case AdjustBlockKind.TypeNameConflict:
                     return "The target namespace already contains a type of the same name.";
+
+                case AdjustBlockKind.NamespaceImportedByProjectFile:
+                    return "The old namespace would become empty, but a project file imports it.";
+
+                case AdjustBlockKind.PartialTypeSplit:
+                    return "Another part of a partial type of the file is not adjusted together with it.";
 
                 default:
                     return "The file cannot be adjusted.";

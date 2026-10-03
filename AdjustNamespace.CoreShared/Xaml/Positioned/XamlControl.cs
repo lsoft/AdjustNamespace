@@ -3,7 +3,9 @@
 namespace AdjustNamespace.Xaml.Positioned
 {
     /// <summary>
-    /// A tag which references a class through an xmlns alias: <c>&lt;alias:ClassName ...</c>.
+    /// A tag which references a class through an xmlns alias: <c>&lt;alias:ClassName ...</c>,
+    /// or a tag without a prefix (<see cref="Alias"/> is empty), which references a class
+    /// when the default declaration in scope maps a CLR namespace.
     /// </summary>
     public class XamlControl : IXamlPerformable
     {
@@ -61,49 +63,46 @@ namespace AdjustNamespace.Xaml.Positioned
         /// <inheritdoc/>
         public bool Perform(
             XamlStructure structure,
-            string sourceNamespace,
-            string objectClassName,
-            string targetNamespace,
+            in XamlMove move,
             ref string xaml,
             out XamlXmlns? newXmlns
             )
         {
-            if (sourceNamespace == null)
-                throw new ArgumentNullException(nameof(sourceNamespace));
-
-            if (objectClassName == null)
-                throw new ArgumentNullException(nameof(objectClassName));
-
-            if (targetNamespace == null)
-                throw new ArgumentNullException(nameof(targetNamespace));
-
             if (xaml == null)
                 throw new ArgumentNullException(nameof(xaml));
 
             newXmlns = null;
 
-            if (ClassName != objectClassName)
+            //a markup extension may be written as an element without its `Extension` suffix
+            if (!move.IsNamed(ClassName))
             {
                 return false;
             }
 
-            var sourceXmlns = structure.GetByAlias(Alias);
-            if (sourceXmlns == null || sourceXmlns.Namespace != sourceNamespace)
+            var sourceXmlns = structure.GetByAlias(Alias, Index);
+            if (!move.IsMappedBy(sourceXmlns))
             {
-                //the alias is unknown (it is not a clr-namespace one)
-                //or it points to another namespace
+                //the alias is unknown (it is not a clr-namespace one), it points to another
+                //namespace or to the same namespace of another assembly
+                return false;
+            }
+
+            if (Alias.Length == 0
+                && structure.IsDefaultDeclarationOfMovedClassOnly(sourceXmlns!, move))
+            {
+                //the default declaration itself follows the class, see XamlXmlns.Perform
                 return false;
             }
 
             //match!
 
             //get or create new xmlns
-            var targetXmlns = structure.TryGetByNamespace(targetNamespace, sourceXmlns.Suffix);
+            var targetXmlns = structure.TryGetByNamespace(move.TargetNamespace, sourceXmlns!.Suffix, Index);
             if (targetXmlns == null)
             {
                 targetXmlns = new XamlXmlns(
                     sourceXmlns,
-                    targetNamespace
+                    move.TargetNamespace
                     );
                 newXmlns = targetXmlns;
             }

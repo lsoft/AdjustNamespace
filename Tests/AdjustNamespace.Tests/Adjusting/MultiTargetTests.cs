@@ -226,6 +226,10 @@ namespace A.Other
         /// target framework, and the rule which skips a file compiled by several projects
         /// (see <see cref="SharedProjectTests.A_xaml_of_a_shared_project_is_not_adjusted"/>)
         /// must not catch this one.
+        ///
+        /// The `x:Class` belongs to the class of the code behind: the xaml itself is no subject
+        /// (it is neither blocked nor planned), and the `x:Class` follows the class when the
+        /// code behind moves.
         /// </summary>
         [Fact]
         public async Task A_xaml_of_a_multi_target_project_is_adjusted()
@@ -246,15 +250,15 @@ namespace A.Other
     xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
 </Window>");
 
-            var plan = await AdjustPlanner.TryPlanAsync(solution.Workspace, xamlFilePath, "X.Y");
+            var result = await AdjustPlanner.PlanAsync(solution.Workspace, xamlFilePath, "X.Y");
 
-            Assert.NotNull(plan);
+            Assert.False(result.HasBlock);
+            Assert.False(result.HasPlan);
 
-            var adjuster = new XamlAdjuster(new ClosedXamlBodyProviderFactory(), plan!.Value);
+            await AdjustAsync(solution, "MyApp", "MainWindow.xaml.cs", "X.Y", xamlFilePath);
 
-            Assert.True(await adjuster.IsChangesExistsAsync());
-            Assert.True(await adjuster.AdjustAsync());
             Assert.Contains(@"x:Class=""X.Y.MainWindow""", solution.XamlTextOf("MyApp", "MainWindow.xaml"));
+            Assert.Empty(await solution.CompilationErrorsAsync());
         }
 
         /// <summary>

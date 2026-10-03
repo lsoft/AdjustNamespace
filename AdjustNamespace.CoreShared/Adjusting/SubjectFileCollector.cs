@@ -84,6 +84,7 @@ namespace AdjustNamespace.Adjusting
 
             var subjectFilePaths = _subjectFilePaths.ToList();
             var foundFileExs = new List<FileEx>();
+            var collectedCsPlans = new List<AdjustPlanItem>();
             var blocked = new List<AdjustBlock>();
 
             var total = subjectFilePaths.Count;
@@ -140,6 +141,8 @@ namespace AdjustNamespace.Adjusting
                         plan,
                         typesInSolutionPerNamespace
                         );
+
+                    collectedCsPlans.Add(plan);
                 }
 
                 foundFileExs.Add(
@@ -147,7 +150,211 @@ namespace AdjustNamespace.Adjusting
                     );
             }
 
+            var splitBlocks = await TryGetPartialTypeSplitBlocksAsync(collectedCsPlans);
+            if (splitBlocks.Count > 0)
+            {
+                var splitPaths = new HashSet<string>(
+                    splitBlocks.Select(b => b.FilePath),
+                    StringComparer.OrdinalIgnoreCase
+                    );
+
+                foundFileExs.RemoveAll(f => splitPaths.Contains(f.FilePath));
+                collectedCsPlans.RemoveAll(p => splitPaths.Contains(p.FilePath));
+                blocked.AddRange(splitBlocks);
+            }
+
+            var emptyingBlocks = await TryGetNamespaceImportedByProjectFileBlocksAsync(collectedCsPlans);
+            if (emptyingBlocks.Count > 0)
+            {
+                var blockedPaths = new HashSet<string>(
+                    emptyingBlocks.Select(b => b.FilePath),
+                    StringComparer.OrdinalIgnoreCase
+                    );
+
+                foundFileExs.RemoveAll(f => blockedPaths.Contains(f.FilePath));
+                blocked.AddRange(emptyingBlocks);
+            }
+
             return new SubjectCollectingResults(foundFileExs, blocked);
+        }
+
+        /// <summary>
+        /// The files which would tear a partial type apart: another part of a type of the file
+        /// (a form and its <c>.Designer.cs</c>, but any partial class) is not collected, or it
+        /// would land in another namespace. The parts would become two different classes.
+        ///
+        /// A part the build writes again (the code behind of a xaml, see
+        /// <see cref="GeneratedCode.IsWrittenByTheBuild"/>) follows by itself and does not count.
+        /// Blocking a file may leave its partner alone, so the check is repeated until nothing
+        /// changes.
+        /// </summary>
+        private async Task<List<AdjustBlock>> TryGetPartialTypeSplitBlocksAsync(
+            List<AdjustPlanItem> collectedCsPlans
+            )
+        {
+            var parts = new List<PartialPart>();
+
+            foreach (var plan in collectedCsPlans)
+            {
+                await ForEachMovingTypeAsync(
+                    plan,
+                    (symbolInfo, transition) =>
+                    {
+                        var otherFiles = symbolInfo.DeclaringSyntaxReferences
+                            .Select(r => r.SyntaxTree.FilePath)
+                            .Where(f => !string.IsNullOrEmpty(f))
+                            .Where(f => !string.Equals(f, plan.FilePath, StringComparison.OrdinalIgnoreCase))
+                            .Where(f => !GeneratedCode.IsWrittenByTheBuild(f))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+
+                        if (otherFiles.Count > 0)
+                        {
+                            parts.Add(
+                                new PartialPart(
+                                    plan.FilePath,
+                                    symbolInfo.ToDisplayString(),
+                                    symbolInfo.Name,
+                                    transition.ModifiedName,
+                                    otherFiles
+                                    )
+                                );
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                    );
+            }
+
+            var result = new List<AdjustBlock>();
+            var blockedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var changed = true;
+            while (changed)
+            {
+                changed = false;
+
+                var adjustedPaths = new HashSet<string>(
+                    collectedCsPlans.Select(p => p.FilePath).Where(f => !blockedPaths.Contains(f)),
+                    StringComparer.OrdinalIgnoreCase
+                    );
+
+                foreach (var part in parts)
+                {
+                    if (blockedPaths.Contains(part.FilePath))
+                    {
+                        continue;
+                    }
+
+                    string? message = null;
+
+                    var missing = part.OtherFiles.FirstOrDefault(f => !adjustedPaths.Contains(f));
+                    if (missing != null)
+                    {
+                        message = $"'{part.TypeName}' is partial, and its part in '{System.IO.Path.GetFileName(missing)}' is not adjusted together with it";
+                    }
+                    else if (parts.Any(o => o.Owner == part.Owner
+                        && !blockedPaths.Contains(o.FilePath)
+                        && o.TargetNamespace != part.TargetNamespace))
+                    {
+                        message = $"the parts of the partial '{part.TypeName}' would land in different namespaces";
+                    }
+
+                    if (message == null)
+                    {
+                        continue;
+                    }
+
+                    blockedPaths.Add(part.FilePath);
+                    result.Add(AdjustBlock.PartialTypeSplit(part.FilePath, message));
+                    changed = true;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// A part of a partial type in a collected file, see <see cref="TryGetPartialTypeSplitBlocksAsync"/>.
+        /// </summary>
+        private readonly struct PartialPart
+        {
+            public readonly string FilePath;
+
+            public readonly string Owner;
+
+            public readonly string TypeName;
+
+            public readonly string TargetNamespace;
+
+            public readonly List<string> OtherFiles;
+
+            public PartialPart(
+                string filePath,
+                string owner,
+                string typeName,
+                string targetNamespace,
+                List<string> otherFiles
+                )
+            {
+                FilePath = filePath;
+                Owner = owner;
+                TypeName = typeName;
+                TargetNamespace = targetNamespace;
+                OtherFiles = otherFiles;
+            }
+        }
+
+        /// <summary>
+        /// The planner blocks a single file which empties a namespace a project file imports,
+        /// see <see cref="AdjustBlockKind.NamespaceImportedByProjectFile"/>. Several files may
+        /// empty such a namespace only together, while every one of them alone leaves something
+        /// in it: all of them are blocked then, otherwise the build breaks after the run.
+        /// </summary>
+        private async Task<List<AdjustBlock>> TryGetNamespaceImportedByProjectFileBlocksAsync(
+            List<AdjustPlanItem> collectedCsPlans
+            )
+        {
+            var result = new List<AdjustBlock>();
+            var alreadyBlocked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var leavingFilesPerNamespace = (
+                from plan in collectedCsPlans
+                from transition in plan.Transitions.Transitions
+                where !transition.KeepsOriginalAlive
+                group plan.FilePath by transition.OriginalName
+                );
+
+            foreach (var group in leavingFilesPerNamespace)
+            {
+                var filePaths = group.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (filePaths.Count < 2)
+                {
+                    //a single file has been checked by the planner already
+                    continue;
+                }
+
+                var importingProject = await _context.Workspace.TryFindProjectImportingEmptiedNamespaceAsync(
+                    group.Key,
+                    filePaths
+                    );
+                if (importingProject == null)
+                {
+                    continue;
+                }
+
+                foreach (var filePath in filePaths)
+                {
+                    if (alreadyBlocked.Add(filePath))
+                    {
+                        result.Add(
+                            AdjustBlock.NamespaceImportedByProjectFile(filePath, group.Key, importingProject)
+                            );
+                    }
+                }
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -190,7 +397,9 @@ namespace AdjustNamespace.Adjusting
                         return Task.CompletedTask;
                     }
 
-                    if (typesInSolutionPerNamespace.CheckForTypeExists(transition.ModifiedName, symbolInfo.Name))
+                    //the other part of the same partial type (a form and its designer file)
+                    //reserves the same name, which is no conflict
+                    if (typesInSolutionPerNamespace.IsConflict(transition.ModifiedName, symbolInfo.Name, symbolInfo.ToDisplayString()))
                     {
                         conflict = AdjustBlock.TypeNameConflict(
                             plan.FilePath,
@@ -219,15 +428,16 @@ namespace AdjustNamespace.Adjusting
                 plan,
                 (symbolInfo, transition) =>
                 {
-                    typesInSolutionPerNamespace.Reserve(transition.ModifiedName, symbolInfo.Name);
+                    typesInSolutionPerNamespace.Reserve(transition.ModifiedName, symbolInfo.Name, symbolInfo.ToDisplayString());
                     return Task.CompletedTask;
                 }
                 );
         }
 
         /// <summary>
-        /// Walk every top-level type of the file which is going to move, with the
-        /// transition of the declaration it is written in.
+        /// Walk every top-level type of the file which is going to move and may conflict with
+        /// a type of the target namespace (a file-local type never does), with the transition
+        /// of the declaration it is written in.
         /// </summary>
         private async Task ForEachMovingTypeAsync(
             AdjustPlanItem plan,
@@ -271,6 +481,13 @@ namespace AdjustNamespace.Adjusting
                     {
                         //a nested type moves together with its outer type
                         //and never conflicts with a type of the target namespace
+                        continue;
+                    }
+
+                    if (symbolInfo.IsFileLocal)
+                    {
+                        //a file-local type is visible in its own file only and never
+                        //conflicts with a type of another file, see NamespaceTypeContainer.Add
                         continue;
                     }
 

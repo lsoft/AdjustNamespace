@@ -49,5 +49,14 @@ namespace AdjustNamespace.Namespace
             ModifiedName = modifiedName;
             IsRoot = isRoot;
         }
+
+        /// <summary>
+        /// The types land inside the original namespace (<c>A.B</c> into <c>A.B.C</c>), so
+        /// that namespace keeps existing after the move whatever else it contains.
+        /// </summary>
+        public bool KeepsOriginalAlive =>
+            ModifiedName == OriginalName
+            || ModifiedName.StartsWith(OriginalName + ".", StringComparison.Ordinal)
+            ;
     }
 }

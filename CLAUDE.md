@@ -30,7 +30,12 @@ Notes:
 - The 4 `MSB3277` warnings about conflicting `StreamJsonRpc` / `Microsoft.VisualStudio.*`
   versions are expected and pre-existing.
 - The post-build event recreates `Tests/Subject` from `Tests/Standard`, so a build always resets
-  the manual-test sample solution.
+  the manual-test sample solution. It relies on `$(SolutionDir)`: build the `.sln`, not the
+  `.csproj` alone, otherwise the event fails with `*Undefined*Tests\Subject`.
+- An incremental build does not refresh `obj/<Configuration>/extension.vsixmanifest`, so after a
+  change of `source.extension.vsixmanifest` (the version, above all) run `-t:Rebuild` and check
+  the `Identity` inside the produced `.vsix`. A plain build packed 0.5.1 long after the source
+  said 0.6.0.
 
 ## Testing
 
@@ -65,16 +70,17 @@ Notes:
   Take the narrowest dependency a class really needs — most of the core needs a `Workspace`
   and nothing else. The wizard itself is covered by the manual procedure only,
   see [Tests/README.md](Tests/README.md).
-- The test project references a **newer Roslyn than `AdjustNamespace.2022`** (only that compiler
-  understands the C# unions, see the note in [Tests/README.md](Tests/README.md)), so the code of
-  `AdjustNamespace.VsixShared` has to compile against both versions: do not use an API which
-  exists in one of them only. `Microsoft.VisualStudio.LanguageServices` has no release for that
-  Roslyn, hence the binding redirects and the explicit MEF composition in `TestSolution`; the
-  `NU1608` warnings about it are expected.
+- The test project references a **newer Roslyn than `AdjustNamespace.2022`** (5.9 against 5.0;
+  only that compiler understands the C# 15 preview features, see the note in
+  [Tests/README.md](Tests/README.md)), so the shared code has to compile against both versions:
+  do not use an API which exists in the newer one only. `Microsoft.VisualStudio.LanguageServices`
+  has no 5.x release, so both projects compile its 4.14 against a newer Roslyn, hence the binding
+  redirects and the explicit MEF composition in `TestSolution`; the `NU1608` warnings about it
+  are expected.
 
 ## The console utility
 
-`AdjustNamespace.Cli` (the `adjustns` tool) is an SDK style `net8.0` project and is the second
+`AdjustNamespace.Cli` (the `adjustns` tool) is an SDK style `net10.0` project and is the second
 exception to the "`dotnet build` does not work here" rule:
 
 ```bash
@@ -105,12 +111,17 @@ as changed instead of the actual edit. If a diff ever looks like a full-file rew
 
 - The extension targets .NET Framework 4.8; `LangVersion` is `latest` and `Nullable` is
   `enable`, with `nullable;CS8766;CS8767` promoted to errors.
-- Version-specific code is guarded with the `VS2022` conditional compilation symbol.
+- The extension supports Visual Studio 18 only and is compiled against the Roslyn of the
+  lowest supported release (5.0.0 for 18.0): Visual Studio binds an older Roslyn reference to
+  its own one, never a newer one. There is no version-specific code and no conditional symbol
+  for it; `Tests/AdjustNamespace.Tests/Build/ProjectConsistencyTests` fails if the shared code
+  uses a symbol the Release build of the extension does not define, or if a Roslyn reference
+  is newer than the lowest Visual Studio of the manifest allows.
 - Almost all of the code lives in two shared projects: `AdjustNamespace.CoreShared` (the
   Visual Studio independent core, compiled into the extension, the tests **and** the console
   utility) and `AdjustNamespace.VsixShared` (the wizard, the commands, the boundary to the IDE).
   A new file has to be added to the `.projitems` of the one it belongs to.
-- The core is compiled against .NET Framework 4.8 **and** .NET 8 at once: it may use neither
+- The core is compiled against .NET Framework 4.8 **and** .NET 10 at once: it may use neither
   the Visual Studio SDK (`Microsoft.VisualStudio.*`, `EnvDTE`) nor an API which exists in one
   of the two target frameworks only. Whatever it needs from the outside goes through an
   interface — see the boundary table in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

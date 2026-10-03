@@ -802,5 +802,267 @@ namespace X
 
             Assert.Empty(await solution.CompilationErrorsAsync());
         }
+
+        /// <summary>
+        /// A case type may be a tuple (any type which converts to <c>object</c> is allowed):
+        /// the reference to a moved type stands inside a nameless tuple element then, and such
+        /// an element has the very same span as its type — the same tie a nameless parameter
+        /// of the case list has. Not specific to the unions, see <c>CsAdjusterTupleTests</c>.
+        /// </summary>
+        [Fact]
+        public async Task A_tuple_case_type_of_a_union_is_moved()
+        {
+            using var solution = new TestSolution()
+                .WithUnionSupport()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Cat.cs",
+@"namespace A.B
+{
+    public class Cat { }
+}
+")
+                .AddDocument("MyApp", "Pet.cs",
+@"using A.B;
+
+namespace Other
+{
+    public class Dog { }
+
+    public union Pet((Cat, int), Dog);
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            await AdjustAndCleanupAsync(solution, "MyApp", "Cat.cs", "X.Y");
+
+            var text = solution.TextOf("MyApp", "Pet.cs");
+
+            Assert.Contains("using X.Y;", text);
+            Assert.DoesNotContain("using A.B;", text);
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
+
+        /// <summary>
+        /// A union conversion (<c>Pet pet = new Cat();</c>) calls the constructor of the union
+        /// implicitly, and the reference search may report such a call as a reference to the
+        /// union at the position of the converted expression, where no name of the union is
+        /// written at all. Only the written names have to be fixed.
+        /// </summary>
+        [Fact]
+        public async Task A_union_conversion_is_no_written_reference()
+        {
+            using var solution = new TestSolution()
+                .WithUnionSupport()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Cases.cs",
+@"namespace Cases
+{
+    public class Cat { }
+
+    public class Dog { }
+}
+")
+                .AddDocument("MyApp", "Pet.cs",
+@"using Cases;
+
+namespace A.B
+{
+    public union Pet(Cat, Dog);
+}
+")
+                .AddDocument("MyApp", "Consumer.cs",
+@"using A.B;
+using Cases;
+
+namespace Other
+{
+    public class Consumer
+    {
+        public Pet FromCat() => new Cat();
+
+        public Pet FromDog()
+        {
+            var dog = new Dog();
+            Pet pet = dog;
+            return pet;
+        }
+
+        public void Take(Pet pet) { }
+
+        public void Call() => Take(new Cat());
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            await AdjustAndCleanupAsync(solution, "MyApp", "Pet.cs", "X.Y");
+
+            var text = solution.TextOf("MyApp", "Consumer.cs");
+
+            Assert.Contains("using X.Y;", text);
+            Assert.DoesNotContain("using A.B;", text);
+            Assert.Contains("Pet pet = dog;", text);
+            Assert.Contains("Take(new Cat());", text);
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
+
+        /// <summary>
+        /// The pattern matching over a union unwraps its value, so a case type is written
+        /// in a type pattern applied to the union itself, and a switch over the case types
+        /// is exhaustive without a discard. A moved case type keeps such a switch compiling.
+        /// </summary>
+        [Fact]
+        public async Task A_case_type_in_a_union_pattern_is_moved()
+        {
+            using var solution = new TestSolution()
+                .WithUnionSupport()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Cat.cs",
+@"namespace A.B
+{
+    public class Cat
+    {
+        public string Name => ""cat"";
+    }
+}
+")
+                .AddDocument("MyApp", "Pet.cs",
+@"using A.B;
+
+namespace Other
+{
+    public class Dog { }
+
+    public union Pet(Cat, Dog);
+
+    public static class PetNames
+    {
+        public static string Of(Pet pet) => pet switch
+        {
+            Cat cat => cat.Name,
+            Dog => ""dog"",
+            null => string.Empty,
+        };
+
+        public static bool IsCat(Pet pet) => pet is Cat;
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            await AdjustAndCleanupAsync(solution, "MyApp", "Cat.cs", "X.Y");
+
+            var text = solution.TextOf("MyApp", "Pet.cs");
+
+            Assert.Contains("using X.Y;", text);
+            Assert.DoesNotContain("using A.B;", text);
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
+
+        /// <summary>
+        /// A union type need not be declared with the <c>union</c> keyword: any struct with
+        /// the <c>[Union]</c> attribute and the union pattern (a constructor per case type and
+        /// a <c>Value</c> property) is one. It is an ordinary struct for the syntax tree, and
+        /// the attribute lives in <c>System.Runtime.CompilerServices</c>, which is never adjusted.
+        /// </summary>
+        [Fact]
+        public async Task A_hand_written_union_type_is_moved()
+        {
+            using var solution = new TestSolution()
+                .WithUnionSupport()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "Pet.cs",
+@"using System.Runtime.CompilerServices;
+
+namespace A.B
+{
+    public class Cat { }
+
+    public class Dog { }
+
+    [Union]
+    public struct Pet
+    {
+        public Pet(Cat value) => Value = value;
+
+        public Pet(Dog value) => Value = value;
+
+        public object Value { get; }
+    }
+}
+")
+                .AddDocument("MyApp", "Consumer.cs",
+@"using A.B;
+
+namespace Other
+{
+    public class Consumer
+    {
+        public Pet Create() => new Cat();
+
+        public bool IsCat(Pet pet) => pet is Cat;
+    }
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            await AdjustAndCleanupAsync(solution, "MyApp", "Pet.cs", "X.Y");
+
+            var text = solution.TextOf("MyApp", "Consumer.cs");
+
+            Assert.Contains("using X.Y;", text);
+            Assert.DoesNotContain("using A.B;", text);
+            Assert.Contains("using System.Runtime.CompilerServices;", solution.TextOf("MyApp", "Pet.cs"));
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
+
+        /// <summary>
+        /// A union may implement an interface (the base clause follows the case list):
+        /// the interface is referenced as a base type of any other struct.
+        /// </summary>
+        [Fact]
+        public async Task An_interface_of_a_union_is_moved()
+        {
+            using var solution = new TestSolution()
+                .WithUnionSupport()
+                .AddProject("MyApp")
+                .AddDocument("MyApp", "IPet.cs",
+@"namespace A.B
+{
+    public interface IPet { }
+}
+")
+                .AddDocument("MyApp", "Pet.cs",
+@"using A.B;
+
+namespace Other
+{
+    public class Cat { }
+
+    public class Dog { }
+
+    public union Pet(Cat, Dog) : IPet;
+}
+")
+                ;
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            await AdjustAndCleanupAsync(solution, "MyApp", "IPet.cs", "X.Y");
+
+            var text = solution.TextOf("MyApp", "Pet.cs");
+
+            Assert.Contains("using X.Y;", text);
+            Assert.DoesNotContain("using A.B;", text);
+            Assert.Empty(await solution.CompilationErrorsAsync());
+        }
     }
 }

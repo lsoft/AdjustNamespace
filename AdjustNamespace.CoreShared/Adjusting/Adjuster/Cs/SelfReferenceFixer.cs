@@ -1,5 +1,6 @@
 ﻿using AdjustNamespace.Adjusting.Edit;
 using AdjustNamespace.Namespace;
+using AdjustNamespace.Roslyn;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
@@ -60,8 +61,10 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         }
 
         /// <summary>
-        /// Walk every simple name of the given tree and schedule a <c>using</c> clause
-        /// for the ones which stop resolving once the file's own namespace is moved.
+        /// Walk every simple name of the given tree (plus every operator and indexer use,
+        /// which may be an extension member of C# 14 / 15 written with no name at all) and
+        /// schedule a <c>using</c> clause for the ones which stop resolving once the file's
+        /// own namespace is moved.
         /// </summary>
         /// <param name="syntaxRoot">Syntax root of the subject file (one of its trees).</param>
         /// <param name="semanticModel">Semantic model of that very tree.</param>
@@ -80,9 +83,11 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 throw new ArgumentNullException(nameof(semanticModel));
             }
 
-            foreach (var nameSyntax in syntaxRoot.DescendantNodes().OfType<SimpleNameSyntax>())
+            QualifyChildNamespaceHeads(syntaxRoot, semanticModel);
+
+            foreach (var node in syntaxRoot.DescendantNodes().Where(IsCandidate))
             {
-                if (!TryGetImportedNamespace(nameSyntax, semanticModel, out var symbolNamespace, out var declaredInSubjectFile))
+                if (!TryGetImportedNamespace(node, semanticModel, out var symbolNamespace, out var declaredInSubjectFile))
                 {
                     continue;
                 }
@@ -100,7 +105,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 }
 
                 var transition = NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf(
-                    nameSyntax,
+                    node,
                     _targetNamespace
                     );
                 if (!transition.HasValue)
@@ -123,7 +128,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 }
 
                 AdjustLog.WriteLine(
-                    $"[Adjust] SelfReferenceFixer: {_subjectFilePath}: '{nameSyntax}' relies on the enclosing "
+                    $"[Adjust] SelfReferenceFixer: {_subjectFilePath}: '{node}' relies on the enclosing "
                     + $"namespace {transition.Value.OriginalName} -> add using {symbolNamespace}"
                     );
 
@@ -132,11 +137,127 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         }
 
         /// <summary>
-        /// The namespace a simple name relies on to resolve, if any: a bare type name, or
-        /// an extension method invoked as a member access (<c>receiver.Method()</c>).
+        /// A name written through a child namespace of an enclosing namespace
+        /// (<c>Properties.Settings.Default</c> inside <c>Legacy.Forms</c>, where <c>Properties</c>
+        /// is <c>Legacy.Properties</c>) resolves only because the file is nested inside that
+        /// enclosing namespace. Once the file leaves it, the head of the name has to be written
+        /// out: a using clause imports the types of a namespace and never its child namespaces.
+        /// </summary>
+        private void QualifyChildNamespaceHeads(
+            SyntaxNode syntaxRoot,
+            SemanticModel semanticModel
+            )
+        {
+            foreach (var name in syntaxRoot.DescendantNodes().OfType<IdentifierNameSyntax>())
+            {
+                if (!IsHeadOfDottedName(name))
+                {
+                    continue;
+                }
+
+                if (!(semanticModel.GetSymbolInfo(name).Symbol is INamespaceSymbol @namespace)
+                    || @namespace.IsGlobalNamespace
+                    )
+                {
+                    continue;
+                }
+
+                var fullName = @namespace.ToDisplayString();
+                var writtenName = name.Identifier.ValueText;
+
+                if (fullName == writtenName)
+                {
+                    //a root level namespace resolves from everywhere
+                    continue;
+                }
+
+                var transition = NamespaceTransitionContainer.TryGetTransitionOfTheDeclarationOf(
+                    name,
+                    _targetNamespace
+                    );
+                if (!transition.HasValue)
+                {
+                    continue;
+                }
+
+                if (!fullName.EndsWith("." + writtenName, StringComparison.Ordinal))
+                {
+                    //found through an alias or a using clause, not through an enclosing namespace
+                    continue;
+                }
+
+                var parentName = fullName.Substring(0, fullName.Length - writtenName.Length - 1);
+
+                if (!IsNestedIn(transition.Value.OriginalName, parentName))
+                {
+                    //the parent is no enclosing namespace of the file: the name does not rely on it
+                    continue;
+                }
+
+                if (IsNestedIn(transition.Value.ModifiedName, parentName))
+                {
+                    //still nested inside that namespace after the move
+                    continue;
+                }
+
+                var firstPart = fullName.Split('.')[0];
+                var isGlobalPrefixRequired = transition.Value.ModifiedName
+                    .Split('.')
+                    .Contains(firstPart);
+
+                var qualified = (isGlobalPrefixRequired ? "global::" : string.Empty) + fullName;
+
+                AdjustLog.WriteLine(
+                    $"[Adjust] SelfReferenceFixer: {_subjectFilePath}: '{name.Parent}' relies on the enclosing "
+                    + $"namespace {parentName} -> write '{writtenName}' as '{qualified}'"
+                    );
+
+                _edits.ReplaceText(_subjectFilePath, name.Span, qualified);
+            }
+        }
+
+        /// <summary>
+        /// The name is the leftmost part of a dotted name (<c>A</c> of <c>A.B.C</c>), written as
+        /// a qualified name or as a member access.
+        /// </summary>
+        private static bool IsHeadOfDottedName(IdentifierNameSyntax name)
+        {
+            if (name.Parent is QualifiedNameSyntax qualified)
+            {
+                return ReferenceEquals(qualified.Left, name);
+            }
+
+            if (name.Parent is MemberAccessExpressionSyntax memberAccess)
+            {
+                return ReferenceEquals(memberAccess.Expression, name);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// A node which may rely on an enclosing namespace: a simple name, or a use of an
+        /// operator or an indexer, which may be an extension member written with no name.
+        /// </summary>
+        private static bool IsCandidate(SyntaxNode node)
+        {
+            return node is SimpleNameSyntax
+                || node is BinaryExpressionSyntax
+                || node is PrefixUnaryExpressionSyntax
+                || node is PostfixUnaryExpressionSyntax
+                || node is AssignmentExpressionSyntax
+                || node is ElementAccessExpressionSyntax
+                ;
+        }
+
+        /// <summary>
+        /// The namespace a node relies on to resolve, if any: a bare type name, an extension
+        /// method or an extension block member invoked as a member access
+        /// (<c>receiver.Method()</c>, <c>receiver.Property</c>, <c>Type.StaticMember()</c>),
+        /// or an extension operator or indexer (<c>a + b</c>, <c>receiver[0]</c>).
         /// </summary>
         private bool TryGetImportedNamespace(
-            SimpleNameSyntax nameSyntax,
+            SyntaxNode node,
             SemanticModel semanticModel,
             out string symbolNamespace,
             out bool declaredInSubjectFile
@@ -145,43 +266,47 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             symbolNamespace = string.Empty;
             declaredInSubjectFile = false;
 
-            var symbol = semanticModel.GetSymbolInfo(nameSyntax).Symbol;
-
-            if (symbol is INamedTypeSymbol typeSymbol)
+            var symbol = semanticModel.GetSymbolInfo(node).Symbol;
+            if (symbol == null)
             {
-                if (IsAlreadyQualified(nameSyntax))
-                {
-                    //this name spells its namespace out already and does not depend
-                    //on the enclosing namespace at all
-                    return false;
-                }
-
-                return TryFromType(typeSymbol, out symbolNamespace, out declaredInSubjectFile);
+                return false;
             }
 
-            //an extension method call is written as a member access (`value.Twice()`):
-            //the name looks qualified, but the method is found only because the enclosing
-            //namespaces are searched for extension methods
-            if (symbol is IMethodSymbol methodSymbol
-                && IsMemberAccessName(nameSyntax)
-                )
+            if (node is SimpleNameSyntax nameSyntax)
             {
-                var extensionMethod = methodSymbol.ReducedFrom ?? methodSymbol;
-                if (!extensionMethod.IsExtensionMethod)
+                if (symbol is INamedTypeSymbol typeSymbol)
+                {
+                    if (IsAlreadyQualified(nameSyntax))
+                    {
+                        //this name spells its namespace out already and does not depend
+                        //on the enclosing namespace at all
+                        return false;
+                    }
+
+                    return TryFromType(typeSymbol, out symbolNamespace, out declaredInSubjectFile);
+                }
+
+                //an extension member is written as a member access (`value.Twice()`,
+                //`value.Loud`, `Cat.Create()`): the name looks qualified, but the member is
+                //found only because the enclosing namespaces are searched for extensions
+                if (!IsMemberAccessName(nameSyntax))
                 {
                     return false;
                 }
-
-                var containingType = extensionMethod.ContainingType;
-                if (containingType == null)
-                {
-                    return false;
-                }
-
-                return TryFromType(containingType, out symbolNamespace, out declaredInSubjectFile);
+            }
+            else if (!(symbol.ContainingType?.IsExtensionBlock() ?? false))
+            {
+                //an operator or an indexer of a type itself needs no import at all
+                return false;
             }
 
-            return false;
+            var container = symbol.TryGetImportedExtensionContainer();
+            if (container == null)
+            {
+                return false;
+            }
+
+            return TryFromType(container, out symbolNamespace, out declaredInSubjectFile);
         }
 
         private bool TryFromType(
