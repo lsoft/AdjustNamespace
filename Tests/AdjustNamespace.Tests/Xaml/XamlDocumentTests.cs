@@ -40,9 +40,10 @@ namespace AdjustNamespace.Tests.Xaml
 
             var result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MyButton", "X.Y");
 
-            //the alias is generated, so only its absence is checked
             Assert.DoesNotContain("<local:MyButton", result);
             Assert.DoesNotContain("</local:MyButton", result);
+            Assert.Contains("<y:MyButton>", result);
+            Assert.Contains("</y:MyButton>", result);
         }
 
         [Fact]
@@ -619,6 +620,101 @@ namespace AdjustNamespace.Tests.Xaml
             var result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MainWindow", "X.Y");
 
             Assert.Contains(@"x:Class=""X.Y.MainWindow""", result);
+        }
+
+        /// <summary>
+        /// A new declaration gets the last part of its namespace as the alias and is written
+        /// like its neighbours: on a line of its own with their indentation. The declaration
+        /// which became unused goes away with its line.
+        /// </summary>
+        [Fact]
+        public void A_new_declaration_is_named_after_its_namespace_and_written_like_the_others()
+        {
+            var body =
+@"<UserControl x:Class=""A.MyControl""
+    xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+    xmlns:local=""clr-namespace:A.B""
+    Background=""White"">
+    <local:MyButton />
+</UserControl>";
+
+            var result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MyButton", "A.Views");
+
+            Assert.Equal(
+@"<UserControl x:Class=""A.MyControl""
+    xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+    xmlns:views=""clr-namespace:A.Views""
+    Background=""White"">
+    <views:MyButton />
+</UserControl>",
+                result);
+        }
+
+        [Fact]
+        public void A_new_declaration_is_written_on_the_same_line_when_the_others_are()
+        {
+            var body =
+@"<UserControl x:Class=""A.MyControl"" xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation"" xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"" xmlns:local=""clr-namespace:A.B"">
+    <local:MyButton />
+    <local:Other />
+</UserControl>";
+
+            var result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MyButton", "A.Views");
+
+            Assert.Equal(
+@"<UserControl x:Class=""A.MyControl"" xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation"" xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"" xmlns:local=""clr-namespace:A.B"" xmlns:views=""clr-namespace:A.Views"">
+    <views:MyButton />
+    <local:Other />
+</UserControl>",
+                result);
+        }
+
+        /// <summary>
+        /// The alias of the new declaration differs from every alias of the document, a nested
+        /// one included: the new declaration is written on the root element, and an alias of a
+        /// nested element would shadow it inside of that element.
+        /// </summary>
+        [Fact]
+        public void A_new_declaration_gets_a_number_when_its_alias_is_taken()
+        {
+            var body =
+@"<UserControl x:Class=""A.MyControl""
+    xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+    xmlns:local=""clr-namespace:A.B"">
+    <StackPanel xmlns:views=""clr-namespace:Other.Views"">
+        <local:MyButton />
+        <views:Unrelated />
+    </StackPanel>
+</UserControl>";
+
+            var result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MyButton", "A.Views");
+
+            Assert.Contains(@"xmlns:views2=""clr-namespace:A.Views""", result);
+            Assert.Contains("<views2:MyButton />", result);
+            Assert.Contains("<views:Unrelated />", result);
+        }
+
+        /// <summary>
+        /// The prefixes starting with <c>xml</c> are reserved by XML.
+        /// </summary>
+        [Fact]
+        public void A_new_declaration_does_not_get_a_reserved_alias()
+        {
+            var body =
+@"<UserControl x:Class=""A.MyControl""
+    xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+    xmlns:local=""clr-namespace:A.B"">
+    <local:MyButton />
+</UserControl>";
+
+            var result = MemoryXamlBodyProvider.MoveObject(body, "A.B", "MyButton", "A.Xml");
+
+            Assert.Contains(@"xmlns:nsxml=""clr-namespace:A.Xml""", result);
+            Assert.Contains("<nsxml:MyButton />", result);
         }
 
         private static int CountOf(string text, string substring)

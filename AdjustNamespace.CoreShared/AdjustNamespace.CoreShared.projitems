@@ -48,6 +48,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)NamespaceReplaceRegex.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Roslyn\DocumentChanger.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Roslyn\GeneratedCode.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Roslyn\NameLookup.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Roslyn\Scope.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Roslyn\SymbolExtensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Roslyn\SyntaxExtensions.cs" />

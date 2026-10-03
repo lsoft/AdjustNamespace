@@ -289,7 +289,11 @@ failure while deciding still raises `FileProcessException` and aborts the scan.
      the current context of that file;
   2. `SelfReferenceFixer` schedules the edits of the references the file itself makes through
      its old enclosing namespaces (a type, an extension member, a child namespace such as
-     `Properties`), and `XmlnsDefinitionFixer` the edits of the
+     `Properties`, a relative `using Fourth;` inside the namespace declaration), of the names
+     its new namespace hides (`First.Second.Thing` inside `Target.First` becomes
+     `global::First.Second.Thing`) and of the type names which would mean another type or
+     become ambiguous in the new namespace (they get the namespace of their type in front of
+     them), and `XmlnsDefinitionFixer` the edits of the
      `[assembly: XmlnsDefinition(uri, "A.B")]` attributes of the namespaces the types leave;
   3. an edit for every root namespace declaration of the file itself is scheduled;
   4. `EditApplier.ApplyAsync` writes the whole set;
@@ -320,6 +324,15 @@ semantic model whether the first part of the target namespace is shadowed at tha
 prefixes the name with `global::` if it is; the same reasoning keeps `AddUsingApplier` out of
 the namespace declarations, because a `using` clause written inside one is resolved that way too.
 
+The semantic model answers for the place a name is written at now, and the moved file is going
+to be somewhere else. `NameLookup` repeats the lookup of C# for a code written in another
+namespace: the members of every enclosing namespace from the innermost one (the namespaces of
+the new chain count even before they exist), then the using clauses (`GetImportScopes`) plus the
+ones the adjusting adds. A name whose lookup gives another symbol, or several ones, is written
+out in full. `RefProcessor` uses the same question the other way round: a `using` clause of the
+target namespace which would make another simple name of the file ambiguous (CS0104) is not
+added, and the reference to the moved type is qualified instead.
+
 `EditApplier` walks the set file by file, and the order of the kinds inside a file matters:
 a `ReplaceTextEdit` is identified by its span in the original text, so all of them are written
 before any other edit shifts these spans. Every kind has its own applier
@@ -344,7 +357,9 @@ fresh snapshot and applied again.
 `NamespaceCenter` knows all the types of the solution grouped by their namespaces and is
 notified about every moved type. A namespace which has lost its last type is remembered, and
 `Cleanup.RemoveEmptyUsingStatementsForAsync` removes the using clauses of such namespaces from
-every C# document of the solution.
+every C# document of the solution, and replaces a `nameof` of such a namespace with the string
+it gives (`nameof(First.Second.Third)` becomes `"Third"`): the program keeps seeing the same
+string, which a rewritten `nameof` would change.
 
 A namespace is emptied for the whole solution, but a `using` clause is resolved against a single
 project: a namespace which another project still fills is not empty and is gone for this project
@@ -355,7 +370,10 @@ ends know about the compilation of the document they work with:
   if that namespace still contains something for the projects of that file
   (`SymbolExtensions.IsNamespaceFilledOutside`); only the types declared *directly* in the
   namespace count — types of the child namespaces are invisible to a `using` of the parent,
-  so counting them would add a clause which later fails to compile;
+  so counting them would add a clause which later fails to compile. Neither the generated part
+  of a moved class counts nor a type the build generates out of the xaml of the moved code
+  behind (`Program` of WinUI in `obj\...\App.g.i.cs`, `GeneratedCode.IsGeneratedOutOfXamlOf`):
+  both are written into the namespace of the `x:Class`, which follows the class;
 - `NamespaceCenter.GetRemovedNamespaces` removes a clause of a namespace the adjusting has
   touched as soon as that namespace has no direct types left for the given compilations, even
   if the rest of the solution still fills it (or a child namespace of it still exists).

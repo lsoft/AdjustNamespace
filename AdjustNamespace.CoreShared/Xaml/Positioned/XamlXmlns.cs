@@ -184,20 +184,20 @@ namespace AdjustNamespace.Xaml.Positioned
         /// <summary>
         /// Create a new declaration for the target namespace, based on the declaration
         /// of the source namespace (to inherit its <see cref="Suffix"/> and <see cref="Form"/>).
-        /// The alias is generated from the last part of the namespace plus a part of a guid
-        /// to prevent a collision with the existing aliases. It is declared on the root element,
-        /// so it is visible in the whole document.
+        /// It is declared on the root element, so it is visible in the whole document.
         /// </summary>
         /// <param name="xmlns">Declaration of the source namespace.</param>
         /// <param name="targetNamespace">The namespace to declare.</param>
+        /// <param name="alias">The alias of the declaration, see <see cref="XamlStructure.CreateAlias"/>.</param>
         public XamlXmlns(
             XamlXmlns xmlns,
-            string targetNamespace
+            string targetNamespace,
+            string alias
             )
         {
             Index = xmlns.Index;
             Length = 0;
-            Alias = GetLastWord(targetNamespace) + GetPartOfGuid();
+            Alias = alias ?? throw new ArgumentNullException(nameof(alias));
             Namespace = targetNamespace;
             IsClr = true;
             Saved = false;
@@ -255,19 +255,29 @@ namespace AdjustNamespace.Xaml.Positioned
         /// </summary>
         /// <param name="xaml">(in/out) Body of the xaml document.</param>
         /// <param name="indexToInsert">(in/out) Position to insert at; it is moved behind the inserted text.</param>
-        internal void SaveTo(ref string xaml, ref int indexToInsert)
+        /// <param name="separator">What is written before the declaration: a space, or a line
+        /// break with the indentation of the declarations written one per line.</param>
+        internal void SaveTo(ref string xaml, ref int indexToInsert, string separator)
         {
-            var s = $@" xmlns:{Alias}=""{Form}:{Namespace}{Suffix}""";
+            var s = $@"{separator}xmlns:{Alias}=""{Form}:{Namespace}{Suffix}""";
             xaml = xaml.Insert(indexToInsert, s);
             indexToInsert += s.Length;
         }
 
         /// <summary>
-        /// Cut this declaration out of the document body.
+        /// Cut this declaration out of the document body, together with the white space in
+        /// front of it: a declaration written on a line of its own takes the line with it, and
+        /// one written among the others leaves a single space between its neighbours.
         /// </summary>
         internal void Remove(ref string xaml)
         {
-            xaml = xaml.Substring(0, Index) + xaml.Substring(Index + Length);
+            var start = Index;
+            while (start > 0 && char.IsWhiteSpace(xaml[start - 1]))
+            {
+                start--;
+            }
+
+            xaml = xaml.Substring(0, start) + xaml.Substring(Index + Length);
         }
 
         /// <summary>
@@ -286,30 +296,6 @@ namespace AdjustNamespace.Xaml.Positioned
             }
 
             return null;
-        }
-
-        /// <summary>
-        /// The part of the namespace after the last dot.
-        /// </summary>
-        private static string GetLastWord(string s)
-        {
-            if (s.Contains("."))
-            {
-                return s.Substring(s.LastIndexOf('.') + 1);
-            }
-
-            return s;
-        }
-
-        /// <summary>
-        /// The first group of a fresh guid; used to make the generated alias unique.
-        /// </summary>
-        private static string GetPartOfGuid()
-        {
-            var g = Guid.NewGuid().ToString();
-            g = g.Substring(0, g.IndexOf('-'));
-
-            return g;
         }
     }
 }

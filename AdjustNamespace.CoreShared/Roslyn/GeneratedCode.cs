@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace AdjustNamespace.Roslyn
 {
@@ -24,8 +25,11 @@ namespace AdjustNamespace.Roslyn
             ".g.i.cs",
             ".designer.cs",
             ".generated.cs",
-            //the code behind part the .NET MAUI source generator writes for a xaml file
-            ".sg.cs"
+            //the parts of the class of a xaml file the .NET MAUI source generator writes:
+            //the code behind (fields, InitializeComponent) and, with the SourceGen inflator,
+            //the inflated body of InitializeComponent
+            ".sg.cs",
+            ".xsg.cs"
         };
 
         /// <summary>
@@ -49,6 +53,49 @@ namespace AdjustNamespace.Roslyn
             }
 
             return !filePath!.EndsWith(".designer.cs", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// The file is written by the build out of the xaml file whose code behind is the given
+        /// one: <c>obj\...\App.g.i.cs</c> or <c>obj\...\App.g.cs</c> of WPF and WinUI for
+        /// <c>App.xaml.cs</c>, <c>obj\...\Views_MainPage.xaml.sg.cs</c> of .NET MAUI for
+        /// <c>Views\MainPage.xaml.cs</c>. Everything such a file declares lives in the namespace
+        /// of the <c>x:Class</c> of that xaml.
+        /// </summary>
+        /// <param name="filePath">The file which may be generated.</param>
+        /// <param name="codeBehindFilePath">The code behind of a xaml file (<c>App.xaml.cs</c>,
+        /// <c>MainView.axaml.cs</c>); any other file has no generated files of this kind.</param>
+        public static bool IsGeneratedOutOfXamlOf(string? filePath, string codeBehindFilePath)
+        {
+            if (codeBehindFilePath is null)
+            {
+                throw new ArgumentNullException(nameof(codeBehindFilePath));
+            }
+
+            if (!IsWrittenByTheBuild(filePath))
+            {
+                return false;
+            }
+
+            var codeBehindName = Path.GetFileName(codeBehindFilePath);
+
+            var xamlIndex = codeBehindName.IndexOf(".xaml.cs", StringComparison.OrdinalIgnoreCase);
+            if (xamlIndex < 0)
+            {
+                xamlIndex = codeBehindName.IndexOf(".axaml.cs", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (xamlIndex <= 0)
+            {
+                return false;
+            }
+
+            var stem = codeBehindName.Substring(0, xamlIndex);
+            var name = Path.GetFileName(filePath!);
+
+            return name.StartsWith(stem + ".", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith("_" + stem + ".xaml.sg.cs", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith("_" + stem + ".xaml.xsg.cs", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsInIntermediateFolder(string filePath)

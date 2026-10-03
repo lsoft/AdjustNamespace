@@ -80,7 +80,7 @@ namespace AdjustNamespace.Namespace
                 //Name is nullable since Roslyn 5 (`using unsafe int*;` has no name)
                 var nname = NormalizeUsingName(n.Name?.ToString() ?? string.Empty);
 
-                if (!_namespacesToRemove.Contains(nname) && !IsGoneForTheseProjects(nname, compilations))
+                if (!IsRemoved(nname, compilations))
                 {
                     //there are a types in this namespace
                     continue;
@@ -90,6 +90,27 @@ namespace AdjustNamespace.Namespace
             }
 
             return toRemove;
+        }
+
+        /// <summary>
+        /// The adjusting has emptied the namespace, for the whole solution or for the given
+        /// compilations, see <see cref="GetRemovedNamespaces"/>.
+        /// </summary>
+        /// <param name="namespaceName">Full name of the namespace.</param>
+        /// <param name="compilations">Compilations of the projects which compile the document
+        /// the namespace is named in, or <c>null</c> if they are unknown.</param>
+        public bool IsRemoved(
+            string namespaceName,
+            IReadOnlyList<Compilation>? compilations = null
+            )
+        {
+            if (namespaceName is null)
+            {
+                throw new ArgumentNullException(nameof(namespaceName));
+            }
+
+            return _namespacesToRemove.Contains(namespaceName)
+                || IsGoneForTheseProjects(namespaceName, compilations);
         }
 
         /// <summary>

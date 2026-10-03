@@ -1030,36 +1030,40 @@ namespace Microsoft.Maui.Controls
         #region The code generated out of a page
 
         /// <summary>
-        /// The generated part of a page in the <c>obj</c> folder (the .NET MAUI source generator
-        /// writes <c>MainPage.xaml.sg.cs</c> there when it emits its files) is rewritten out of
-        /// the <c>x:Class</c> on the next build, so it does not keep the old namespace alive.
+        /// The generated parts of a page are rewritten out of the <c>x:Class</c> on the next
+        /// build, so they do not keep the old namespace alive. The paths are the ones a real
+        /// build gives to the documents of the generator: under <c>obj</c>, with the
+        /// <c>generated</c> folder when the project emits the generated files and without it
+        /// otherwise. The generator writes two parts of a page: <c>.xaml.sg.cs</c> always and
+        /// <c>.xaml.xsg.cs</c> with <c>MauiXamlInflator=SourceGen</c>.
         /// </summary>
-        [Fact]
-        public async Task The_sg_part_of_a_page_in_the_obj_folder_does_not_keep_the_old_namespace()
+        [Theory]
+        [InlineData(@"obj\Debug\net10.0-windows10.0.19041.0\win-x64\generated\Microsoft.Maui.Controls.SourceGen\Microsoft.Maui.Controls.SourceGen.XamlGenerator\Views_MainPage.xaml.sg.cs")]
+        [InlineData(@"obj\Debug\net10.0-windows10.0.19041.0\win-x64\Microsoft.Maui.Controls.SourceGen\Microsoft.Maui.Controls.SourceGen.XamlGenerator\Views_MainPage.xaml.xsg.cs")]
+        public async Task The_generated_part_of_a_page_in_the_obj_folder_does_not_keep_the_old_namespace(string generatedFilePath)
         {
-            var text = await MoveAPageWithAGeneratedPartAsync(
-                @"obj\Debug\net10.0-windows\generated\Microsoft.Maui.Controls.SourceGen\MainPage.xaml.sg.cs"
-                );
+            var text = await MoveAPageWithAGeneratedPartAsync(generatedFilePath);
 
             Assert.Contains("namespace TestMauiApp.Views", text);
             Assert.DoesNotContain("using Old.Views;", text);
         }
 
         /// <summary>
-        /// Was red: a document of a source generator has no file on the disk, its path is
-        /// <c>&lt;generator assembly&gt;\&lt;generator type&gt;\&lt;hint name&gt;</c>: not in
-        /// <c>obj</c>, and <c>.xaml.sg.cs</c> is not among the generated suffixes
-        /// (<c>GeneratedCode</c> knows <c>.g.cs</c>, <c>.g.i.cs</c>, <c>.designer.cs</c>,
-        /// <c>.generated.cs</c>). The generated part of the page counts as a declaration of
-        /// its own, keeps <c>Old.Views</c> alive, the code behind imports it and stops
-        /// compiling (CS0234) once the generator writes the part into the new namespace.
+        /// Was red: a document of a source generator in a project without an output path has
+        /// the path <c>&lt;generator assembly&gt;\&lt;generator type&gt;\&lt;hint name&gt;</c>:
+        /// not in <c>obj</c>, and the suffixes of the generator were not among the generated
+        /// ones. The generated part of the page counted as a declaration of its own, kept
+        /// <c>Old.Views</c> alive, the code behind imported it and stopped compiling (CS0234)
+        /// once the generator wrote the part into the new namespace. A real build puts the
+        /// documents under <c>obj</c> (see the test above), so this is the safety net for a
+        /// host which does not.
         /// </summary>
-        [Fact]
-        public async Task The_sg_part_of_a_page_from_a_source_generator_does_not_keep_the_old_namespace()
+        [Theory]
+        [InlineData(@"Microsoft.Maui.Controls.SourceGen\Microsoft.Maui.Controls.SourceGen.XamlGenerator\Views_MainPage.xaml.sg.cs")]
+        [InlineData(@"Microsoft.Maui.Controls.SourceGen\Microsoft.Maui.Controls.SourceGen.XamlGenerator\Views_MainPage.xaml.xsg.cs")]
+        public async Task The_generated_part_of_a_page_outside_the_obj_folder_does_not_keep_the_old_namespace(string generatedFilePath)
         {
-            var text = await MoveAPageWithAGeneratedPartAsync(
-                @"Microsoft.Maui.Controls.SourceGen\Microsoft.Maui.Controls.SourceGen.CodeBehindGenerator\MainPage.xaml.sg.cs"
-                );
+            var text = await MoveAPageWithAGeneratedPartAsync(generatedFilePath);
 
             Assert.Contains("namespace TestMauiApp.Views", text);
             Assert.DoesNotContain("using Old.Views;", text);

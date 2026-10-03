@@ -100,6 +100,77 @@ namespace AdjustNamespace.Tests.Adjusting
         }
 
         /// <summary>
+        /// Was red: the WinUI build generates a class of its own out of <c>App.xaml</c> next to
+        /// the code behind, <c>Program</c> with the <c>Main</c> method, into the namespace of the
+        /// <c>x:Class</c>. That class is no part of the moved one, kept the old namespace alive,
+        /// and <c>using TestMauiApp.WinUI;</c> was added; the next build regenerated
+        /// <c>Program</c> into the new namespace and the clause stopped compiling (CS0234).
+        /// Found by running the console utility over a real MAUI application.
+        /// </summary>
+        [Fact]
+        public async Task A_class_generated_out_of_the_same_xaml_does_not_keep_the_old_namespace()
+        {
+            using var solution = new TestSolution()
+                .AddProject("TestMauiApp")
+                .AddDocument("TestMauiApp", @"Platforms\Windows\App.xaml.cs",
+@"namespace TestMauiApp.WinUI
+{
+    public partial class App
+    {
+        public App()
+        {
+            this.InitializeComponent();
+        }
+    }
+}
+")
+                .AddDocument("TestMauiApp", @"obj\Debug\net10.0-windows10.0.19041.0\win-x64\Platforms\Windows\App.g.i.cs",
+@"namespace TestMauiApp.WinUI
+{
+    public partial class App
+    {
+        public void InitializeComponent()
+        {
+        }
+    }
+
+    public static class Program
+    {
+        public static void Run()
+        {
+            new App();
+        }
+    }
+}
+")
+                ;
+
+            var xamlFilePath = solution.AddXamlFile("TestMauiApp", @"Platforms\Windows\App.xaml",
+@"<maui:MauiWinUIApplication
+    x:Class=""TestMauiApp.WinUI.App""
+    xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+    xmlns:maui=""using:Microsoft.Maui""
+    >
+</maui:MauiWinUIApplication>");
+
+            Assert.Empty(await solution.CompilationErrorsAsync());
+
+            await AdjustRunner.AdjustAndCleanupAsync(
+                solution,
+                "TestMauiApp",
+                @"Platforms\Windows\App.xaml.cs",
+                "TestMauiApp.Platforms.Windows",
+                xamlFilePath
+                );
+
+            var text = solution.TextOf("TestMauiApp", @"Platforms\Windows\App.xaml.cs");
+
+            Assert.Contains("namespace TestMauiApp.Platforms.Windows", text);
+            Assert.DoesNotContain("using TestMauiApp.WinUI;", text);
+        }
+
+        /// <summary>
         /// The generated part is not a reason to keep the old namespace: a using clause of it
         /// has to disappear from the other files of the solution as well.
         /// </summary>

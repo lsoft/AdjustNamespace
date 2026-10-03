@@ -46,6 +46,15 @@ My others extensions lives [here](https://marketplace.visualstudio.com/publisher
   class was torn apart. A file whose partial class has a part which is not chosen is blocked.
 - Fixed `Properties.Settings.Default` and similar names of a child namespace of the old
   enclosing namespace, which were lost when a file left that namespace.
+- The names of a moved file are checked against its new namespace: a relative
+  `using Fourth;` inside the namespace declaration, a full name hidden by the new namespace
+  (`First.Second.Thing` inside `Target.First`), a type name which would silently mean a type
+  of the new namespace or become ambiguous (CS0104) are written out in full.
+- A using clause of the target namespace is not added to a file in which it would make
+  another name ambiguous; the reference to the moved type is qualified instead.
+- `nameof` of an emptied namespace is replaced with the string it gives.
+- WinUI: the `Program` class the build generates out of `App.xaml` does not keep the old
+  namespace of a moved `App.xaml.cs` alive anymore (a `using` of it broke the next build).
 - Fixed the `[assembly: XmlnsDefinition(uri, "A.B")]` attributes of WPF, Avalonia and MAUI
   (including the global xmlns of .NET MAUI 10), which kept pointing to the old namespace.
 - Fixed the Avalonia style selectors (`Selector="local|MyButton"`), which were not rewritten.
@@ -55,6 +64,10 @@ My others extensions lives [here](https://marketplace.visualstudio.com/publisher
   type of the same name as another class, a markup extension written as an element without its
   `Extension` suffix, and a MAUI page without `xmlns:x`. The xmlns clauses which were unused
   before the move are not removed anymore.
+- Xaml: a new xmlns clause is named after its namespace (`xmlns:views` for `App.Views`,
+  `views2` when `views` is taken) instead of a random `Viewsd3999903`, and is written like
+  the clauses around it (on a line of its own with their indentation); a removed clause takes
+  its line with it.
 - Fixed a xaml whose code behind lies in another folder or in the global namespace: the
   `x:Class` follows the class of its code behind and nothing else.
 - Global undo: the whole adjusting run is one linked undo transaction, so a single Ctrl+Z

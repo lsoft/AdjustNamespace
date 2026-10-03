@@ -191,6 +191,14 @@ namespace AdjustNamespace.Roslyn
                         continue;
                     }
 
+                    //a type of its own the build generates out of the xaml of the moved code
+                    //behind (`Program` of WinUI in `App.g.i.cs`): it is written into the
+                    //namespace of the `x:Class`, which follows the moved class
+                    if (GeneratedCode.IsGeneratedOutOfXamlOf(reference.SyntaxTree.FilePath, filePath))
+                    {
+                        continue;
+                    }
+
                     AdjustLog.WriteLine(
                         $"[Adjust] IsNamespaceFilledOutside: {compilation.AssemblyName}: {namespaceName} "
                         + $"kept by {type.ToDisplayString()} in {reference.SyntaxTree.FilePath} "

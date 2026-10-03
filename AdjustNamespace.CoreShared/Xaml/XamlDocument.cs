@@ -137,12 +137,12 @@ namespace AdjustNamespace.Xaml
             var newDeclarations = structure.Xmlns.Where(x => !x.Saved).ToList();
             if (newDeclarations.Count > 0)
             {
-                var indexToInsert = FindRootDeclarationPosition(xaml);
+                var indexToInsert = FindRootDeclarationPosition(xaml, out var separator);
                 if (indexToInsert >= 0)
                 {
                     foreach (var xmlns in newDeclarations)
                     {
-                        xmlns.SaveTo(ref xaml, ref indexToInsert);
+                        xmlns.SaveTo(ref xaml, ref indexToInsert, separator);
                     }
                 }
             }
@@ -476,9 +476,15 @@ namespace AdjustNamespace.Xaml
         /// declaration is written: behind the last declaration of that tag, or behind the
         /// name of the element when it has none.
         /// </summary>
+        /// <param name="xaml">Body of the xaml document.</param>
+        /// <param name="separator">What a new declaration is written behind: a line break and
+        /// the indentation of the last declaration when it is written on a line of its own,
+        /// a space otherwise.</param>
         /// <returns><c>-1</c> if the document has no element at all.</returns>
-        private static int FindRootDeclarationPosition(string xaml)
+        private static int FindRootDeclarationPosition(string xaml, out string separator)
         {
+            separator = " ";
+
             var elements = ReadElements(xaml);
             if (elements.Count == 0)
             {
@@ -488,10 +494,19 @@ namespace AdjustNamespace.Xaml
             var root = elements[0];
             var startTag = xaml.Substring(root.Start, root.StartTagEnd - root.Start);
 
-            var declarations = Regex.Matches(startTag, $@"\sxmlns(\s*:\s*{Prefix})?\s*=\s*([""']).*?\2", RegexOptions.Singleline);
+            var declarations = Regex.Matches(startTag, $@"(\s+)xmlns(\s*:\s*{Prefix})?\s*=\s*([""']).*?\3", RegexOptions.Singleline);
             if (declarations.Count > 0)
             {
                 var last = declarations[declarations.Count - 1];
+
+                var whiteSpace = last.Groups[1].Value;
+                var lineBreakEnd = whiteSpace.LastIndexOf('\n');
+                if (lineBreakEnd >= 0)
+                {
+                    var lineBreak = lineBreakEnd > 0 && whiteSpace[lineBreakEnd - 1] == '\r' ? "\r\n" : "\n";
+                    separator = lineBreak + whiteSpace.Substring(lineBreakEnd + 1);
+                }
+
                 return root.Start + last.Index + last.Length;
             }
 

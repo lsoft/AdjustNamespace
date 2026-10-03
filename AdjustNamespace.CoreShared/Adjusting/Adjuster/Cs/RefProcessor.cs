@@ -33,6 +33,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         private readonly EditSet _edits;
         private readonly NamespaceTransition _targetNamespaceInfo;
 
+        /// <summary>
+        /// Whether a using clause of the target namespace would make another name of the
+        /// file ambiguous, by the file path, see <see cref="WouldImportBreakAnotherName"/>.
+        /// </summary>
+        private readonly Dictionary<string, bool> _importConflicts;
+
         /// <param name="workspace">Roslyn workspace to search the references in.</param>
         /// <param name="edits">Set the scheduled edits are placed into.</param>
         /// <param name="targetNamespaceInfo">Transition (old namespace -> new namespace) of the processed type.</param>
@@ -55,6 +61,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             _workspace = workspace;
             _edits = edits;
             _targetNamespaceInfo = targetNamespaceInfo;
+            _importConflicts = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -82,6 +89,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             //and Roslyn cascades the search to all of them: the very same location is reported
             //once per project which compiles the file it lives in
             var processedLocations = new HashSet<(string, TextSpan)>();
+
+            //the files the type is declared in move together with it into the target namespace
+            var declaringFiles = new HashSet<string>(
+                symbolInfo.DeclaringSyntaxReferences.Select(r => r.SyntaxTree.FilePath),
+                StringComparer.OrdinalIgnoreCase
+                );
 
             foreach (var foundReference in foundReferences)
             {
@@ -113,7 +126,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
                     AdjustLog.WriteLine($"[Adjust] RefProcessor: reference at {location.Document.FilePath}@{location.Location.SourceSpan}");
 
-                    await ProcessLocationAsync(location, cancellationToken);
+                    await ProcessLocationAsync(location, declaringFiles, cancellationToken);
                 }
             }
         }
@@ -124,6 +137,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         /// </summary>
         private async Task ProcessLocationAsync(
             ReferenceLocation location,
+            IReadOnlyCollection<string> declaringFiles,
             CancellationToken cancellationToken
             )
         {
@@ -258,7 +272,7 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             {
                 AdjustLog.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}@{syntax.Span}: '{syntax}' is a part of the qualified name '{qns}'");
 
-                ProcessQualifiedName(location, semanticModel, syntax, symbol.Name, qns);
+                ProcessQualifiedName(location, semanticModel, syntax, symbol.Name, qns, declaringFiles);
             }
             else if (syntax.Parent is MemberAccessExpressionSyntax maes)
             {
@@ -271,7 +285,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                     semanticModel,
                     syntax,
                     symbol,
-                    maesr
+                    maesr,
+                    declaringFiles
                     );
             }
             else
@@ -292,7 +307,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 AdjustLog.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: add using {_targetNamespaceInfo.ModifiedName} (fallback branch)");
 
                 //add a new using clause
-                _edits.AddUsing(location.Document.FilePath, _targetNamespaceInfo.ModifiedName);
+                AddUsingOrQualify(
+                    location,
+                    semanticModel,
+                    syntax is SimpleNameSyntax name && name.Identifier.ValueText == symbol.Name ? name : null,
+                    declaringFiles
+                    );
             }
         }
 
@@ -305,12 +325,14 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
         /// <param name="syntax">The node of the reference itself, i.e. the name of the moved type.</param>
         /// <param name="typeName">The name of the moved type.</param>
         /// <param name="qns">The qualified name the reference is a part of.</param>
+        /// <param name="declaringFiles">The files the moved type is declared in.</param>
         private void ProcessQualifiedName(
             ReferenceLocation location,
             SemanticModel semanticModel,
             SyntaxNode syntax,
             string typeName,
-            QualifiedNameSyntax qns
+            QualifiedNameSyntax qns,
+            IReadOnlyCollection<string> declaringFiles
             )
         {
             var uqns = qns.ToUpperSymbol(semanticModel);
@@ -323,9 +345,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
                 AdjustLog.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: '{qns}' has no upper qualified name");
 
-                if (ReferenceEquals(qns.Left, syntax)
+                var isHead = ReferenceEquals(qns.Left, syntax)
                     && syntax is SimpleNameSyntax sns
                     && sns.Identifier.ValueText == typeName
+                    ;
+
+                if (isHead
                     && TryFixShadowedReference(
                         location,
                         semanticModel,
@@ -340,7 +365,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
                 AdjustLog.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: add using {_targetNamespaceInfo.ModifiedName} (qualified name, no upper name)");
 
-                _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
+                AddUsingOrQualify(
+                    location,
+                    semanticModel,
+                    isHead ? qns.ToUpperSyntax<QualifiedNameSyntax>() : null,
+                    declaringFiles
+                    );
 
                 return;
             }
@@ -411,7 +441,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             SemanticModel semanticModel,
             SyntaxNode syntax,
             ISymbol symbol,
-            MemberAccessExpressionSyntax maes
+            MemberAccessExpressionSyntax maes,
+            IReadOnlyCollection<string> declaringFiles
             )
         {
             if (!symbol.Kind.NotIn(SymbolKind.Property, SymbolKind.Field, SymbolKind.Method))
@@ -445,7 +476,12 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             {
                 AdjustLog.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: '{maes}' typeIndex={typeIndex} -> add using {_targetNamespaceInfo.ModifiedName}");
 
-                _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
+                AddUsingOrQualify(
+                    location,
+                    semanticModel,
+                    typeIndex == 0 && syntax is SimpleNameSyntax ? syntax : null,
+                    declaringFiles
+                    );
 
                 return;
             }
@@ -492,6 +528,207 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
 
             AdjustLog.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: '{nodeToReplace}' is shadowed by the target namespace {_targetNamespaceInfo.ModifiedName}, qualifying instead of using");
 
+            Qualify(location, semanticModel, nodeToReplace);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Import the target namespace into the file of the reference, or, if such a using
+        /// clause would make another name of that file ambiguous (see
+        /// <see cref="WouldImportBreakAnotherName"/>), write the target namespace in front of
+        /// the reference instead.
+        /// </summary>
+        /// <param name="location">The reference location.</param>
+        /// <param name="semanticModel">Semantic model of the document the reference lives in.</param>
+        /// <param name="nodeToQualify">The name to be qualified, or <c>null</c> if the reference
+        /// is not written in a way which may be qualified: the using clause is added then.</param>
+        /// <param name="declaringFiles">The files the moved type is declared in.</param>
+        private void AddUsingOrQualify(
+            ReferenceLocation location,
+            SemanticModel semanticModel,
+            SyntaxNode? nodeToQualify,
+            IReadOnlyCollection<string> declaringFiles
+            )
+        {
+            if (nodeToQualify != null
+                && WouldImportBreakAnotherName(location.Document.FilePath!, semanticModel, declaringFiles)
+                )
+            {
+                AdjustLog.WriteLine($"[Adjust] RefProcessor: {location.Document.FilePath}: using {_targetNamespaceInfo.ModifiedName} would make another name ambiguous, qualifying '{nodeToQualify}' instead");
+
+                Qualify(location, semanticModel, nodeToQualify);
+
+                return;
+            }
+
+            _edits.AddUsing(location.Document.FilePath!, _targetNamespaceInfo.ModifiedName);
+        }
+
+        /// <summary>
+        /// A using clause of the target namespace would make another name of the file mean
+        /// another type: the file writes the simple name of a type it imports from elsewhere,
+        /// and the target namespace has a type of that very name (CS0104).
+        ///
+        /// A file the moved type is declared in is moved into the target namespace together
+        /// with it, and a using clause of its own namespace changes nothing there.
+        /// </summary>
+        private bool WouldImportBreakAnotherName(
+            string filePath,
+            SemanticModel semanticModel,
+            IReadOnlyCollection<string> declaringFiles
+            )
+        {
+            if (declaringFiles.Contains(filePath))
+            {
+                return false;
+            }
+
+            if (_importConflicts.TryGetValue(filePath, out var known))
+            {
+                return known;
+            }
+
+            var brokenName = FindNameBrokenByImport(semanticModel);
+            var result = brokenName != null;
+            if (result)
+            {
+                AdjustLog.WriteLine($"[Adjust] RefProcessor: {filePath}: '{brokenName}' would be ambiguous with a type of {_targetNamespaceInfo.ModifiedName}");
+            }
+
+            _importConflicts[filePath] = result;
+
+            return result;
+        }
+
+        /// <summary>
+        /// The first simple name of the document which a using clause of the target namespace
+        /// would make ambiguous, see <see cref="WouldImportBreakAnotherName"/>.
+        /// </summary>
+        private string? FindNameBrokenByImport(SemanticModel semanticModel)
+        {
+            var compilation = semanticModel.Compilation;
+
+            var target = compilation.TryFindNamespace(_targetNamespaceInfo.ModifiedName);
+            if (target == null)
+            {
+                //the target namespace has no types yet
+                return null;
+            }
+
+            var root = semanticModel.SyntaxTree.GetRoot();
+
+            foreach (var name in root.DescendantNodes().OfType<SimpleNameSyntax>())
+            {
+                if (name.Parent is QualifiedNameSyntax qualified && ReferenceEquals(qualified.Right, name))
+                {
+                    continue;
+                }
+
+                if (name.Parent is MemberAccessExpressionSyntax access && ReferenceEquals(access.Name, name))
+                {
+                    continue;
+                }
+
+                if (name.Parent is AliasQualifiedNameSyntax
+                    || name.Ancestors().Any(a => a is UsingDirectiveSyntax)
+                    )
+                {
+                    continue;
+                }
+
+                var symbol = semanticModel.GetSymbolInfo(name).Symbol;
+                var type = symbol as INamedTypeSymbol
+                    ?? (symbol is IMethodSymbol { MethodKind: MethodKind.Constructor } constructor && name.Parent is AttributeSyntax
+                        ? constructor.ContainingType
+                        : null);
+
+                if (type == null
+                    || type.ContainingType != null
+                    || type.ContainingNamespace == null
+                    || type.ContainingNamespace.IsGlobalNamespace
+                    || semanticModel.GetAliasInfo(name) != null
+                    )
+                {
+                    continue;
+                }
+
+                var arity = name is GenericNameSyntax generic ? generic.Arity : 0;
+
+                var others = target
+                    .GetTypeMembers(type.Name, arity)
+                    .Where(t => !NameLookup.IsSame(t, type))
+                    .Where(t => NameLookup.IsVisibleOutsideItsFile(compilation, t))
+                    ;
+                if (!others.Any())
+                {
+                    continue;
+                }
+
+                if (IsFoundInEnclosingNamespace(semanticModel, name.SpanStart, type))
+                {
+                    //an enclosing namespace is searched before the using clauses
+                    continue;
+                }
+
+                if (NameLookup.FindImportedTypes(semanticModel, name.SpanStart, Array.Empty<string>(), type.Name, arity)
+                    .Any(t => !NameLookup.IsSame(t, type)))
+                {
+                    //ambiguous already, and the file compiles: the name is not used as a type
+                    continue;
+                }
+
+                return name.ToString();
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// The type is a member of a namespace which encloses the given position.
+        /// </summary>
+        private static bool IsFoundInEnclosingNamespace(
+            SemanticModel semanticModel,
+            int position,
+            INamedTypeSymbol type
+            )
+        {
+            var enclosingSymbol = semanticModel.GetEnclosingSymbol(position);
+
+            var @namespace = enclosingSymbol as INamespaceSymbol
+                ?? enclosingSymbol?.ContainingNamespace
+                ;
+
+            var typeNamespace = type.ContainingNamespace.ToDisplayString();
+
+            while (@namespace != null && !@namespace.IsGlobalNamespace)
+            {
+                if (@namespace.ToDisplayString() == typeNamespace)
+                {
+                    return true;
+                }
+
+                @namespace = @namespace.ContainingNamespace;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Write the target namespace in front of the given name.
+        /// </summary>
+        /// <param name="location">The reference location.</param>
+        /// <param name="semanticModel">Semantic model of the document the reference lives in.</param>
+        /// <param name="nodeToReplace">
+        /// The whole name to be qualified: the name of the type itself (<c>Class1</c>)
+        /// or the name it is the head of (<c>Class1.NestedClass2</c>).
+        /// </param>
+        private void Qualify(
+            ReferenceLocation location,
+            SemanticModel semanticModel,
+            SyntaxNode nodeToReplace
+            )
+        {
             //`global::Class1` is a name of the root namespace already: the target namespace
             //is written after that alias and not in front of it
             var isAliasQualified = nodeToReplace.Parent is AliasQualifiedNameSyntax;
@@ -510,8 +747,6 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 nodeToReplace.Span,
                 modified.ToString()
                 );
-
-            return true;
         }
 
         /// <summary>

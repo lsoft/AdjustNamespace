@@ -130,7 +130,8 @@ namespace AdjustNamespace.Xaml.Positioned
             {
                 targetXmlns = new XamlXmlns(
                     sourceXmlns,
-                    move.TargetNamespace
+                    move.TargetNamespace,
+                    structure.CreateAlias(move.TargetNamespace)
                     );
                 newXmlns = targetXmlns;
             }

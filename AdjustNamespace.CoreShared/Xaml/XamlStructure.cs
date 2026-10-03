@@ -166,6 +166,42 @@ namespace AdjustNamespace.Xaml
         }
 
         /// <summary>
+        /// An alias for a new declaration of the given namespace: the last part of the
+        /// namespace in lower case (<c>views</c> for <c>App.Views</c>), with a number added
+        /// when the document has that alias already. Every alias of the document counts,
+        /// a nested one too: the new declaration is written on the root element and would be
+        /// shadowed inside of that nested element.
+        /// </summary>
+        internal string CreateAlias(string @namespace)
+        {
+            var taken = new HashSet<string>(StringComparer.Ordinal) { XPrefix.Alias };
+            taken.UnionWith(Xmlns.Select(x => x.Alias));
+            taken.UnionWith(Controls.Select(c => c.Alias));
+            taken.UnionWith(RefFroms.Select(r => r.Alias));
+            taken.UnionWith(TypeUsages.Select(u => u.Alias));
+
+            var lastDot = @namespace.LastIndexOf('.');
+            var baseAlias = @namespace.Substring(lastDot + 1).ToLowerInvariant();
+            if (baseAlias.Length == 0)
+            {
+                baseAlias = "ns";
+            }
+            else if (baseAlias.StartsWith("xml", StringComparison.Ordinal))
+            {
+                //the prefixes starting with `xml` are reserved by XML
+                baseAlias = "ns" + baseAlias;
+            }
+
+            var alias = baseAlias;
+            for (var number = 2; taken.Contains(alias); number++)
+            {
+                alias = baseAlias + number;
+            }
+
+            return alias;
+        }
+
+        /// <summary>
         /// Alias of the xaml language namespace (usually `x`).
         /// </summary>
         public XamlX GetXPrefix()
