@@ -1,3 +1,4 @@
+using AdjustNamespace.TextReferences;
 using AdjustNamespace.VisualStudio;
 using Microsoft.CodeAnalysis;
 using System.Collections.Generic;
@@ -27,6 +28,11 @@ namespace AdjustNamespace.Cli.MsBuild
         /// </summary>
         private IReadOnlyDictionary<string, ProjectRef>? _projectOfEveryFile;
 
+        /// <summary>
+        /// The walk through the folders of the projects is made once, like the one above.
+        /// </summary>
+        private IReadOnlyList<string>? _textFilePaths;
+
         public MsBuildSolutionExplorer(
             Workspace workspace
             )
@@ -51,6 +57,97 @@ namespace AdjustNamespace.Cli.MsBuild
         public Task<IReadOnlyDictionary<string, ProjectRef>> GetProjectOfEveryFileAsync()
         {
             return Task.FromResult(ProjectOfEveryFile());
+        }
+
+        /// <inheritdoc/>
+        public Task<IReadOnlyList<string>> GetTextFilePathsAsync()
+        {
+            if (_textFilePaths != null)
+            {
+                return Task.FromResult(_textFilePaths);
+            }
+
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var project in ProjectsWithFile())
+            {
+                result.Add(project.FilePath!);
+
+                var projectFolder = Path.GetDirectoryName(project.FilePath!);
+                if (!string.IsNullOrEmpty(projectFolder))
+                {
+                    foreach (var filePath in EnumerateTextFiles(projectFolder!))
+                    {
+                        result.Add(filePath);
+                    }
+                }
+
+                foreach (var document in project.AdditionalDocuments)
+                {
+                    if (!string.IsNullOrEmpty(document.FilePath))
+                    {
+                        result.Add(document.FilePath!);
+                    }
+                }
+            }
+
+            _textFilePaths = result.ToList();
+
+            return Task.FromResult(_textFilePaths);
+        }
+
+        /// <summary>
+        /// The files of the folder (recursively) that the search of the text references can look
+        /// into. The folders of the build outputs and of the tools are not entered, so a big
+        /// <c>node_modules</c> costs nothing.
+        /// </summary>
+        private static IEnumerable<string> EnumerateTextFiles(
+            string projectFolder
+            )
+        {
+            if (!Directory.Exists(projectFolder))
+            {
+                yield break;
+            }
+
+            var folders = new Stack<string>();
+            folders.Push(projectFolder);
+
+            while (folders.Count > 0)
+            {
+                var folder = folders.Pop();
+
+                IEnumerable<string> files;
+                IEnumerable<string> subfolders;
+
+                try
+                {
+                    files = Directory.GetFiles(folder);
+                    subfolders = Directory.GetDirectories(folder);
+                }
+                catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                foreach (var filePath in files)
+                {
+                    var extension = Path.GetExtension(filePath);
+
+                    if (TextReferenceFiles.CandidateExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                    {
+                        yield return filePath;
+                    }
+                }
+
+                foreach (var subfolder in subfolders)
+                {
+                    if (!TextReferenceFiles.IsExcludedFolderName(Path.GetFileName(subfolder)))
+                    {
+                        folders.Push(subfolder);
+                    }
+                }
+            }
         }
 
         private IReadOnlyDictionary<string, ProjectRef> ProjectOfEveryFile()

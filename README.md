@@ -1,6 +1,6 @@
 # Adjust Namespaces
 
-AdjustNamespace is a Visual Studio 2026 extension which brings the C# namespaces in accordance with the location and **rules the resulting regressions in the code (including XAML), e.g. fixes the broken references**. This extension works like Resharper `Adjust namespaces` function. If you know Resharper, you know what this extension is trying to do.
+AdjustNamespace is a Visual Studio 2026 (and 2022 17.14) extension which brings the C# namespaces in accordance with the location and **rules the resulting regressions in the code (including XAML), e.g. fixes the broken references**. This extension works like Resharper `Adjust namespaces` function. If you know Resharper, you know what this extension is trying to do.
 
 The same job is done by the console utility `adjustns` (see [Console utility](#console-utility)), which needs no Visual Studio at all and is therefore usable on a build server.
 
@@ -32,7 +32,10 @@ You can also exclude some folders from participating in namespace chain. AdjustN
 
 1. **Preparation.** Every project of the solution is compiled and the found errors are reported. The adjusting is based on the Roslyn semantic model, so a broken solution may lead to incorrect results. You are allowed to move next anyway.
 2. **Selection.** The chosen files are scanned and only those which really have to be changed are shown, grouped by their folder. Here you may uncheck the files you do not want to touch, tune the target namespace with a regex (see below) and decide whether the changed files have to be opened in the editor. If the target namespace of a file already contains a type with the same name, the scan stops with an error: such a move would break the compilation.
+   The same step has a collapsible **Text references** block: the aggressiveness of the search of the names of the moved types that are written as a text (see [Text references](#text-references)) and which kinds of files are searched.
+   **Review** (only if the search has found something to show). Every text reference is a row: a level badge (Certain, Likely, Possible), the line with the name highlighted, `old -> new` and a check box which the aggressiveness has preset; the tooltip tells why the score is what it is. Filter the rows by level, `Check all Likely`, `Check all` and `Uncheck all` are there, a double click opens the file at the line. `Next` runs the adjusting with the checked rows only.
 3. **Performing.** The files are processed one by one, then the using clauses of the namespaces which became empty are removed from the whole solution.
+4. **Report.** The window does not close right after the run: it shows what has been adjusted (per file: the old and the new namespace, the files that had to be changed because of it and what was done in each), what has not been adjusted and why (blocked, nothing to move, not reached because of the cancel, failed) and the using clauses the cleanup has removed. What the run has not fixed (the text references that were left, the new compilation errors of the optional build check) is also put into the **Error List** as warnings, so it stays visible after the window is closed. `Copy as Markdown` puts the report on the clipboard, `Save report...` writes it to a file (Markdown, or JSON by the extension), a double click on a file opens it. Whether the step is shown is an option, see [Settings](#settings).
 
 ## How the target namespace is calculated
 
@@ -67,7 +70,16 @@ The settings are stored in `adjust_namespaces_settings.xml`, in the folder of yo
 </AdjustNamespaceSettings>
 ```
 
-The extension also keeps a few per user options (`Tools -> Options -> Adjust Namespaces`); they are used for the release notes gold bar and for the rating request only.
+The per user options live in `Tools -> Options -> Adjust Namespaces`:
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `Aggressiveness` | `Balanced` | The default aggressiveness of the search of the [text references](#text-references): `Off`, `ReportOnly`, `Conservative`, `Balanced`, `Aggressive`. The wizard shows it on the selection step, where it can be changed for this run; a solution can override it in its settings file. |
+| `Search the comments`, `Search the xml configs`, `Search the json files`, `Search the Razor files`, `Search the project and settings files` | off, on, on, on, on | Which kinds of files the search looks into besides the string literals of C#. |
+| `Run the build check` | off | Count the compilation errors of the affected projects before the run and after it; the new ones are listed in the report. It compiles the projects, so it takes time on a big solution. |
+| `Show the report` | `Always` | When the wizard shows the report after the run: `Always`, `WhenSomethingIsLeft` (a file is blocked, not processed or failed) or `Never` (the window closes as soon as the run is over). A failed run is always shown. |
+
+The extension also keeps a few hidden options for the release notes gold bar and for the rating request.
 
 ## What is fixed
 
@@ -85,6 +97,41 @@ XAML files (`.xaml` and Avalonia `.axaml`):
 - the `{x:Type}` and `{x:Static}` markup extensions;
 - the other places where a class is referenced through an xmlns alias: an attribute value (`TargetType="local:MyButton"`), an attached property (`local:Helper.IsEnabled="True"`), a custom markup extension (`{local:UpperCase}`) and `x:TypeArguments`;
 - the `xmlns:…="clr-namespace:…"` and `xmlns:…="using:…"` clauses: a clause for the target namespace is created when required (in the same form as the source) and the clauses which became unused are removed.
+
+## Text references
+
+Roslyn sees the references to a type that are written as code. A name written as a **text** keeps its old name after the move and breaks the program at run time only: `Type.GetType("A.B.C, MyAsm")`, `new ResourceManager("A.B.Properties.Resources", ...)`, a comment. From 0.8.0 the extension searches for such names, gives every match a **confidence score** (0..100, with the list of the reasons) and changes the ones you trust.
+
+- Only the **full names** of the moved types are searched (`A.B.C`, `global::A.B.C`, `A.B.Outer+Inner`, ``A.B.C`1``, `A.B.C, MyAsm, Version=...`), never a short name like `Customer`. A name has borders: `X.A.B.C` and `A.B.CExtra` are not `A.B.C`, `A.B.C.Member` is.
+- The score depends on the place the name is found in (a string passed as a type name is worth much more than a name inside a sentence) and on the signs around it (the assembly of the moved type, a file extension, prose, a type of the same name in another assembly, test data).
+- The levels are **Certain** (90..100), **Likely** (70..89), **Possible** (45..69) and **Unlikely** (below 45, hidden).
+
+| Mode | Changed on its own | Offered (unchecked) |
+| --- | --- | --- |
+| `Off` | | |
+| `ReportOnly` | nothing | from Possible |
+| `Conservative` | Certain | Likely, Possible |
+| `Balanced` (default) | Certain, Likely | Possible |
+| `Aggressive` | Certain, Likely, Possible | |
+
+What is searched: the string literals of C# files (always, except in the `Off` mode) and, if you switch them on, the comments of C#; the directives of the Razor files (`@using`, `@model`, `@inherits`, `@inject`, `@typeparam`, `@implements`, `@namespace` of `.cshtml` and `.razor` files); `<StartupObject>` and `CustomToolNamespace` of a project file (a moved startup class is a build error otherwise); `GeneratedClassNamespace` and the `Type` of a setting of a `.settings` file; the xml configs (`*.config`: `type`, `typeName`, `mapTo`, `contract`, `factory`, the `name` of a `service`, any other value that is the name as a whole); `appsettings*.json` (the values of `$type`, `type`, `class`, the elements of `Using`, any other value that is the name as a whole). Other xml and json files are searched if you name them in the settings file (`<TextReferenceFiles>`). A `$type` in a json file gets a note in the report: data serialized with the old name (a database, a queue) cannot be fixed by an edit of the sources. A namespace (`@using A.B`) is changed only if the run empties it and all of its types go to the same place, and it is never more than Likely; a namespace that stays alive is left as it is. Every offered match is listed in the report with the line, the old and the new name and the score with its reasons. A match is changed only if the file still has the name where it was found.
+
+Not detectable, and therefore not handled: names built at run time (`"A.B." + name`), and short or partial names inside strings (`"B.C"` for `A.B.C`).
+
+To override the defaults for a solution, add the elements to `adjust_namespaces_settings.xml` (all of them are optional, a file without them keeps working):
+
+```xml
+<AdjustNamespaceSettings ...>
+  <SkippedFolderSuffixes />
+  <TextReferenceMode>Conservative</TextReferenceMode> <!-- Off, ReportOnly, Conservative, Balanced, Aggressive -->
+  <ScanComments>true</ScanComments>
+  <ScanXmlConfigs>true</ScanXmlConfigs>   <!-- also ScanJson, ScanRazor, ScanProjectFiles -->
+  <TextReferenceFiles>                    <!-- xml and json files besides the usual configs -->
+    <string>Services.xml</string>
+    <string>MyApp\Config\*.json</string>
+  </TextReferenceFiles>
+</AdjustNamespaceSettings>
+```
 
 ## Undo
 
@@ -127,10 +174,14 @@ adjustns <solution> [options]
 | `--check` | Change nothing and exit with the code `2` if there is something to adjust. This is the mode a CI job runs the utility in. |
 | `--force` | Adjust even if the solution does not compile. |
 | `-v`, `--verbose` | Report every processed file and not the changed ones only. |
+| `--text <mode>` | How aggressively the [text references](#text-references) are searched and changed: `off`, `report`, `conservative`, `balanced` (the default), `aggressive`. With `--dry-run` the matches are listed with their scores (add `-v` for the reasons of every score). A match left at the Likely level is not an error: the exit code is not affected by the text references. |
+| `--text-kinds <list>` | Where the text references are looked for besides the string literals of C#: a comma separated list of `comments`, `xml`, `json`, `razor`, `project` (the default is everything but `comments`). |
+| `--build-check` | Count the compilation errors of the affected projects before the run and after it and list the new ones in the report. |
+| `--report <path>` | Write the report of the run to this file: Markdown, or JSON if the extension is `.json`. The very same report is printed on the console after every run. |
 | `--debug` | Write the detailed `[Adjust]` diagnostics into `%TEMP%\AdjustNamespace.cli.log`. |
 | `-h`, `--help` | Show the help. |
 
-The exit code is `0` when the run is over (including "there was nothing to do"), `1` when the utility has failed and `2` when `--check` has found the files to adjust.
+The exit code is `0` when the run is over (including "there was nothing to do"), `1` when the utility has failed (or at least one file cannot be adjusted) and `2` when `--check` has found the files to adjust.
 
 A few things which differ from the extension:
 
@@ -156,9 +207,8 @@ A few things which are worth to know:
 
 ## Requirements
 
-- Visual Studio 2026 (18.0 and newer 18.x), amd64 or arm64. Visual Studio 2022 is supported up
-  to version 0.6.0 of the extension: the newer ones are compiled against the Roslyn of Visual
-  Studio 2026, which Visual Studio 2022 cannot load;
+- Visual Studio 2026 or Visual Studio 2022 17.14, amd64 or arm64. The C# 14 and C# 15 features
+  are adjusted where the compiler of that Visual Studio understands them;
 - .NET Framework 4.8 (to build the extension);
 - .NET 10 SDK (to build and to run the console utility; a newer SDK is fine too). The adjusted
   projects themselves may target any framework the installed SDK can build.
@@ -178,7 +228,7 @@ The solution consists of:
 
 - `AdjustNamespace.CoreShared` — a shared project with the core: everything which knows nothing about Visual Studio;
 - `AdjustNamespace.VsixShared` — a shared project with the wizard, the menu commands and the boundary to the IDE;
-- `AdjustNamespace.2022` — the VSIX project (the manifest, the command table, the resources); it keeps its old name, but targets Visual Studio 2026;
+- `AdjustNamespace.2022` — the VSIX project (the manifest, the command table, the resources); it targets Visual Studio 2022 17.14 and Visual Studio 2026;
 - `AdjustNamespace.Cli` — the console utility (`net10.0`), the core over an `MSBuildWorkspace`;
 - `Tests/AdjustNamespace.Tests` — the automated tests of the core (`dotnet test`).
 

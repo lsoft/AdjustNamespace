@@ -692,7 +692,7 @@ $@"    <Window.Styles>
     xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
 </UserControl>");
 
-            var outcome = await new AdjustSession(solution.Context, new NamespaceReplaceRegex(string.Empty, string.Empty))
+            var report = await new AdjustSession(solution.Context, new NamespaceReplaceRegex(string.Empty, string.Empty))
                 .RunAsync(
                     new[]
                     {
@@ -704,7 +704,7 @@ $@"    <Window.Styles>
                     CancellationToken.None
                     );
 
-            Assert.Equal(AdjustSessionOutcome.Completed, outcome);
+            Assert.Equal(AdjustSessionOutcome.Completed, report.Outcome);
 
             var viewModel = await solution.GetTypeAsync("Sample", "Sample.ViewModels.MainViewModel");
             var viewName = viewModel.ToDisplayString().Replace("ViewModel", "View");

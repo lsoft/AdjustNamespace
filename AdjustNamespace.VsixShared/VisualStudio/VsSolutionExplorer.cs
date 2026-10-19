@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AdjustNamespace.VisualStudio
@@ -15,6 +16,28 @@ namespace AdjustNamespace.VisualStudio
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
 
             return await SolutionHelper.GetAllFilesFromAsync();
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<string>> GetTextFilePathsAsync()
+        {
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+            //every file of the tree, plus the project files, which are no items of the tree
+            var result = new List<string>(await SolutionHelper.GetAllFilesFromAsync());
+
+            var projectOfFile = await GetProjectOfEveryFileAsync();
+
+            result.AddRange(
+                projectOfFile.Values
+                    .Select(p => p.FilePath)
+                    .Where(p => !string.IsNullOrEmpty(p))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                );
+
+            return result
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         /// <inheritdoc/>

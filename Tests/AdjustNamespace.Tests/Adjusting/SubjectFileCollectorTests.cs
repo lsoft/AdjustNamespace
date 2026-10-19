@@ -533,7 +533,7 @@ namespace MyApp
             Assert.Equal(solution.PathOf("MyApp", @"Folder1\Other.cs"), results.CollectedFiles[0].FilePath);
             Assert.Single(results.Blocked);
 
-            var outcome = await new AdjustNamespace.Adjusting.Session.AdjustSession(
+            var report = await new AdjustNamespace.Adjusting.Session.AdjustSession(
                 solution.Context,
                 new NamespaceReplaceRegex(string.Empty, string.Empty)
                 ).RunAsync(
@@ -542,7 +542,7 @@ namespace MyApp
                     default
                     );
 
-            Assert.Equal(AdjustNamespace.Adjusting.Session.AdjustSessionOutcome.Completed, outcome);
+            Assert.Equal(AdjustNamespace.Adjusting.Session.AdjustSessionOutcome.Completed, report.Outcome);
             Assert.Contains("namespace A.B", solution.TextOf("MyApp", @"Folder1\Class1.cs"));
             Assert.Contains("namespace MyApp.Folder1", solution.TextOf("MyApp", @"Folder1\Other.cs"));
             Assert.Empty(await solution.CompilationErrorsAsync());

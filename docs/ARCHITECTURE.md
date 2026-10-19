@@ -42,10 +42,16 @@ The core has two hosts. Visual Studio drives it through the wizard:
    +--> 1. PreparationStepViewModel   - compiles the solution, reports the errors
    |
    +--> 2. SelectedStepViewModel      - SubjectFileCollector scans the files,
-   |                                    the user chooses what to adjust
+   |                                    the user chooses what to adjust and how
+   |                                    aggressively the text references are searched
+   |
+   +--> 2a. ReviewStepViewModel       - the text references found, each with a check box
+   |                                    (skipped when there is nothing to show)
    |
    +--> 3. PerformingViewModel        - shows the progress and cancels,
-                                        AdjustSession does the job
+   |                                    AdjustSession does the job
+   |
+   +--> 4. ReportStepViewModel        - shows the AdjustReport of the run
 ```
 
 and the console utility walks the very same three steps without asking anybody:
@@ -62,6 +68,8 @@ and the console utility walks the very same three steps without asking anybody:
    +--> 2. SubjectFileCollector      - the same scan; --dry-run and --check stop here
    |
    +--> 3. AdjustSession             - the same job, the progress goes to the console
+   |
+   +--> 4. AdjustReport              - printed on the console, saved by --report
 ```
 
 Both the scan and the adjusting ask one and the same `AdjustPlanner` whether a file is a
@@ -82,6 +90,8 @@ the solution.
 | `AdjustNamespace.Adjusting.Plan` | The decision what has to happen with a file (`AdjustPlanner`, `AdjustPlanItem`). |
 | `AdjustNamespace.Adjusting.Edit` | The decision what has to be written into the files (`EditSet`, `FileEdit`) and, in `.Apply`, the only code which writes it. |
 | `AdjustNamespace.Adjusting.Session` | One run over the chosen files (`AdjustSession`): the stages, the progress and the cancellation. |
+| `AdjustNamespace.TextReferences` | The search of the names of the moved types that are written as a text, the confidence score of a match and the application of the approved ones. |
+| `AdjustNamespace.Adjusting.Report` | What a run has done (`AdjustReport`, built by `AdjustReportBuilder`) and the renderers of it: Markdown, JSON and the tree of the wizard. |
 | `AdjustNamespace.Namespace` | Namespace transitions and the namespace state of the solution. |
 | `AdjustNamespace.Xaml` | Reading, modification and saving of the xaml files. |
 | `AdjustNamespace.Settings` | Per solution settings stored in the solution folder. |
@@ -97,13 +107,13 @@ A folder is a namespace and a namespace is a folder: `AdjustNamespace.Roslyn` is
 
 ### The boundary to Visual Studio
 
-Everything the core needs from the outside world is behind four interfaces of
+Everything the core needs from the outside world is behind these interfaces of
 `AdjustNamespace.VisualStudio` and `AdjustNamespace.Xaml.BodyProvider`. The interfaces live in
 the core, the implementations belong to the host:
 
 | Interface | What it gives | In Visual Studio | In the console utility |
 | --- | --- | --- | --- |
-| `ISolutionExplorer` | The files of the solution and the project of every one of them (`ProjectRef`). The tree is walked once per session, see `AdjustPlanner`. | `VsSolutionExplorer` (the solution tree, main thread) | `MsBuildSolutionExplorer` (the documents of the workspace plus the xaml files found on the disk) |
+| `ISolutionExplorer` | The files of the solution and the project of every one of them (`ProjectRef`). The tree is walked once per session, see `AdjustPlanner`. Also the text files that may name a type (`GetTextFilePathsAsync`): the project files, the configs, the Razor views. | `VsSolutionExplorer` (the solution tree, main thread) | `MsBuildSolutionExplorer` (the documents of the workspace plus the xaml files found on the disk) |
 | `IProjectDefaultNamespaceProvider` | The `DefaultNamespace` property of a project. | `DteProjectDefaultNamespaceProvider` (DTE, main thread) | `ProjectFileDefaultNamespaceProvider` (`Project.DefaultNamespace` of Roslyn, i.e. the `RootNamespace` of the project file) |
 | `IXamlBodyProviderFactory` | The way a xaml file is read and written. Reads always go through the file system; writes in Visual Studio go through an invisible text buffer so they participate in the global linked undo. | `VsXamlBodyProviderFactory` | `ClosedXamlBodyProviderFactory`: always the file system |
 
@@ -126,13 +136,13 @@ itself.
 The steps are chained through `IStepFactory<TParameters>`: every step knows the factory of the
 next one **and what that step has to be entered with**, so a step wired to a wrong neighbour
 does not compile instead of throwing an `InvalidCastException` in the middle of the wizard.
-The three parameter types (`PreparationParameters`, `SelectedStepParameters`,
-`PerformingParameters`) are the whole contract between the steps.
+The parameter types (`PreparationParameters`, `SelectedStepParameters`, `ReviewParameters`,
+`PerformingParameters`, `ReportParameters`) are the whole contract between the steps.
 
 `WizardChain` builds the chain and is the only place which knows its shape. The chain is not a
-line — the second step allows to go back, so the first two steps reference each other and one of
-them is necessarily built after the other; this is why the previous step is asked for as a
-`Func<>` at the moment the step is created and not at the moment its factory is.
+line — the second step allows to go back, and so does the review step, so these steps reference
+each other and one of them is necessarily built after the other; this is why the previous step
+is asked for as a `Func<>` at the moment the step is created and not at the moment its factory is.
 
 A step does not know the window it lives in. `IWizardHost` is the window as a step sees it —
 show this control with this viewmodel, or close the wizard — and `WizardHost` is the
@@ -147,10 +157,30 @@ user with the error text and not with an empty window.
    the subject to change, grouped by their physical folder (`SelectFolderViewModel` +
    `SelectFileViewModel`). Here the user tunes the target namespace regex
    (`NamespaceReplaceRegex`, `KnownRegex`).
+   The same step has a collapsible **Text references** block: the aggressiveness combo box
+   (`TextModeChoice`) and a check box per kind of file. They start from the user options
+   (`General`, Tools -> Options) overridden by the settings of the solution, and what the user
+   chooses here is handed back to the step if the review sends them back (`SelectedStepParameters`).
+   "Next" runs the search (`TextReferenceScanner`, the progress goes to the status line) and enters
+   the review step with the result (`ReviewParameters`).
+   **`ReviewStepViewModel`** shows the text references of the scan grouped by file: a level badge
+   (colored by the level), the line with the name highlighted, `old -> new`, a check box that is
+   the `IsApproved` of the match itself (preset by the mode, so what the session reads is what the
+   user sees), the signals of the score as a tooltip, a filter by level (the unlikely ones are
+   hidden unless asked for), "Check all Likely", "Check all" and "Uncheck all", and a double click
+   that opens the file at the line (`FileNavigator`). `ReviewStepFactory` shows the step only if
+   the scan has something to show; otherwise it goes straight to the run. "Next" starts the
+   session with the reviewed `TextReferenceScanResult`, so the session does not search again.
 3. **`PerformingViewModel`** opens a global linked undo transaction (`mdtGlobal`), starts an
-   `AdjustSession`, shows what it reports and closes the window when it is over. The adjusting
-   itself is not written here: the viewmodel owns the `CancellationTokenSource` behind the
-   `Cancel` button and the undo transaction.
+   `AdjustSession`, shows what it reports and, when it is over, closes the transaction and
+   moves on to the report. The adjusting itself is not written here: the viewmodel owns the
+   `CancellationTokenSource` behind the `Cancel` button and the undo transaction. A failed
+   session (`AdjustSessionOutcome.Failed`) aborts the transaction, as an exception used to.
+4. **`ReportStepViewModel`** shows the `AdjustReport` of the run instead of the automatic close:
+   the summary line, a tree of the sections (`AdjustReportSections`, built in the core so the
+   viewmodel has nothing to decide), and the buttons `Copy as Markdown`, `Save report...`,
+   `Open log` and `Close`. Whether the step is shown is the option `General.ShowReport`
+   (always / only if something is left / never); a failed run is always shown.
 
 ### The session
 
@@ -167,6 +197,47 @@ between the files and between the types of a file, never while the edits of a fi
 written: an `EditSet` describes a single consistent change and a half of it is a broken file.
 A cancelled session is a usual outcome (`AdjustSessionOutcome.Cancelled`) and not an error, and
 the changes which have been applied before the cancel are not reverted.
+
+When the search of the text references is on (see [Text references](#text-references)), the
+session starts with it: it searches by itself (`AdjustStage.TextReferences` is reported) or
+takes the `TextReferenceScanResult` the wizard has made and the user has reviewed, and changes
+the approved matches before the first file is adjusted. A session built without the options
+does not search at all, which is what the tests of the adjusting itself rely on.
+
+`RunAsync` answers with an `AdjustReport` (the outcome is its `Outcome` property). An unexpected
+failure while a file is processed is caught there as well: the session stops, the report is
+`AdjustSessionOutcome.Failed` and names the file and the message, and the files behind it are
+not processed. What a caller does about it is its own business: the wizard rolls the undo
+transaction back, the console utility prints the message and exits with a failure.
+
+### The run report
+
+`AdjustReport` (`Adjusting.Report`) is a plain data object of the core, which says what a run
+has done:
+
+- per file the user wanted adjusted an `AdjustFileOutcome`: adjusted (with the old and the new
+  namespaces, the files its adjusting has changed and what has been done in each of them),
+  skipped (nothing to move), blocked (with the `AdjustBlock` and its reason), not processed (the
+  run was cancelled or failed before the file) or failed (with the message). The files the scan
+  before the session has found impossible to adjust are given to the session and are in the
+  report as blocked;
+- the cleanup apart: the using clauses it has removed and the `nameof` it has replaced, per file;
+- every touched file once, with all the edits of it, by `EditKind` (using added, name
+  qualified, `global::` added, namespace declaration moved, `XmlnsDefinition`, `x:Class`, xaml
+  references and xmlns, `nameof` replaced, using removed by the cleanup).
+
+The adjusters and the cleanup do not know the report; they are given an optional
+`AdjustReportBuilder` and tell it what they are about to write (`CsAdjuster` the whole `EditSet`
+of a file right before `EditApplier` writes it, `XamlAdjuster` the `x:Class`, `Cleanup` the
+removals). The kind of a `ReplaceTextEdit` is a property of the edit and no part of its
+identity, so the report is a view of the decision and not a second source of truth.
+
+The report renders itself: `ToMarkdown()` (`AdjustReportMarkdown`) and `ToJson()`
+(`AdjustReportJson`, over a small indenting writer of its own, because the core is compiled for
+.NET Framework 4.8 and for .NET 10 and a JSON library would be one more dependency of the
+extension). The wizard shows `AdjustReportSections.Build(report)`, a tree of `ReportItem`, the
+console utility prints the Markdown, and `Copy as Markdown` and `--report` give the very same
+text. The paths are shown relative to the folder of the solution (`ReportPaths`).
 
 ## The core
 
@@ -314,6 +385,7 @@ so a decision may be built, inspected and asserted without touching the solution
 | `ReplaceTextEdit` | Rewrite a span of the text: a fully qualified name (`A.B.Class1`, `A.B.Class1.StaticMember`). |
 | `AddUsingEdit` | Import a namespace, always among the `using` clauses of the compilation unit. |
 | `MoveNamespaceEdit` | Move a namespace declared in the file: rename every declaration of it and import its old name. |
+| `ReplaceFileTextEdit` | Rewrite a span of the text of a file that is no C# document (a config, a Razor view, a project file). The file is never parsed and written back through a DOM, so its formatting, encoding, BOM and line breaks stay as they are. It is written through the body provider of the host (`IXamlBodyProviderFactory`, which despite its name works with any text file), i.e. an invisible text buffer in Visual Studio, so the global undo covers it. |
 
 The duplicates are dropped by the set itself: a file which references the moved type ten times
 needs one `using` clause and not ten.
@@ -382,6 +454,151 @@ A file which several projects compile has a single text for all of them, so both
 questions are asked about every project which compiles it and the answers are merged: the clause
 stays as soon as a single one of them still needs it.
 
+### The build check and the Error List
+
+Two things keep what a run has not fixed in sight after the window is closed.
+
+- **The build check** (`Adjusting.BuildChecking`, optional: the option `General.RunBuildCheck`,
+  `--build-check` of the console utility, the `runBuildCheck` argument of `AdjustSession`).
+  `BuildChecker.CaptureAsync` collects the compilation errors of the C# projects from the
+  compilations of the workspace (the thing the adjusting relies on anyway: no build, no output
+  folder, no main thread) before the run; after it the projects the run has affected are
+  recomputed (`AffectedProjectNames`: the project of every changed file — a C# document or a file
+  inside a project folder — and everything that transitively depends on it) and `Compare` tells
+  the new errors. An error is the same error before and after when the project, the diagnostic id
+  and the message are the same: the position is no part of it, because the run moves the lines.
+  One thing the workspace gets wrong is compensated for: it reads the project file when the solution
+  is opened and never again, so a `StartupObject` the run has changed would still be looked for
+  under its old name (CS1555, a false "new error"); the "after" snapshot compiles that project
+  with the new `MainTypeName`.
+  The result is `AdjustReport.BuildCheck`; new errors are listed with their file and line (the
+  wizard opens them on a double click) and make the report `HasLeftovers`.
+- **The Error List.** `AdjustReportErrorList.Build` decides what goes there — one warning for every
+  text reference the run has left and one for every new compilation error, each at its file and
+  line — and `ErrorListReporter` (Visual Studio only, an `ErrorListProvider`) replaces the entries
+  of the previous run with them. `PerformingViewModel` calls it as soon as the run is over, so the
+  entries are there whether the report step is shown or not.
+
+## Text references
+
+Roslyn sees the references to a type that are written as code. A name written as a text is out of
+its sight and keeps the old name after the move: `Type.GetType("A.B.C, MyAsm")`, a comment, the
+`type="..."` attribute of a config file. `AdjustNamespace.TextReferences` finds them, gives every
+match a **confidence score** and changes the ones the user's mode trusts.
+
+Only the **full names** of the moved types are searched, never a short name (`Customer`,
+`Models` are far too common), and a name has borders (`X.A.B.C` and `A.B.CExtra` are not
+`A.B.C`; `A.B.C.Member` is). The forms are `A.B.C`, `global::A.B.C`, the metadata forms
+`A.B.Outer+Inner` and ``A.B.C`1``, and the assembly qualified `A.B.C, MyAsm, Version=...`; the
+replacement is the same form with the new namespace.
+
+### The pipeline
+
+```
+ plans of the session ──> MovedTypeCollector ──> MovedTypeSet
+                                                    │
+ C# documents ─────────> CSharpTextScanner ──┐      │
+ (other files, see below)  scanners         ─┼──> TextCandidate ──> TextReferenceAnalyzer ──> TextReferenceMatch
+                                             │     (a part of a file     (finds the names,        (span, line, score,
+                                                    that may name a type)  scores them)            signals)
+ TextReferenceScanner ───────────────────────────────> TextReferenceScanResult ──> TextReferenceApplier ──> EditSet
+```
+
+- **`MovedTypeCollector`** learns which top level types the session moves and where to out of the
+  plans of the files, with the very rules `CsAdjuster` follows (`NamespaceTransitionContainer`).
+  Nothing has been changed yet, so the search runs *before* the adjusting. It also replays the
+  moves on a `NamespaceCenter` to learn which namespaces are emptied, and asks the compilation
+  whether a type (or a namespace) of that full name exists in another referenced assembly.
+  The result is a `MovedTypeSet`: the types indexed by their old full name, and the namespaces.
+  A nested type moves with its outer one and is known by its metadata name only.
+- **A scanner** finds the *candidates*, the parts of a file that may name a type, and knows
+  nothing about the moved types: `CSharpTextScanner` walks the tokens of a syntax tree (string
+  literals of every kind — regular, verbatim, raw, UTF-8, the text parts of an interpolated
+  string — and, if asked for, comments and the text of documentation comments, but not a `cref`,
+  which Roslyn handles). A string that is passed as a type name (`Type.GetType`,
+  `Assembly.GetType`, `Activator.CreateInstance`, `AppDomain.CreateInstance*`,
+  `new ResourceManager(baseName, ...)`, `[TypeConverter]`, `[Designer]`, `[Editor]`,
+  `[DebuggerTypeProxy]`, `[TypeForwardedFrom]`, any parameter named `typeName`,
+  `assemblyQualifiedName`, `className` or `baseName`) is told from the others through the
+  semantic model; without one the names of the methods are all there is. The spans are exact:
+  the raw text of the file is searched, not the value of a literal.
+- The other files each have a scanner of their own, which produces candidates the same way:
+  `RazorTextScanner` (the directive lines `@using`, `@model`, `@inherits`, `@inject`,
+  `@typeparam`, `@implements`, `@namespace` of `.cshtml` and `.razor` files, `_ViewImports`
+  included; a generic argument is in the rest of the line, which is searched whole),
+  `ProjectTextScanner` (`<StartupObject>` and the `CustomToolNamespace` of a `.csproj`; the
+  `GeneratedClassNamespace` and the `Type` of a setting of a `.settings` file). They read the text
+  with `XmlTokenizer`, a small positioned reader of xml: `XmlReader` knows the line of a node but
+  not where the value of an attribute starts, and a file has to be changed where it is written,
+  never re-serialized through a DOM. The tokenizer is tolerant, so a config that is not a well
+  formed xml is read as far as it goes.
+  `XmlConfigTextScanner` (the attributes `type`, `typeName`, `mapTo`, `contract`, `factory` — with
+  or without a prefix, so `xsi:type` counts — and the `name` of a `service`, plus the text of
+  elements called so; every other attribute value and text is a plain value; xml comments only if
+  asked for) and `JsonTextScanner` (the string values of a json file with exact spans, the value of
+  `$type`, `type`, `class` and the elements of `Using` in any case are type values; the keys are not
+  searched; `//` and `/* */` comments are skipped). The json reader is hand written because the
+  core is compiled for .NET Framework 4.8 as well and `Utf8JsonReader` would be a dependency. A
+  match under `$type` carries a note, and the report prints it: data serialized with the old name
+  may exist elsewhere and cannot be fixed by an edit of the sources.
+  A **namespace** is a candidate where it can be named (a Razor `@using` / `@namespace`,
+  `GeneratedClassNamespace`, `CustomToolNamespace`): it is changed only if the session empties
+  it and all of its types go to the same place (`MovedNamespace.IsEmptied` / `NewName`), and
+  never gets above 89 ("not certain"); a namespace that stays alive or is split between several
+  places is not a match at all.
+- **Which files** are searched: `ISolutionExplorer.GetTextFilePathsAsync` (the solution tree and
+  the project files in Visual Studio, a walk through the folders of the projects without `bin`,
+  `obj`, `node_modules`, `.git` and `.vs` in the console utility) and `TextReferenceFiles.Classify`
+  (the extension tells the kind, the switches of the options say whether the kind is searched).
+  Unlike the namespace chain, the skipped folders of `adjust_namespaces_settings.xml` are *not*
+  excluded here: they are folders that do not take part in the namespaces, and `Properties`,
+  the usual one, holds the `.settings` files.
+- **`TextReferenceAnalyzer`** looks for the names in a candidate (`NameMatcher`: one regex pass
+  over the dotted identifier chains and a dictionary lookup of the longest prefix, so a thousand
+  moved types cost no more than one) and scores what it finds.
+- **`TextReferenceScanner`** puts it together (`ScanAsync`), numbers the matches and presets the
+  approval of every one by the mode. A file that names none of the types is not parsed at all.
+- **`TextReferenceApplier`** turns the approved matches into the edits of an `EditSet` (a C#
+  document gets a `ReplaceTextEdit`, any other file a `ReplaceFileTextEdit`) and `EditApplier`
+  writes it, as everywhere else. A match is changed only if the text at its span is still the
+  name that was found: a text that has changed since the search (the user typed, a cancelled run
+  left files behind) is reported as left, never corrupted.
+
+The session changes the text references *first*, before the first file is adjusted: the spans of
+the search are valid against the text as it is, and a cancelled run leaves the strings in the
+state the next run finds the types in.
+
+### The score
+
+Every match has a score 0..100 that is a **list of named signals with weights** (`ConfidenceScore`,
+`ConfidenceSignal`, the weights are in `ScoreSignals`): the place the name is found in is the base
+(a Razor directive 100, a string passed as a type name 95, an xml `type` attribute 85, a json
+`$type` 80, a string literal that is the name as a whole 60, an xml or json value 50, a comment 40,
+a name inside a longer string 30) and the modifiers add to it (the assembly of the moved type +20,
+another assembly -40, the real metadata form +10, exactly the name +10, prose around it -10,
+looks like a file or a URL -40, a type of that name in another assembly -30, test data -20; a
+namespace that is emptied never gets above 89, one that stays alive is not a match at all). The
+signals are data so that the review step can show "why this score" as a tooltip and the report
+prints it. The levels are ranges of the score: Certain 90..100, Likely 70..89, Possible 45..69,
+Unlikely 0..44 (hidden). The weights are a starting point checked by
+`TextReferenceScoringCorpusTests`: every example of the corpus has to land in its expected level.
+
+### The mode
+
+| Mode | Scan | Changed | Offered (unchecked) |
+| --- | --- | --- | --- |
+| `Off` | no | | |
+| `ReportOnly` | yes | nothing | from Possible |
+| `Conservative` | yes | Certain | Likely, Possible |
+| `Balanced` (default) | yes | Certain, Likely | Possible |
+| `Aggressive` | yes | Certain, Likely, Possible | |
+
+plus a switch per kind of text (`TextReferenceKinds`: comments, xml configs, json, Razor, project
+and settings files). The defaults are the user options in Visual Studio and the command line of
+the console utility; the settings file of the solution overrides them
+(`TextReferenceOptions.Resolve`: new optional elements of `AdjustNamespaceSettings`, an older
+file without them overrides nothing, and every element is nullable so "not said" is not "false").
+
 ## The xaml subsystem
 
 A xaml file is processed as a plain text with a set of regexes instead of an XML DOM: this is
@@ -437,6 +654,11 @@ Visual Studio does for the extension:
   and stops if there are errors (`--force` overrules, exactly as the "Next" button of the first
   step does), collects the subject files and runs an `AdjustSession` with a `ConsoleProgress`.
   `--dry-run` and `--check` stop after the collecting; they differ in the exit code only.
+  After a real run the Markdown of the `AdjustReport` is printed and, with `--report <path>`,
+  written to a file (JSON if the extension is `.json`). `--text <mode>` and `--text-kinds <list>`
+  tell how aggressive the search of the text references is (the default is balanced, without the
+  comments), over the settings file of the solution; `--dry-run` lists the matches with their
+  scores (`--verbose` adds the signals of every score).
 - `MsBuildSolutionExplorer` answers out of the loaded workspace. Two things do not come from
   Roslyn: the generated sources under `obj` are dropped (the solution tree of Visual Studio
   never showed them, MSBuild reports them as usual documents of the project) and the xaml files

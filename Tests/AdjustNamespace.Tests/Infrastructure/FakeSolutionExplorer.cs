@@ -1,6 +1,7 @@
 using AdjustNamespace.VisualStudio;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace AdjustNamespace.Tests.Infrastructure
@@ -51,6 +52,18 @@ namespace AdjustNamespace.Tests.Infrastructure
                     AdjustNamespace.Xaml.XamlPathHelper.EnumerateXamlFiles(_solution.SolutionFolder)
                     );
             }
+
+            return Task.FromResult<IReadOnlyList<string>>(result);
+        }
+
+        /// <inheritdoc/>
+        public Task<IReadOnlyList<string>> GetTextFilePathsAsync()
+        {
+            //the text files are real files inside the solution folder (and so are the project
+            //files a test has written), see TestSolution.AddTextFile
+            var result = Directory.Exists(_solution.SolutionFolder)
+                ? Directory.GetFiles(_solution.SolutionFolder, "*", SearchOption.AllDirectories).ToList()
+                : new List<string>();
 
             return Task.FromResult<IReadOnlyList<string>>(result);
         }

@@ -22,10 +22,79 @@ namespace AdjustNamespace.Settings
             set;
         } = null!;
 
+        /// <summary>
+        /// The aggressiveness of the search of the text references to the moved types for this
+        /// solution: <c>Off</c>, <c>ReportOnly</c>, <c>Conservative</c>, <c>Balanced</c> or
+        /// <c>Aggressive</c>. <c>null</c> leaves the choice to the user options.
+        /// </summary>
+        public string? TextReferenceMode
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Search the comments for the text references; <c>null</c> leaves the choice to the user options.
+        /// </summary>
+        public bool? ScanComments
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Search the xml configs for the text references; <c>null</c> leaves the choice to the user options.
+        /// </summary>
+        public bool? ScanXmlConfigs
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Search the json files for the text references; <c>null</c> leaves the choice to the user options.
+        /// </summary>
+        public bool? ScanJson
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Search the Razor files for the text references; <c>null</c> leaves the choice to the user options.
+        /// </summary>
+        public bool? ScanRazor
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Search the project files and the settings files for the text references; <c>null</c>
+        /// leaves the choice to the user options.
+        /// </summary>
+        public bool? ScanProjectFiles
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// The xml and json files besides the usual configs the search looks into. A name
+        /// (<c>Services.xml</c>), a path relative to the solution folder (<c>Config\*.json</c>)
+        /// or a pattern with <c>*</c> and <c>?</c>.
+        /// </summary>
+        public List<string> TextReferenceFiles
+        {
+            get;
+            set;
+        } = null!;
+
 
         public AdjustNamespaceSettings()
         {
             SkippedFolderSuffixes = new List<string>();
+            TextReferenceFiles = new List<string>();
         }
     }
 }

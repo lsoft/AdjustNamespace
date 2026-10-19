@@ -1,5 +1,7 @@
 ﻿using AdjustNamespace.Adjusting.Adjuster;
+using AdjustNamespace.Adjusting.Edit;
 using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Adjusting.Report;
 using AdjustNamespace.Xaml;
 using AdjustNamespace.Xaml.BodyProvider;
 using System;
@@ -21,12 +23,15 @@ namespace AdjustNamespace.Adjusting.Adjuster
         private readonly IXamlBodyProviderFactory _xamlBodyProviderFactory;
         private readonly string _subjectFilePath;
         private readonly string _targetNamespace;
+        private readonly AdjustReportBuilder? _report;
 
         /// <param name="xamlBodyProviderFactory">How the xaml file is read and written.</param>
         /// <param name="plan">What has to happen with the file.</param>
+        /// <param name="report">The run report the change is told to, or <c>null</c>.</param>
         public XamlAdjuster(
             IXamlBodyProviderFactory xamlBodyProviderFactory,
-            AdjustPlanItem plan
+            AdjustPlanItem plan,
+            AdjustReportBuilder? report = null
             )
         {
             if (xamlBodyProviderFactory is null)
@@ -37,6 +42,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
             _xamlBodyProviderFactory = xamlBodyProviderFactory;
             _subjectFilePath = plan.FilePath;
             _targetNamespace = plan.TargetNamespace;
+            _report = report;
         }
 
         /// <inheritdoc/>
@@ -54,6 +60,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
             }
 
             modifiedDocument.SaveIfChangesExistsAgainst(xamlDocument);
+
+            _report?.RecordEdit(_subjectFilePath, _subjectFilePath, EditKind.XamlClassMoved, 1);
 
             return true;
         }

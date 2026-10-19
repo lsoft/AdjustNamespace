@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AdjustNamespace.Adjusting.Report;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Roslyn;
 using System.Threading;
@@ -21,12 +22,15 @@ namespace AdjustNamespace.Adjusting
     {
         private readonly Workspace _workspace;
         private readonly NamespaceCenter _namespaceCenter;
+        private readonly AdjustReportBuilder? _report;
 
         /// <param name="workspace">Roslyn workspace to clean up.</param>
         /// <param name="namespaceCenter">Namespace state container which knows which namespaces became empty.</param>
+        /// <param name="report">The run report the removals are told to, or <c>null</c>.</param>
         public Cleanup(
             Workspace workspace,
-            NamespaceCenter namespaceCenter
+            NamespaceCenter namespaceCenter,
+            AdjustReportBuilder? report = null
             )
         {
             if (workspace is null)
@@ -41,6 +45,7 @@ namespace AdjustNamespace.Adjusting
 
             _workspace = workspace;
             _namespaceCenter = namespaceCenter;
+            _report = report;
         }
 
         /// <summary>
@@ -84,12 +89,13 @@ namespace AdjustNamespace.Adjusting
 
                 var originalRoot = syntaxRoot;
 
-                syntaxRoot = await ReplaceNameofsOfRemovedNamespacesAsync(
+                var (rootWithoutNameofs, replacedNameofs) = await ReplaceNameofsOfRemovedNamespacesAsync(
                     document,
                     syntaxRoot,
                     compilations,
                     cancellationToken
                     );
+                syntaxRoot = rootWithoutNameofs;
 
                 var namespaces = syntaxRoot.GetAllDescendants<UsingDirectiveSyntax>();
 
@@ -109,6 +115,11 @@ namespace AdjustNamespace.Adjusting
                     var changedDocument = document.WithSyntaxRoot(syntaxRoot);
 
                     r = workspace.TryApplyChanges(changedDocument.Project.Solution);
+
+                    if (r)
+                    {
+                        _report?.RecordCleanup(documentFilePath, toRemove.Count, replacedNameofs);
+                    }
                 }
             }
             while (!r);
@@ -120,7 +131,7 @@ namespace AdjustNamespace.Adjusting
         /// compile. The string is kept as it is rather than following the move, because the
         /// program sees it, and the types of the namespace may have moved into several ones.
         /// </summary>
-        private async Task<SyntaxNode> ReplaceNameofsOfRemovedNamespacesAsync(
+        private async Task<(SyntaxNode Root, int Replaced)> ReplaceNameofsOfRemovedNamespacesAsync(
             Document document,
             SyntaxNode syntaxRoot,
             IReadOnlyList<Compilation> compilations,
@@ -138,13 +149,13 @@ namespace AdjustNamespace.Adjusting
 
             if (nameofs.Count == 0)
             {
-                return syntaxRoot;
+                return (syntaxRoot, 0);
             }
 
             var semanticModel = await document.GetSemanticModelAsync(cancellationToken);
             if (semanticModel == null)
             {
-                return syntaxRoot;
+                return (syntaxRoot, 0);
             }
 
             var toReplace = new Dictionary<SyntaxNode, string>();
@@ -180,15 +191,17 @@ namespace AdjustNamespace.Adjusting
 
             if (toReplace.Count == 0)
             {
-                return syntaxRoot;
+                return (syntaxRoot, 0);
             }
 
-            return syntaxRoot.ReplaceNodes(
+            var replacedRoot = syntaxRoot.ReplaceNodes(
                 toReplace.Keys,
                 (original, _) => SyntaxFactory
                     .LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(toReplace[original]))
                     .WithTriviaFrom(original)
                 );
+
+            return (replacedRoot, toReplace.Count);
         }
 
         /// <summary>

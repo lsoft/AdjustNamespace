@@ -717,6 +717,25 @@ namespace AdjustNamespace.Tests.Infrastructure
         }
 
         /// <summary>
+        /// Create a real file that is no C# document inside the project folder: a config, a
+        /// Razor view, a project file (<c>{name}.csproj</c> is the project file of the project
+        /// itself), a json file. The search of the text references reads these files from the disk.
+        /// </summary>
+        /// <returns>Full path of the created file.</returns>
+        public string AddTextFile(string projectName, string relativeFilePath, string body, Encoding? encoding = null)
+        {
+            return AddXamlFile(projectName, relativeFilePath, body, encoding ?? new UTF8Encoding(false));
+        }
+
+        /// <summary>
+        /// The current content of a file created by <see cref="AddTextFile"/>.
+        /// </summary>
+        public string TextFileTextOf(string projectName, string relativeFilePath)
+        {
+            return XamlTextOf(projectName, relativeFilePath);
+        }
+
+        /// <summary>
         /// The current content of the xaml file on the disk, as raw bytes.
         /// </summary>
         public byte[] XamlBytesOf(string projectName, string relativeFilePath)

@@ -52,6 +52,11 @@ namespace AdjustNamespace
         }
 
         /// <summary>
+        /// The settings of the solution (the file in the solution folder).
+        /// </summary>
+        public AdjustNamespaceSettings2 Settings => TargetNamespaces.Settings;
+
+        /// <summary>
         /// How a xaml file is read and written: an invisible text buffer in Visual Studio
         /// (so the change is undoable), the file system elsewhere.
         /// </summary>

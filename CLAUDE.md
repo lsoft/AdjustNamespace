@@ -70,13 +70,13 @@ Notes:
   Take the narrowest dependency a class really needs — most of the core needs a `Workspace`
   and nothing else. The wizard itself is covered by the manual procedure only,
   see [Tests/README.md](Tests/README.md).
-- The test project references a **newer Roslyn than `AdjustNamespace.2022`** (5.9 against 5.0;
+- The test project references a **newer Roslyn than `AdjustNamespace.2022`** (5.9 against 4.14;
   only that compiler understands the C# 15 preview features, see the note in
   [Tests/README.md](Tests/README.md)), so the shared code has to compile against both versions:
   do not use an API which exists in the newer one only. `Microsoft.VisualStudio.LanguageServices`
-  has no 5.x release, so both projects compile its 4.14 against a newer Roslyn, hence the binding
-  redirects and the explicit MEF composition in `TestSolution`; the `NU1608` warnings about it
-  are expected.
+  has no 5.x release, so the test project compiles its 4.14 against a newer Roslyn, hence the
+  binding redirects and the explicit MEF composition in `TestSolution`; the `NU1608` warnings
+  about it are expected.
 
 ## The console utility
 
@@ -111,9 +111,13 @@ as changed instead of the actual edit. If a diff ever looks like a full-file rew
 
 - The extension targets .NET Framework 4.8; `LangVersion` is `latest` and `Nullable` is
   `enable`, with `nullable;CS8766;CS8767` promoted to errors.
-- The extension supports Visual Studio 18 only and is compiled against the Roslyn of the
-  lowest supported release (5.0.0 for 18.0): Visual Studio binds an older Roslyn reference to
-  its own one, never a newer one. There is no version-specific code and no conditional symbol
+- The manifest targets `[17.14, 19.0)`: the Marketplace refuses 18.0 as the lower bound
+  ("API version 18.0 is experimental"), Visual Studio 2026 runs the extensions of API version
+  17.x, and only the lower bound decides the compatibility. So the extension is installed into
+  Visual Studio 2022 17.14 too and is compiled against the Roslyn of that release (4.14.0):
+  Visual Studio binds an older Roslyn reference to its own one, never a newer one. Do not raise
+  the Roslyn references above 4.14 and do not move the lower bound to 18.0 — the
+  Marketplace rejects the upload. There is no version-specific code and no conditional symbol
   for it; `Tests/AdjustNamespace.Tests/Build/ProjectConsistencyTests` fails if the shared code
   uses a symbol the Release build of the extension does not define, or if a Roslyn reference
   is newer than the lowest Visual Studio of the manifest allows.

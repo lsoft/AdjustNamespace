@@ -14,6 +14,7 @@ using AdjustNamespace.Adjusting.Edit.Apply;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Adjusting.Adjuster.Cs;
 using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Adjusting.Report;
 using AdjustNamespace;
 
 namespace AdjustNamespace.Adjusting.Adjuster
@@ -41,18 +42,21 @@ namespace AdjustNamespace.Adjusting.Adjuster
         private readonly string _targetNamespace;
         private readonly NamespaceTransitionContainer _transitions;
         private readonly List<string> _xamlFilePaths;
+        private readonly AdjustReportBuilder? _report;
 
         /// <param name="workspace">Roslyn workspace of the solution.</param>
         /// <param name="xamlBodyProviderFactory">How a xaml file is read and written.</param>
         /// <param name="namespaceCenter">Namespace state container shared across the whole adjusting session.</param>
         /// <param name="plan">What has to happen with the file.</param>
         /// <param name="xamlFilePaths">All the xaml files of the solution (they may reference the moved types).</param>
+        /// <param name="report">The run report the changes are told to, or <c>null</c>.</param>
         public CsAdjuster(
             Workspace workspace,
             IXamlBodyProviderFactory xamlBodyProviderFactory,
             NamespaceCenter namespaceCenter,
             AdjustPlanItem plan,
-            List<string> xamlFilePaths
+            List<string> xamlFilePaths,
+            AdjustReportBuilder? report = null
             )
         {
             if (workspace is null)
@@ -82,6 +86,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
             _targetNamespace = plan.TargetNamespace;
             _transitions = plan.Transitions;
             _xamlFilePaths = xamlFilePaths;
+            _report = report;
         }
 
         /// <inheritdoc/>
@@ -136,6 +141,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
             //perform the changes. The cancellation is not asked anymore: the edits of one file
             //describe a single consistent change of the solution and a half of them is a broken
             //file, so the writing is never interrupted
+            _report?.RecordEdits(_subjectFilePath, edits);
+
             await new EditApplier(_workspace)
                 .ApplyAsync(edits);
 
@@ -363,6 +370,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
                     );
 
                 modifiedRealDocument.SaveIfChangesExistsAgainst(realDocument);
+
+                _report?.RecordEdit(_subjectFilePath, xamlFilePath, EditKind.XamlReferencesUpdated, 1);
             }
         }
 

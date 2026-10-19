@@ -33,11 +33,26 @@ namespace AdjustNamespace.Adjusting.Session
         /// <summary>
         /// The progress line shown to the user.
         /// </summary>
-        public string Message =>
-            Stage == AdjustStage.Cleanup
-                ? $"{Current}/{Total} Performing cleanup {FilePath}"
-                : $"{Current}/{Total}: {FilePath}"
-                ;
+        public string Message
+        {
+            get
+            {
+                switch (Stage)
+                {
+                    case AdjustStage.Cleanup:
+                        return $"{Current}/{Total} Performing cleanup {FilePath}";
+
+                    case AdjustStage.TextReferences:
+                        return $"{Current}/{Total} Searching for text references {FilePath}";
+
+                    case AdjustStage.BuildCheck:
+                        return $"{Current}/{Total} Checking the build: {FilePath}";
+
+                    default:
+                        return $"{Current}/{Total}: {FilePath}";
+                }
+            }
+        }
 
         public AdjustProgress(
             AdjustStage stage,

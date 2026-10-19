@@ -137,6 +137,21 @@ namespace AdjustNamespace.Tests.Build
         }
 
         /// <summary>
+        /// The Marketplace refuses an upload whose installation target starts at 18.0: "API
+        /// version 18.0 is experimental, and not allowed in the Marketplace at this time. Please
+        /// change your installation target to use the latest stable API version 17.14."
+        /// Visual Studio 2026 runs the extensions of API version 17.x, so 17.14 covers it.
+        /// </summary>
+        [Fact]
+        public void The_lowest_visual_studio_of_the_manifest_is_accepted_by_the_marketplace()
+        {
+            Assert.True(
+                LowestVisualStudioOfManifest() <= new Version(17, 14),
+                $"The installation target starts at {LowestVisualStudioOfManifest()}, the Marketplace accepts 17.14 at most"
+                );
+        }
+
+        /// <summary>
         /// The prerequisite of the manifest starts at the same Visual Studio as its targets.
         /// </summary>
         [Fact]
@@ -168,7 +183,7 @@ namespace AdjustNamespace.Tests.Build
         }
 
         /// <summary>
-        /// The lower bound of a version range of a manifest: <c>[18.0, 19.0)</c> gives 18.0.
+        /// The lower bound of a version range of a manifest: <c>[17.14, 19.0)</c> gives 17.14.
         /// </summary>
         private static Version LowerBoundOf(string range)
         {

@@ -12,10 +12,12 @@ namespace AdjustNamespace.UI.StepFactory
     {
         private readonly AdjustContext _context;
         private readonly IWizardHost _host;
+        private readonly IStepFactory<ReportParameters> _nextStepFactory;
 
         public PerformingStepFactory(
             AdjustContext context,
-            IWizardHost host
+            IWizardHost host,
+            IStepFactory<ReportParameters> nextStepFactory
             )
         {
             if (host is null)
@@ -23,8 +25,14 @@ namespace AdjustNamespace.UI.StepFactory
                 throw new ArgumentNullException(nameof(host));
             }
 
+            if (nextStepFactory is null)
+            {
+                throw new ArgumentNullException(nameof(nextStepFactory));
+            }
+
             _context = context;
             _host = host;
+            _nextStepFactory = nextStepFactory;
         }
 
         /// <inheritdoc/>
@@ -35,6 +43,7 @@ namespace AdjustNamespace.UI.StepFactory
                 new PerformingViewModel(
                     _context,
                     _host,
+                    _nextStepFactory,
                     parameters
                     )
                 );

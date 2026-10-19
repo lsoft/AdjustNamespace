@@ -1,3 +1,4 @@
+using AdjustNamespace.TextReferences;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -77,6 +78,42 @@ namespace AdjustNamespace.Cli.CommandLine
             get;
         }
 
+        /// <summary>
+        /// Where to write the report of the run: Markdown, or JSON if the extension is
+        /// <c>.json</c>. <c>null</c> if the report is not asked for.
+        /// </summary>
+        public string? ReportPath
+        {
+            get;
+        }
+
+        /// <summary>
+        /// How aggressive the search of the text references is, if the command line says so;
+        /// <c>null</c> leaves the choice to the settings of the solution and the default (balanced).
+        /// </summary>
+        public TextReferenceMode? TextMode
+        {
+            get;
+        }
+
+        /// <summary>
+        /// The kinds of files the search of the text references looks into, if the command line
+        /// says so; <c>null</c> leaves the choice to the settings of the solution and the default.
+        /// </summary>
+        public TextReferenceKinds? TextKinds
+        {
+            get;
+        }
+
+        /// <summary>
+        /// Count the compilation errors before the run and after it and put the new ones into
+        /// the report.
+        /// </summary>
+        public bool BuildCheck
+        {
+            get;
+        }
+
         private CliOptions(
             string solutionPath,
             IReadOnlyList<string> paths,
@@ -85,7 +122,11 @@ namespace AdjustNamespace.Cli.CommandLine
             bool check,
             bool force,
             bool verbose,
-            bool debug
+            bool debug,
+            string? reportPath,
+            TextReferenceMode? textMode,
+            TextReferenceKinds? textKinds,
+            bool buildCheck
             )
         {
             SolutionPath = solutionPath;
@@ -96,6 +137,10 @@ namespace AdjustNamespace.Cli.CommandLine
             Force = force;
             Verbose = verbose;
             Debug = debug;
+            ReportPath = reportPath;
+            TextMode = textMode;
+            TextKinds = textKinds;
+            BuildCheck = buildCheck;
         }
 
         /// <summary>
@@ -120,6 +165,19 @@ Options:
                              to adjust (for a CI job).
       --force                Adjust even if the solution does not compile.
   -v, --verbose              Report every processed file.
+      --report <path>        Write the report of the run to this file: Markdown, or JSON if
+                             the extension is .json. The report is printed on the console
+                             in any case.
+      --text <mode>          How aggressively the references to the moved types which are
+                             written as a text (Type.GetType(""A.B.C""), a config, a Razor
+                             directive) are searched and changed: off, report, conservative,
+                             balanced (the default), aggressive. --dry-run lists them with
+                             their scores.
+      --text-kinds <list>    Where the text references are looked for besides the string
+                             literals of C#: comments, xml, json, razor, project (a comma
+                             separated list; the default is everything but comments).
+      --build-check          Count the compilation errors of the affected projects before the
+                             run and after it, and list the new ones in the report.
       --debug                Write the detailed [Adjust] diagnostics into
                              %TEMP%\AdjustNamespace.cli.log.
   -h, --help                 Show this text.
@@ -161,6 +219,10 @@ Exit codes:
             var force = false;
             var verbose = false;
             var debug = false;
+            string? reportPath = null;
+            TextReferenceMode? textMode = null;
+            TextReferenceKinds? textKinds = null;
+            var buildCheck = false;
 
             for (var i = 0; i < args.Length; i++)
             {
@@ -194,6 +256,10 @@ Exit codes:
                         debug = true;
                         break;
 
+                    case "--build-check":
+                        buildCheck = true;
+                        break;
+
                     case "-p":
                     case "--path":
                         if (!TryTakeValue(args, ref i, out var path))
@@ -203,6 +269,48 @@ Exit codes:
                         }
 
                         paths.Add(Path.GetFullPath(path!));
+                        break;
+
+                    case "--report":
+                        if (!TryTakeValue(args, ref i, out var reportValue))
+                        {
+                            error = $"The option {argument} requires a value.";
+                            return false;
+                        }
+
+                        reportPath = Path.GetFullPath(reportValue!);
+                        break;
+
+                    case "--text":
+                        if (!TryTakeValue(args, ref i, out var textValue))
+                        {
+                            error = $"The option {argument} requires a value.";
+                            return false;
+                        }
+
+                        if (!TextReferenceOptions.TryParseMode(textValue!, out var parsedMode))
+                        {
+                            error = $"Unknown mode '{textValue}' of {argument}; use off, report, conservative, balanced or aggressive.";
+                            return false;
+                        }
+
+                        textMode = parsedMode;
+                        break;
+
+                    case "--text-kinds":
+                        if (!TryTakeValue(args, ref i, out var kindsValue))
+                        {
+                            error = $"The option {argument} requires a value.";
+                            return false;
+                        }
+
+                        if (!TextReferenceOptions.TryParseKinds(kindsValue!, out var parsedKinds))
+                        {
+                            error = $"Unknown kind in '{kindsValue}' of {argument}; use comments, xml, json, razor, project.";
+                            return false;
+                        }
+
+                        textKinds = parsedKinds;
                         break;
 
                     case "--regex":
@@ -262,7 +370,11 @@ Exit codes:
                 check,
                 force,
                 verbose,
-                debug
+                debug,
+                reportPath,
+                textMode,
+                textKinds,
+                buildCheck
                 );
 
             return true;

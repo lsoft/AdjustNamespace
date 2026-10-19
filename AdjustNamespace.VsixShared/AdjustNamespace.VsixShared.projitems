@@ -21,12 +21,19 @@
     <Compile Include="$(MSBuildThisFileDirectory)InfoBar\ReleaseNotesInfoBarService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Logging.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Options\General.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Options\ReportVisibility.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)RelayCommand.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\Control\PerformingUserControl.xaml.cs">
       <DependentUpon>PerformingUserControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)UI\Control\PreparationUserControl.xaml.cs">
       <DependentUpon>PreparationUserControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Control\ReportUserControl.xaml.cs">
+      <DependentUpon>ReportUserControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)UI\Control\ReviewUserControl.xaml.cs">
+      <DependentUpon>ReviewUserControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)UI\Control\SelectedUserControl.xaml.cs">
       <DependentUpon>SelectedUserControl.xaml</DependentUpon>
@@ -37,6 +44,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\IStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\PerformingStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\PreparationStepFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\ReportStepFactory.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\ReviewStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\SelectedStepFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\StepFactory\WizardChain.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\BaseViewModel.cs" />
@@ -45,16 +54,26 @@
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PerformingViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PreparationParameters.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\PreparationStepViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\ReportParameters.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Reporting\ReportNodeViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Reporting\ReportStepViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Review\ReviewFileViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Review\ReviewMatchViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Review\ReviewStepViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\ReviewParameters.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\BlockedFileViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\ISelectItemViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\KnownRegex.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectedStepViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectFileViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\SelectFolderViewModel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\Select\TextModeChoice.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\ViewModel\SelectedStepParameters.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\VsTheme.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)UI\WizardHost.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\DteProjectDefaultNamespaceProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\ErrorListReporter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\FileNavigator.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\ProjectItemInformation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\SolutionHelper.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)VisualStudio\VsAdjustContext.cs" />
@@ -79,6 +98,14 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="$(MSBuildThisFileDirectory)UI\Control\PreparationUserControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="$(MSBuildThisFileDirectory)UI\Control\ReportUserControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="$(MSBuildThisFileDirectory)UI\Control\ReviewUserControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

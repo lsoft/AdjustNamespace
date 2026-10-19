@@ -1,5 +1,6 @@
 using AdjustNamespace.Adjusting;
 using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Adjusting.Report;
 using AdjustNamespace.Adjusting.Session;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Tests.Infrastructure;
@@ -249,14 +250,14 @@ namespace WinApp
             var form = solution.PathOf("WinApp", @"Forms\MainForm.cs");
             var designer = solution.PathOf("WinApp", @"Forms\MainForm.Designer.cs");
 
-            var outcome = await RunAsync(
+            var report = await RunAsync(
                 solution,
                 designerFirst
                     ? new[] { designer, form }
                     : new[] { form, designer }
                 );
 
-            Assert.Equal(AdjustSessionOutcome.Completed, outcome);
+            Assert.Equal(AdjustSessionOutcome.Completed, report.Outcome);
             Assert.Contains("namespace WinApp.Forms", solution.TextOf("WinApp", @"Forms\MainForm.cs"));
 
             var designerText = solution.TextOf("WinApp", @"Forms\MainForm.Designer.cs");
@@ -998,14 +999,14 @@ namespace WinApp.Forms
 
             var before = File.ReadAllBytes(resxPath);
 
-            var outcome = await RunAsync(
+            var report = await RunAsync(
                 solution,
                 solution.PathOf("WinApp", @"Forms\MainForm.cs"),
                 solution.PathOf("WinApp", @"Forms\MainForm.Designer.cs"),
                 resxPath
                 );
 
-            Assert.Equal(AdjustSessionOutcome.Completed, outcome);
+            Assert.Equal(AdjustSessionOutcome.Completed, report.Outcome);
             Assert.Equal(before, File.ReadAllBytes(resxPath));
             Assert.Contains("namespace WinApp.Forms", solution.TextOf("WinApp", @"Forms\MainForm.cs"));
             Assert.Empty(await solution.CompilationErrorsAsync());
@@ -1071,7 +1072,7 @@ namespace WinApp.Forms
                 ;
         }
 
-        private static async System.Threading.Tasks.Task<AdjustSessionOutcome> RunAsync(
+        private static async System.Threading.Tasks.Task<AdjustReport> RunAsync(
             TestSolution solution,
             params string[] subjectFilePaths
             )

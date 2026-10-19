@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using AdjustNamespace.Xaml.BodyProvider;
+using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,10 +19,16 @@ namespace AdjustNamespace.Adjusting.Edit.Apply
     public sealed class EditApplier
     {
         private readonly Workspace _workspace;
+        private readonly IXamlBodyProviderFactory? _bodyProviders;
 
         /// <param name="workspace">Roslyn workspace of the solution.</param>
+        /// <param name="bodyProviders">
+        /// How a file that is no C# document is read and written; required only by a set that
+        /// has a <see cref="ReplaceFileTextEdit"/>.
+        /// </param>
         public EditApplier(
-            Workspace workspace
+            Workspace workspace,
+            IXamlBodyProviderFactory? bodyProviders = null
             )
         {
             if (workspace is null)
@@ -30,6 +37,7 @@ namespace AdjustNamespace.Adjusting.Edit.Apply
             }
 
             _workspace = workspace;
+            _bodyProviders = bodyProviders;
         }
 
         /// <summary>
@@ -81,6 +89,23 @@ namespace AdjustNamespace.Adjusting.Edit.Apply
                     _workspace,
                     filePath,
                     edit.Transition
+                    );
+            }
+
+            var fileTextEdits = fileEdits.OfType<ReplaceFileTextEdit>().ToList();
+            if (fileTextEdits.Count > 0)
+            {
+                if (_bodyProviders is null)
+                {
+                    throw new InvalidOperationException(
+                        $"{filePath} is no C# document and cannot be changed without a body provider factory."
+                        );
+                }
+
+                await ReplaceFileTextApplier.ApplyAsync(
+                    _bodyProviders,
+                    filePath,
+                    fileTextEdits
                     );
             }
         }

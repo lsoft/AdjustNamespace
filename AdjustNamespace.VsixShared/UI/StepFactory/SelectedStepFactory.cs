@@ -22,13 +22,13 @@ namespace AdjustNamespace.UI.StepFactory
         /// </summary>
         private readonly Func<IStepFactory<PreparationParameters>> _previousStepFactory;
 
-        private readonly IStepFactory<PerformingParameters> _nextStepFactory;
+        private readonly IStepFactory<ReviewParameters> _nextStepFactory;
 
         public SelectedStepFactory(
             AdjustContext context,
             IWizardHost host,
             Func<IStepFactory<PreparationParameters>> previousStepFactory,
-            IStepFactory<PerformingParameters> nextStepFactory
+            IStepFactory<ReviewParameters> nextStepFactory
             )
         {
             if (host is null)

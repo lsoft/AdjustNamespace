@@ -25,7 +25,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>adjustns</ToolCommandName>
     <PackageId>AdjustNamespace.Cli</PackageId>
-    <Version>0.7.0</Version>
+    <Version>0.8.0</Version>
     <Description>Brings the C# namespaces of a solution in accordance with the location of the files and fixes the resulting regressions, including the xaml.</Description>
   </PropertyGroup>
 

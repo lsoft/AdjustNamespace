@@ -23,6 +23,42 @@ My others extensions lives [here](https://marketplace.visualstudio.com/publisher
 
 # Adjust namespaces Release Notes
 
+## 0.8.0
+
+- **Visual Studio 2022 17.14 and Visual Studio 2026.** The Marketplace does not accept the
+  API version 18.0 as the lowest one, so the extension targets 17.14 and newer and is compiled
+  against the Roslyn of Visual Studio 17.14; it is installed into Visual Studio 2022 17.14 again.
+- **The run report.** The wizard does not close right after the run anymore: the last step
+  shows what has been adjusted, what has been left (blocked, skipped, not processed) and
+  what was done to the other files, and the console utility prints the same text.
+  `adjustns --report <path>` writes it to a file (Markdown, or JSON by the `.json` extension).
+- **Text references.** The names of the moved types that are written as a text (a string passed
+  to `Type.GetType`, `Activator.CreateInstance` or `new ResourceManager(...)`, any other string
+  that is the full name, a comment) used to keep the old namespace and broke the program at run
+  time. The full names are searched now, every match gets a confidence score with the list of
+  its reasons (Certain, Likely, Possible, Unlikely), and the aggressiveness decides which levels
+  are changed: `Off`, `ReportOnly`, `Conservative`, `Balanced` (the default), `Aggressive`.
+  Console utility: `--text <mode>`, `--text-kinds <list>`, and `--dry-run` lists the matches
+  with their scores. A solution can override the mode in `adjust_namespaces_settings.xml`.
+- The xml configs (`app.config`, `web.config`, `nlog.config`, ...) and the `appsettings*.json`
+  files are searched too (`type=`, `$type`, `Using`, any value that is a full name); other xml
+  and json files can be named in `adjust_namespaces_settings.xml`. A `$type` adds a note to the
+  report about serialized data that may exist elsewhere.
+- The text references are searched in the `.cshtml` and `.razor` directives, in the
+  `<StartupObject>` and `CustomToolNamespace` of project files and in the `.settings` files too;
+  the files are changed as a text, so their encoding, byte order mark and line breaks stay.
+- **The Error List and the build check.** The text references a run has left and the new
+  compilation errors are put into the Error List of Visual Studio as warnings. The optional
+  build check (`Run the build check` in the options, `adjustns --build-check`) counts the
+  compilation errors of the affected projects before and after the run and lists the new ones in
+  the report.
+- **The wizard** has a collapsible `Text references` block on the selection step (the
+  aggressiveness and the kinds of files) and a new review step: every text reference is a row
+  with a level badge, the line with the name highlighted, `old -> new` and a check box preset by
+  the aggressiveness; the tooltip says why the score is what it is. The options page
+  (`Tools -> Options -> Adjust Namespaces`) is visible now: the default aggressiveness, the
+  kinds of files and when to show the report.
+
 ## 0.7.0
 
 - **Visual Studio 2026 (18.x) only.** The extension is compiled against the Roslyn of Visual

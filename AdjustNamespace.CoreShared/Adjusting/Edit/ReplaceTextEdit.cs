@@ -33,10 +33,20 @@ namespace AdjustNamespace.Adjusting.Edit
             get;
         }
 
+        /// <summary>
+        /// What the replacement means to the user (the run report counts it by the kind).
+        /// It is no part of the identity of the edit.
+        /// </summary>
+        public EditKind Kind
+        {
+            get;
+        }
+
         public ReplaceTextEdit(
             string filePath,
             TextSpan span,
-            string text
+            string text,
+            EditKind kind = EditKind.NameQualified
             )
             : base(filePath)
         {
@@ -47,6 +57,7 @@ namespace AdjustNamespace.Adjusting.Edit
 
             Span = span;
             Text = text;
+            Kind = kind;
         }
 
         public override bool Equals(object? obj)

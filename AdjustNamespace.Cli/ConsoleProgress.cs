@@ -14,6 +14,7 @@ namespace AdjustNamespace.Cli
         private readonly bool _verbose;
 
         private bool _cleanupAnnounced;
+        private bool _textReferencesAnnounced;
 
         /// <param name="output">Where the lines go.</param>
         /// <param name="rootFolder">Folder the reported paths are shown relative to.</param>
@@ -47,6 +48,34 @@ namespace AdjustNamespace.Cli
                 _output.WriteLine(
                     $"  [{value.Current}/{value.Total}] {RelativePath.Of(value.FilePath, _rootFolder)}"
                     );
+
+                return;
+            }
+
+            if (value.Stage == AdjustStage.TextReferences)
+            {
+                if (!_textReferencesAnnounced)
+                {
+                    _textReferencesAnnounced = true;
+
+                    _output.WriteLine(
+                        $"Searching for the text references ({value.Total} file(s))"
+                        );
+                }
+
+                if (_verbose)
+                {
+                    _output.WriteLine(
+                        $"  [{value.Current}/{value.Total}] {RelativePath.Of(value.FilePath, _rootFolder)}"
+                        );
+                }
+
+                return;
+            }
+
+            if (value.Stage == AdjustStage.BuildCheck)
+            {
+                _output.WriteLine($"Counting the compilation errors: {value.FilePath}");
 
                 return;
             }

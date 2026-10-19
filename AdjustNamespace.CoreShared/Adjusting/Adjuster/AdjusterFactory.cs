@@ -1,4 +1,5 @@
 ﻿using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Adjusting.Report;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Xaml;
 using System;
@@ -21,6 +22,7 @@ namespace AdjustNamespace.Adjusting.Adjuster
         private readonly AdjustContext _context;
         private readonly AdjustPlanner _planner;
         private readonly NamespaceCenter _namespaceCenter;
+        private readonly AdjustReportBuilder? _report;
 
         /// <summary>
         /// All the xaml files of the solution. A C# type moved to another namespace
@@ -35,10 +37,12 @@ namespace AdjustNamespace.Adjusting.Adjuster
         /// <param name="context">Everything the adjusting session works with.</param>
         /// <param name="replaceRegex">User defined regex which additionally modifies the target namespace.</param>
         /// <param name="namespaceCenter">Namespace state container shared across the whole adjusting session.</param>
+        /// <param name="report">The run report the adjusters tell their changes to, or <c>null</c>.</param>
         public static async Task<AdjusterFactory> CreateAsync(
             AdjustContext context,
             NamespaceReplaceRegex replaceRegex,
-            NamespaceCenter namespaceCenter
+            NamespaceCenter namespaceCenter,
+            AdjustReportBuilder? report = null
             )
         {
             if (context is null)
@@ -61,7 +65,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 context,
                 new AdjustPlanner(context, replaceRegex),
                 namespaceCenter,
-                xamlFilePaths
+                xamlFilePaths,
+                report
                 );
 
         }
@@ -70,7 +75,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
             AdjustContext context,
             AdjustPlanner planner,
             NamespaceCenter namespaceCenter,
-            List<string> xamlFilePaths
+            List<string> xamlFilePaths,
+            AdjustReportBuilder? report
             )
         {
             if (namespaceCenter is null)
@@ -87,6 +93,26 @@ namespace AdjustNamespace.Adjusting.Adjuster
             _planner = planner;
             _namespaceCenter = namespaceCenter;
             _xamlFilePaths = xamlFilePaths;
+            _report = report;
+        }
+
+        /// <summary>
+        /// The decision of the planner for the given file, with the reason when the file is
+        /// blocked. Use <see cref="Create(AdjustPlanItem)"/> to get the adjuster of a plan.
+        /// </summary>
+        /// <param name="subjectFilePath">Full path to the file to adjust.</param>
+        /// <param name="cancellationToken">Cancellation of the session.</param>
+        public async Task<AdjustPlanResult> PlanAsync(
+            string subjectFilePath,
+            CancellationToken cancellationToken = default
+            )
+        {
+            if (subjectFilePath is null)
+            {
+                throw new ArgumentNullException(nameof(subjectFilePath));
+            }
+
+            return await _planner.PlanAsync(subjectFilePath, cancellationToken);
         }
 
         /// <summary>
@@ -128,7 +154,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
             {
                 return new XamlAdjuster(
                     _context.XamlBodyProviderFactory,
-                    plan
+                    plan,
+                    _report
                     );
             }
 
@@ -137,7 +164,8 @@ namespace AdjustNamespace.Adjusting.Adjuster
                 _context.XamlBodyProviderFactory,
                 _namespaceCenter,
                 plan,
-                _xamlFilePaths
+                _xamlFilePaths,
+                _report
                 );
         }
     }

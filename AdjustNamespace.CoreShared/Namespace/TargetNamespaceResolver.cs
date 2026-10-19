@@ -20,6 +20,11 @@ namespace AdjustNamespace.Namespace
         private readonly AdjustNamespaceSettings2 _settings;
         private readonly IProjectDefaultNamespaceProvider _defaultNamespaces;
 
+        /// <summary>
+        /// Settings of the solution.
+        /// </summary>
+        public AdjustNamespaceSettings2 Settings => _settings;
+
         /// <param name="settings">Settings of the solution, they know the excluded folders.</param>
         /// <param name="defaultNamespaces">Source of the default namespace of a project.</param>
         public TargetNamespaceResolver(

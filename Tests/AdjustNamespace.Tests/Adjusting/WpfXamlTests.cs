@@ -1,3 +1,4 @@
+using AdjustNamespace.Adjusting.Report;
 using AdjustNamespace.Adjusting.Session;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Tests.Infrastructure;
@@ -1018,13 +1019,13 @@ namespace AdjustNamespace.Tests.Adjusting
 
             Assert.Empty(await solution.CompilationErrorsAsync());
 
-            var outcome = await RunSessionAsync(
+            var report = await RunSessionAsync(
                 solution,
                 solution.PathOf(Project, @"Views\MyControl.xaml.cs"),
                 solution.PathOf(Project, @"Views\MyControl.xaml")
                 );
 
-            Assert.Equal(AdjustSessionOutcome.Completed, outcome);
+            Assert.Equal(AdjustSessionOutcome.Completed, report.Outcome);
             Assert.Contains("namespace MyApp.Views", solution.TextOf(Project, @"Views\MyControl.xaml.cs"));
             Assert.Empty(await solution.CompilationErrorsAsync());
 
@@ -1218,7 +1219,7 @@ namespace AdjustNamespace.Tests.Adjusting
         /// <summary>
         /// Run the adjusting session over the files the way the last step of the wizard does.
         /// </summary>
-        private static async System.Threading.Tasks.Task<AdjustSessionOutcome> RunSessionAsync(
+        private static async System.Threading.Tasks.Task<AdjustReport> RunSessionAsync(
             TestSolution solution,
             params string[] subjectFilePaths
             )

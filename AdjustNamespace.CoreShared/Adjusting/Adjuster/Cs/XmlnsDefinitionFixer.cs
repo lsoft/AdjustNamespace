@@ -138,7 +138,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 _edits.ReplaceText(
                     definition.FilePath,
                     new TextSpan(list.Span.End, 0),
-                    LineBreakOf(list) + copy
+                    LineBreakOf(list) + copy,
+                    EditKind.XmlnsDefinition
                     );
                 return;
             }
@@ -154,7 +155,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
                 _edits.ReplaceText(
                     definition.FilePath,
                     TextSpan.FromBounds(list.SpanStart, list.FullSpan.End),
-                    string.Empty
+                    string.Empty,
+                    EditKind.XmlnsDefinition
                     );
                 return;
             }
@@ -164,7 +166,8 @@ namespace AdjustNamespace.Adjusting.Adjuster.Cs
             _edits.ReplaceText(
                 definition.FilePath,
                 definition.Literal.Span,
-                Quote(transition.ModifiedName)
+                Quote(transition.ModifiedName),
+                EditKind.XmlnsDefinition
                 );
         }
 

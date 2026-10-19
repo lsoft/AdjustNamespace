@@ -1,3 +1,4 @@
+using AdjustNamespace.Adjusting.Report;
 using AdjustNamespace.Adjusting.Session;
 using AdjustNamespace.Namespace;
 using AdjustNamespace.Tests.Infrastructure;
@@ -59,13 +60,13 @@ namespace Other
 ")
                 ;
 
-            var outcome = await RunAsync(
+            var report = await RunAsync(
                 solution,
                 solution.PathOf("MyApp", @"First\Class1.cs"),
                 solution.PathOf("MyApp", @"Second\Class2.cs")
                 );
 
-            Assert.Equal(AdjustSessionOutcome.Completed, outcome);
+            Assert.Equal(AdjustSessionOutcome.Completed, report.Outcome);
             Assert.Contains("namespace MyApp.First", solution.TextOf("MyApp", @"First\Class1.cs"));
             Assert.Contains("namespace MyApp.Second", solution.TextOf("MyApp", @"Second\Class2.cs"));
 
@@ -102,13 +103,15 @@ namespace Other
 
             var before = solution.TextOf("MyApp", "Settled.cs");
 
-            var outcome = await RunAsync(
+            var report = await RunAsync(
                 solution,
                 solution.PathOf("MyApp", "Settled.cs"),
                 solution.PathOf("MyApp", "Class1.cs")
                 );
 
-            Assert.Equal(AdjustSessionOutcome.Completed, outcome);
+            Assert.Equal(AdjustSessionOutcome.Completed, report.Outcome);
+            Assert.Equal(AdjustFileStatus.Skipped, StatusOf(report, solution.PathOf("MyApp", "Settled.cs")));
+            Assert.Equal(AdjustFileStatus.Adjusted, StatusOf(report, solution.PathOf("MyApp", "Class1.cs")));
             Assert.Equal(before, solution.TextOf("MyApp", "Settled.cs"));
             Assert.Contains("namespace MyApp", solution.TextOf("MyApp", "Class1.cs"));
         }
@@ -198,13 +201,18 @@ namespace Other
             //the user presses `Cancel` while the first file is being processed
             var recorder = new ProgressRecorder(r => cts.Cancel());
 
-            var outcome = await RunAsync(solution, recorder, cts.Token,
+            var report = await RunAsync(solution, recorder, cts.Token,
                 solution.PathOf("MyApp", @"First\Class1.cs"),
                 solution.PathOf("MyApp", @"Second\Class2.cs")
                 );
 
-            Assert.Equal(AdjustSessionOutcome.Cancelled, outcome);
+            Assert.Equal(AdjustSessionOutcome.Cancelled, report.Outcome);
             Assert.Equal(before, solution.TextOf("MyApp", @"Second\Class2.cs"));
+
+            //the files the run did not get to are said to be not processed
+            Assert.Equal(AdjustFileStatus.NotProcessed, StatusOf(report, solution.PathOf("MyApp", @"First\Class1.cs")));
+            Assert.Equal(AdjustFileStatus.NotProcessed, StatusOf(report, solution.PathOf("MyApp", @"Second\Class2.cs")));
+            Assert.Equal(2, report.NotProcessedCount);
         }
 
         /// <summary>
@@ -236,12 +244,15 @@ namespace Other
                     }
                 });
 
-            var outcome = await RunAsync(solution, recorder, cts.Token,
+            var report = await RunAsync(solution, recorder, cts.Token,
                 solution.PathOf("MyApp", "Class1.cs")
                 );
 
-            Assert.Equal(AdjustSessionOutcome.Cancelled, outcome);
+            Assert.Equal(AdjustSessionOutcome.Cancelled, report.Outcome);
             Assert.Contains("namespace MyApp", solution.TextOf("MyApp", "Class1.cs"));
+
+            //the file has been adjusted before the cancel, and the report says so
+            Assert.Equal(AdjustFileStatus.Adjusted, StatusOf(report, solution.PathOf("MyApp", "Class1.cs")));
         }
 
         /// <summary>
@@ -291,7 +302,7 @@ namespace Other
             Assert.Equal(1, solutionExplorer.GetProjectOfEveryFileCallCount);
         }
 
-        private static async System.Threading.Tasks.Task<AdjustSessionOutcome> RunAsync(
+        private static async System.Threading.Tasks.Task<AdjustReport> RunAsync(
             TestSolution solution,
             params string[] subjectFilePaths
             )
@@ -299,7 +310,7 @@ namespace Other
             return await RunAsync(solution, null, CancellationToken.None, subjectFilePaths);
         }
 
-        private static async System.Threading.Tasks.Task<AdjustSessionOutcome> RunAsync(
+        private static async System.Threading.Tasks.Task<AdjustReport> RunAsync(
             TestSolution solution,
             IProgress<AdjustProgress>? progress,
             CancellationToken cancellationToken,
@@ -308,6 +319,11 @@ namespace Other
         {
             return await new AdjustSession(solution.Context, NoRegex())
                 .RunAsync(subjectFilePaths, progress, cancellationToken);
+        }
+
+        private static AdjustFileStatus StatusOf(AdjustReport report, string filePath)
+        {
+            return report.Files.Single(f => f.FilePath == filePath).Status;
         }
 
         private static NamespaceReplaceRegex NoRegex()

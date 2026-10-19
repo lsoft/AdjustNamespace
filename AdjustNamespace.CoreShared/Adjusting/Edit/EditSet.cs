@@ -103,9 +103,18 @@ namespace AdjustNamespace.Adjusting.Edit
         /// Schedule a span of the text of the file to be replaced,
         /// see <see cref="ReplaceTextEdit"/>.
         /// </summary>
-        public void ReplaceText(string filePath, TextSpan span, string text)
+        public void ReplaceText(string filePath, TextSpan span, string text, EditKind kind = EditKind.NameQualified)
         {
-            Add(new ReplaceTextEdit(filePath, span, text));
+            Add(new ReplaceTextEdit(filePath, span, text, kind));
+        }
+
+        /// <summary>
+        /// Schedule a span of the text of a file that is no C# document to be replaced,
+        /// see <see cref="ReplaceFileTextEdit"/>.
+        /// </summary>
+        public void ReplaceFileText(string filePath, TextSpan span, string text)
+        {
+            Add(new ReplaceFileTextEdit(filePath, span, text));
         }
 
         /// <summary>

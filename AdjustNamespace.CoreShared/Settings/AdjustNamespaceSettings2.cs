@@ -18,6 +18,11 @@ namespace AdjustNamespace.Settings
         /// </summary>
         public readonly AdjustNamespaceSettings Settings;
 
+        /// <summary>
+        /// Folder of the solution the settings belong to.
+        /// </summary>
+        public string SolutionFolder => _solutionFolder;
+
         /// <param name="solutionFolder">Folder of the solution the settings belong to.</param>
         /// <param name="settings">The settings themselves.</param>
         public AdjustNamespaceSettings2(

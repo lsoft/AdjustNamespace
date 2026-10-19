@@ -9,6 +9,9 @@ using AdjustNamespace.UI.StepFactory;
 using Microsoft.CodeAnalysis;
 using AdjustNamespace.Adjusting;
 using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Adjusting.Session;
+using AdjustNamespace.Options;
+using AdjustNamespace.TextReferences;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Threading;
 
@@ -26,8 +29,13 @@ namespace AdjustNamespace.UI.ViewModel.Select
         private readonly AdjustContext _context;
         private readonly IWizardHost _host;
         private readonly IStepFactory<PreparationParameters> _previousStepFactory;
-        private readonly IStepFactory<PerformingParameters> _nextStepFactory;
+        private readonly IStepFactory<ReviewParameters> _nextStepFactory;
         private readonly HashSet<string> _filePaths;
+
+        /// <summary>
+        /// The files the last scan has found impossible to adjust; the report says they were left.
+        /// </summary>
+        private IReadOnlyList<AdjustBlock> _blocked = Array.Empty<AdjustBlock>();
 
         /// <summary>
         /// The scan has been finished successfully, so the user is allowed to move next
@@ -46,6 +54,10 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
         private string _replaceRegex = string.Empty;
         private string _replacedString = string.Empty;
+
+        private TextReferenceMode _textReferenceMode;
+        private TextReferenceKinds _textReferenceKinds;
+        private readonly IReadOnlyList<string> _textReferenceFiles;
 
         /// <summary>
         /// Status line of the step.
@@ -139,6 +151,76 @@ namespace AdjustNamespace.UI.ViewModel.Select
         }
 
         /// <summary>
+        /// The aggressiveness of the search of the text references the user can choose from.
+        /// </summary>
+        public IReadOnlyList<TextModeChoice> TextModeChoices => TextModeChoice.All;
+
+        /// <summary>
+        /// The aggressiveness of the search of the text references.
+        /// </summary>
+        public TextReferenceMode SelectedTextMode
+        {
+            get => _textReferenceMode;
+            set
+            {
+                _textReferenceMode = value;
+
+                OnPropertyChanged(nameof(SelectedTextMode));
+                OnPropertyChanged(nameof(AreTextKindsEnabled));
+            }
+        }
+
+        /// <summary>
+        /// The kinds of the files can be chosen: the search is not off.
+        /// </summary>
+        public bool AreTextKindsEnabled => _textReferenceMode != TextReferenceMode.Off;
+
+        /// <summary>
+        /// Search the comments of C#.
+        /// </summary>
+        public bool ScanComments
+        {
+            get => HasKind(TextReferenceKinds.Comments);
+            set => SetKind(TextReferenceKinds.Comments, value, nameof(ScanComments));
+        }
+
+        /// <summary>
+        /// Search the xml configs.
+        /// </summary>
+        public bool ScanXmlConfigs
+        {
+            get => HasKind(TextReferenceKinds.XmlConfigs);
+            set => SetKind(TextReferenceKinds.XmlConfigs, value, nameof(ScanXmlConfigs));
+        }
+
+        /// <summary>
+        /// Search the json files.
+        /// </summary>
+        public bool ScanJson
+        {
+            get => HasKind(TextReferenceKinds.Json);
+            set => SetKind(TextReferenceKinds.Json, value, nameof(ScanJson));
+        }
+
+        /// <summary>
+        /// Search the Razor files.
+        /// </summary>
+        public bool ScanRazor
+        {
+            get => HasKind(TextReferenceKinds.Razor);
+            set => SetKind(TextReferenceKinds.Razor, value, nameof(ScanRazor));
+        }
+
+        /// <summary>
+        /// Search the project files and the settings files.
+        /// </summary>
+        public bool ScanProjectFiles
+        {
+            get => HasKind(TextReferenceKinds.ProjectFiles);
+            set => SetKind(TextReferenceKinds.ProjectFiles, value, nameof(ScanProjectFiles));
+        }
+
+        /// <summary>
         /// Close the wizard.
         /// </summary>
         public ICommand CloseCommand
@@ -216,21 +298,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
                 if (_nextCommand == null)
                 {
                     _nextCommand = new AsyncRelayCommand(
-                        async a =>
-                        {
-                            var filePaths = ToFilterItems
-                                .Where(s => s.FileEx.HasValue && s.IsChecked.GetValueOrDefault(false))
-                                .Select(s => s.FileEx!.Value.FilePath)
-                                .ToList();
-                            var pp = new PerformingParameters(
-                                filePaths,
-                                CreateNamespaceReplaceRegex()
-                                );
-
-                            Cleanup();
-
-                            await _nextStepFactory.CreateAsync(pp);
-                        },
+                        async a => await GoNextAsync(),
                         r => _statusOk && ToFilterItems.Any(s => s.IsChecked.GetValueOrDefault(false))
                         );
                 }
@@ -279,7 +347,7 @@ namespace AdjustNamespace.UI.ViewModel.Select
             AdjustContext context,
             IWizardHost host,
             IStepFactory<PreparationParameters> previousStepFactory,
-            IStepFactory<PerformingParameters> nextStepFactory,
+            IStepFactory<ReviewParameters> nextStepFactory,
             SelectedStepParameters parameters
             )
         {
@@ -303,6 +371,15 @@ namespace AdjustNamespace.UI.ViewModel.Select
             _previousStepFactory = previousStepFactory;
             _nextStepFactory = nextStepFactory;
             _filePaths = parameters.FilePaths;
+
+            //the user options, overridden by the settings of the solution; what the user has
+            //chosen here before going forward and back wins over both
+            var textOptions = parameters.TextReferenceOptions
+                ?? TextReferenceOptions.Resolve(General.Instance.ToTextReferenceOptions(), context.Settings.Settings);
+
+            _textReferenceMode = textOptions.Mode;
+            _textReferenceKinds = textOptions.Kinds;
+            _textReferenceFiles = textOptions.ExtraFiles;
 
             _foreground = Brushes.Green;
             ToFilterItems = new ObservableCollection<ISelectItemViewModel>();
@@ -360,6 +437,8 @@ namespace AdjustNamespace.UI.ViewModel.Select
 
             _statusOk = false;
 
+            _blocked = Array.Empty<AdjustBlock>();
+
             ToFilterItems.Clear();
             BlockedItems.Clear();
             OnPropertyChanged(nameof(HasBlockedItems));
@@ -389,6 +468,8 @@ namespace AdjustNamespace.UI.ViewModel.Select
                         MainMessage = $"{progress}/{total} Processing {filePaths}";
                     }
                     );
+
+                _blocked = sr.Blocked;
 
                 BuildTree(sr.CollectedFiles);
                 BuildBlocked(sr.Blocked);
@@ -425,6 +506,90 @@ namespace AdjustNamespace.UI.ViewModel.Select
             }
 
             return $"{collectedCount} file(s) to adjust, {blockedCount} cannot be adjusted.";
+        }
+
+        /// <summary>
+        /// Search for the text references to the types of the checked files (unless the search
+        /// is off) and go to the review step with what is found.
+        /// </summary>
+        private async Task GoNextAsync()
+        {
+            var filePaths = ToFilterItems
+                .Where(s => s.FileEx.HasValue && s.IsChecked.GetValueOrDefault(false))
+                .Select(s => s.FileEx!.Value.FilePath)
+                .ToList();
+
+            var replaceRegex = CreateNamespaceReplaceRegex();
+            var options = CreateTextReferenceOptions();
+
+            TextReferenceScanResult scan;
+
+            try
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                if (options.IsScanEnabled)
+                {
+                    MainMessage = "Searching for the text references...";
+                }
+
+                scan = options.IsScanEnabled
+                    ? await TextReferenceScanner.ScanAsync(
+                        _context,
+                        replaceRegex,
+                        filePaths,
+                        options,
+                        new Progress<AdjustProgress>(p => MainMessage = p.Message)
+                        )
+                    : TextReferenceScanResult.Empty(options)
+                    ;
+            }
+            catch (Exception excp)
+            {
+                MainMessage =
+                    "The search for the text references fails."
+                    + Environment.NewLine
+                    + excp.Message
+                    ;
+
+                Logging.LogVS(excp);
+                return;
+            }
+
+            var parameters = new ReviewParameters(
+                _filePaths,
+                filePaths,
+                replaceRegex,
+                _blocked,
+                scan
+                );
+
+            Cleanup();
+
+            await _nextStepFactory.CreateAsync(parameters);
+        }
+
+        /// <summary>
+        /// The options of the search of the text references as the user has set them here.
+        /// </summary>
+        private TextReferenceOptions CreateTextReferenceOptions()
+        {
+            return new TextReferenceOptions(_textReferenceMode, _textReferenceKinds, _textReferenceFiles);
+        }
+
+        private bool HasKind(TextReferenceKinds kind)
+        {
+            return (_textReferenceKinds & kind) != 0;
+        }
+
+        private void SetKind(TextReferenceKinds kind, bool value, string propertyName)
+        {
+            _textReferenceKinds = value
+                ? _textReferenceKinds | kind
+                : _textReferenceKinds & ~kind
+                ;
+
+            OnPropertyChanged(propertyName);
         }
 
         /// <summary>

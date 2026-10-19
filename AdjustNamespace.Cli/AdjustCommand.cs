@@ -1,10 +1,12 @@
 using AdjustNamespace;
 using AdjustNamespace.Adjusting;
 using AdjustNamespace.Adjusting.Plan;
+using AdjustNamespace.Adjusting.Report;
 using AdjustNamespace.Adjusting.Session;
 using AdjustNamespace.Cli.CommandLine;
 using AdjustNamespace.Cli.MsBuild;
 using AdjustNamespace.Namespace;
+using AdjustNamespace.TextReferences;
 using AdjustNamespace.VisualStudio;
 using AdjustNamespace.Xaml.BodyProvider;
 using Microsoft.CodeAnalysis;
@@ -119,8 +121,26 @@ namespace AdjustNamespace.Cli
                 _output.WriteLine("Every namespace is in accordance with the location of its file, nothing to do.");
             }
 
+            var textOptions = ResolveTextOptions(context);
+
             if (_options.DryRun || _options.Check)
             {
+                if (_options.ReportPath != null)
+                {
+                    _error.WriteLine("warning: --report is written by a real run only, it is ignored here.");
+                }
+
+                if (collect.SubjectFilePaths.Count > 0 && textOptions.IsScanEnabled)
+                {
+                    await ReportTextReferencesAsync(
+                        context,
+                        collect.SubjectFilePaths,
+                        textOptions,
+                        solutionFolder,
+                        cancellationToken
+                        );
+                }
+
                 if (collect.Blocked.Count > 0)
                 {
                     return ExitCode.Error;
@@ -137,25 +157,97 @@ namespace AdjustNamespace.Cli
                     ;
             }
 
+            AdjustReport report;
             if (collect.SubjectFilePaths.Count > 0)
             {
-                var adjustExit = await AdjustAsync(
+                report = await AdjustAsync(
                     context,
-                    collect.SubjectFilePaths,
+                    collect,
+                    textOptions,
                     solutionFolder,
                     cancellationToken
                     );
-
-                if (adjustExit != ExitCode.Success)
+            }
+            else
+            {
+                //there is nothing to run, but the report still has to say what has been left
+                var builder = new AdjustReportBuilder(solutionFolder);
+                foreach (var block in collect.Blocked)
                 {
-                    return adjustExit;
+                    builder.RecordFile(AdjustFileOutcome.Blocked(block));
                 }
+
+                report = builder.Build(AdjustSessionOutcome.Completed);
+            }
+
+            if (collect.SubjectFilePaths.Count > 0 || collect.Blocked.Count > 0)
+            {
+                _output.Write(report.ToMarkdown());
+            }
+
+            if (!TryWriteReport(report))
+            {
+                return ExitCode.Error;
+            }
+
+            if (report.Outcome == AdjustSessionOutcome.Cancelled)
+            {
+                //the files which have been adjusted before the cancel are changed already
+                _error.WriteLine("Cancelled. The changes which were applied before the cancel are kept.");
+
+                return ExitCode.Error;
+            }
+
+            if (report.Outcome == AdjustSessionOutcome.Failed)
+            {
+                _error.WriteLine($"error: {report.FailureMessage}");
+
+                return ExitCode.Error;
             }
 
             return collect.Blocked.Count > 0
                 ? ExitCode.Error
                 : ExitCode.Success
                 ;
+        }
+
+        /// <summary>
+        /// Save the report where <c>--report</c> says: Markdown, or JSON for a <c>.json</c> file.
+        /// </summary>
+        /// <returns><c>false</c> if the file cannot be written.</returns>
+        private bool TryWriteReport(
+            AdjustReport report
+            )
+        {
+            if (_options.ReportPath is null)
+            {
+                return true;
+            }
+
+            var isJson = string.Equals(
+                Path.GetExtension(_options.ReportPath),
+                ".json",
+                StringComparison.OrdinalIgnoreCase
+                );
+
+            try
+            {
+                File.WriteAllText(
+                    _options.ReportPath,
+                    isJson ? report.ToJson() : report.ToMarkdown(),
+                    new System.Text.UTF8Encoding(false)
+                    );
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                _error.WriteLine($"error: cannot write the report {_options.ReportPath}: {exception.Message}");
+
+                return false;
+            }
+
+            _output.WriteLine($"Report: {_options.ReportPath}");
+
+            return true;
         }
 
         /// <summary>
@@ -353,35 +445,97 @@ namespace AdjustNamespace.Cli
         /// Adjust the collected files and remove the using clauses of the namespaces which
         /// became empty.
         /// </summary>
-        private async Task<ExitCode> AdjustAsync(
+        private async Task<AdjustReport> AdjustAsync(
             AdjustContext context,
-            IReadOnlyList<string> subjectFilePaths,
+            CollectResult collect,
+            TextReferenceOptions textOptions,
             string solutionFolder,
             CancellationToken cancellationToken
             )
         {
             var session = new AdjustSession(
                 context,
-                _options.ReplaceRegex
+                _options.ReplaceRegex,
+                collect.Blocked,
+                textOptions,
+                null,
+                _options.BuildCheck
                 );
 
-            var outcome = await session.RunAsync(
-                subjectFilePaths,
+            return await session.RunAsync(
+                collect.SubjectFilePaths,
                 new ConsoleProgress(_output, solutionFolder, _options.Verbose),
                 cancellationToken
                 );
+        }
 
-            if (outcome == AdjustSessionOutcome.Cancelled)
+        /// <summary>
+        /// The options of the search of the text references: the default, overridden by the
+        /// settings file of the solution and by the command line (in this order).
+        /// </summary>
+        private TextReferenceOptions ResolveTextOptions(
+            AdjustContext context
+            )
+        {
+            var options = TextReferenceOptions.Resolve(
+                TextReferenceOptions.Default,
+                context.Settings.Settings
+                );
+
+            if (_options.TextMode.HasValue)
             {
-                //the files which have been adjusted before the cancel are changed already
-                _error.WriteLine("Cancelled. The changes which were applied before the cancel are kept.");
-
-                return ExitCode.Error;
+                options = options.WithMode(_options.TextMode.Value);
             }
 
-            _output.WriteLine($"Done, {subjectFilePaths.Count} file(s) adjusted.");
+            if (_options.TextKinds.HasValue)
+            {
+                options = options.WithKinds(_options.TextKinds.Value);
+            }
 
-            return ExitCode.Success;
+            return options;
+        }
+
+        /// <summary>
+        /// List the text references a real run would change or offer, with their scores:
+        /// the output of <c>--dry-run</c> and <c>--check</c>.
+        /// </summary>
+        private async Task ReportTextReferencesAsync(
+            AdjustContext context,
+            IReadOnlyList<string> subjectFilePaths,
+            TextReferenceOptions textOptions,
+            string solutionFolder,
+            CancellationToken cancellationToken
+            )
+        {
+            var scan = await TextReferenceScanner.ScanAsync(
+                context,
+                _options.ReplaceRegex,
+                subjectFilePaths,
+                textOptions,
+                null,
+                cancellationToken
+                );
+
+            var shown = scan.Shown.ToList();
+
+            _output.WriteLine(
+                $"{shown.Count} text reference(s) found ({textOptions.Mode.ToString().ToLowerInvariant()} mode): "
+                + $"{shown.Count(m => m.IsApproved)} to change, {shown.Count(m => !m.IsApproved)} offered."
+                );
+
+            foreach (var match in shown)
+            {
+                _output.WriteLine(
+                    $"  {(match.IsApproved ? "change" : "offer ")} [{match.Level} {match.Score.Value}] "
+                    + $"{RelativePath.Of(match.FilePath, solutionFolder)}:{match.Line}  "
+                    + $"{match.MatchedText} -> {match.ReplacementText}"
+                    );
+
+                if (_options.Verbose)
+                {
+                    _output.WriteLine($"      {match.Score.Explain()}");
+                }
+            }
         }
 
         /// <summary>
